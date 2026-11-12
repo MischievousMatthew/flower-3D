@@ -96,6 +96,9 @@
                     <option value="bouquet">Bouquet</option>
                   </select>
                 </label>
+                <div v-if="form.selling_type === 'bouquet'" class="sp-field sp-span-all">
+                  <BouquetFlowersInput v-model="form.composition" :error="errors.composition || ''" />
+                </div>
                 <label class="sp-field">
                   <span>Season</span>
                   <select v-model="form.season" class="sp-select">
@@ -232,6 +235,8 @@ import { apiMessage, money, titleCase } from "./useVendorCatalog";
 import FlowerColorPicker from "./FlowerColorPicker.vue";
 import ColorStockInputs from "./ColorStockInputs.vue";
 import { colorFields, colorProblem, colorsFromProduct } from "../../../utils/flowerColors.js";
+import BouquetFlowersInput from "./BouquetFlowersInput.vue";
+import { compositionField, compositionFromProduct, compositionProblem } from "../../../utils/bouquetComposition.js";
 
 const props = defineProps({ productId: { type: Number, default: null } });
 const emit = defineEmits(["close", "saved"]);
@@ -287,6 +292,7 @@ async function fetch() {
       category: p.category ?? "",
       flower_type: p.flower_type ?? "",
       colors: colorsFromProduct(p), // every flower colour, the first is the main one
+      composition: compositionFromProduct(p), // a bouquet's flowers and how many of each
       selling_type: p.selling_type ?? "per_piece",
       season: p.season ?? "all-year",
       selling_price: Number(p.selling_price ?? 0),
@@ -384,6 +390,8 @@ function validate() {
   if (photoCount.value === 0) errors.images = "Keep at least one photo.";
   const colorIssue = form.value.colors.length ? colorProblem(form.value.colors) : "";
   if (colorIssue) errors[colorIssue.startsWith("Enter how many") ? "color_stock" : "color"] = colorIssue;
+  const flowersIssue = form.value.selling_type === "bouquet" ? compositionProblem(form.value.composition) : "";
+  if (flowersIssue) errors.composition = flowersIssue;
   return Object.keys(errors).length === 0;
 }
 
@@ -394,10 +402,12 @@ async function save() {
     const fd = new FormData();
     fd.append("_method", "PUT");
     for (const [key, value] of Object.entries(form.value)) {
-      if (key === "occasion_tags" || key === "colors") continue;
+      if (key === "occasion_tags" || key === "colors" || key === "composition") continue;
       if (typeof value === "boolean") fd.append(key, value ? "1" : "0");
       else fd.append(key, value ?? "");
     }
+    // The bouquet's flowers (only bouquets keep them)
+    fd.append("composition", form.value.selling_type === "bouquet" ? compositionField(form.value.composition) : "[]");
     // Flower colours (and a stock count per colour when there are 2 or more)
     if (form.value.colors.length) {
       for (const [key, value] of Object.entries(colorFields(form.value.colors))) fd.append(key, String(value));

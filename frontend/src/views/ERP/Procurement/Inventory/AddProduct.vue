@@ -391,6 +391,13 @@
                     >
                   </span>
                 </div>
+                <div v-if="formData.selling_type === 'bouquet'" class="form-group full-width" data-field="composition">
+                  <BouquetFlowersInput
+                    v-model="formData.composition"
+                    :error="errors.composition || ''"
+                    @update:model-value="clearError('composition')"
+                  />
+                </div>
               </div>
             </div>
 
@@ -655,6 +662,8 @@ import { useProductTaxonomies } from "../../../../composables/useProductTaxonomi
 import FlowerColorPicker from "../../../../components/vendor/shop/FlowerColorPicker.vue";
 import ColorStockInputs from "../../../../components/vendor/shop/ColorStockInputs.vue";
 import { colorFields, colorProblem, countsPerColor, totalOf } from "../../../../utils/flowerColors.js";
+import BouquetFlowersInput from "../../../../components/vendor/shop/BouquetFlowersInput.vue";
+import { compositionField, compositionProblem } from "../../../../utils/bouquetComposition.js";
 
 const { taxonomies, withCurrent } = useProductTaxonomies();
 
@@ -685,6 +694,7 @@ const formData = reactive({
   color: "",
   color_other: "",
   colors: [], // [{ value, name, quantity }]: every flower colour, the first is the main one
+  composition: [], // a bouquet's flowers: [{ flower, color, count }]
   purchase_price: 0,
   selling_price: 0,
   has_discount: false,
@@ -923,6 +933,13 @@ const validateForm = () => {
     if (!firstError || firstError === "color") firstError = key;
   }
 
+  const flowersIssue = formData.selling_type === "bouquet" ? compositionProblem(formData.composition) : "";
+  if (flowersIssue) {
+    errors.composition = flowersIssue;
+    isValid = false;
+    if (!firstError) firstError = "composition";
+  }
+
   const selling = parseFloat(formData.selling_price) || 0;
   const purchase = parseFloat(formData.purchase_price) || 0;
   if (selling <= purchase) {
@@ -1054,6 +1071,8 @@ const submitProduct = async () => {
 
     // Flower colours, with a stock count per colour when there are 2 or more
     submitData.append("color_options", colorFields(formData.colors).color_options);
+    // The bouquet's flowers (only bouquets keep them)
+    submitData.append("composition", formData.selling_type === "bouquet" ? compositionField(formData.composition) : "[]");
 
     // owner_id
     submitData.append("owner_id", user.value.id.toString());

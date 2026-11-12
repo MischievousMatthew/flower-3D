@@ -126,6 +126,22 @@ class ProductColorStockTest extends TestCase
         DB::transaction(fn () => $this->assertNull(Product::takeStock($p->id, 4)));
     }
 
+    public function test_a_bouquets_flowers_are_checked(): void
+    {
+        $method = new \ReflectionMethod(ProductController::class, 'compositionFromRequest');
+        $method->setAccessible(true);
+        $controller = app(ProductController::class);
+        $read = fn ($composition, $type = 'bouquet') => $method->invoke($controller, Request::create('/', 'POST', ['composition' => json_encode($composition)]), $type);
+
+        $ok = $read([['flower' => ' Rose ', 'color' => 'Red', 'count' => '12'], ['flower' => '', 'color' => '', 'count' => ''], ['flower' => "Baby's breath", 'count' => 5]]);
+        $this->assertSame([['flower' => 'Rose', 'color' => 'Red', 'count' => 12], ['flower' => "Baby's breath", 'color' => null, 'count' => 5]], $ok['attributes']['composition'], 'empty rows are skipped');
+
+        $this->assertSame(['composition' => null], $read([['flower' => 'Rose', 'count' => 1]], 'per_piece')['attributes'], 'only bouquets keep a list');
+        $this->assertArrayHasKey('errors', $read([['flower' => '', 'count' => 3]]));
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 0]]));
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 1.5]]));
+    }
+
     public function test_the_product_form_payload_is_checked(): void
     {
         $method = new \ReflectionMethod(ProductController::class, 'colorStockFromRequest');

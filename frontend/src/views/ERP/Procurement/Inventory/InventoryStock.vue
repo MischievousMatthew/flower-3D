@@ -53,6 +53,28 @@
       </div>
     </Transition>
 
+    <!-- Stems to buy for the bouquets that need restocking -->
+    <section v-if="data?.bouquet_flowers?.length" class="sp-card st-bf" aria-labelledby="st-bf">
+      <div class="sp-card-head">
+        <div>
+          <h2 id="st-bf">Flowers needed for bouquets</h2>
+          <p>Stems to make the bouquets that need restocking: each bouquet's order amount × the flowers in it</p>
+        </div>
+      </div>
+      <ul class="st-bf-list">
+        <li v-for="f in data.bouquet_flowers" :key="`${f.flower}|${f.color || ''}`" class="st-bf-row">
+          <span class="st-bf-name">
+            <i class="st-bf-dot" :style="{ background: flowerSwatch(f.color || f.flower) }" aria-hidden="true"></i>
+            <b>{{ f.color ? `${f.color} ${f.flower.toLowerCase()}` : f.flower }}</b>
+          </span>
+          <span class="st-bf-for">
+            <small v-for="b in f.bouquets" :key="b.id">{{ b.make }} × {{ b.name }} <span class="muted">({{ b.per }} each)</span></small>
+          </span>
+          <b class="st-bf-stems">{{ f.stems.toLocaleString("en-PH") }} <small>{{ f.stems === 1 ? "stem" : "stems" }}</small></b>
+        </li>
+      </ul>
+    </section>
+
     <!-- Items -->
     <section class="sp-card st-card" aria-label="Stock">
       <div v-if="!data" class="st-rows"><div v-for="n in 6" :key="n" class="st-row sk"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
@@ -82,6 +104,9 @@
                 <span class="sp-chip" :class="kindOf(it.kind).tone">{{ kindOf(it.kind).label }}</span>
                 <span v-if="it.material" class="sp-chip slate">Material</span>
                 <span v-if="it.sku">{{ it.sku }}</span>
+              </small>
+              <small v-if="it.composition?.length" class="st-compo" :title="'Flowers in one bouquet'">
+                {{ it.composition.map((f) => `${f.count} ${f.color ? `${f.color.toLowerCase()} ` : ""}${f.flower.toLowerCase()}`).join(" · ") }} per bouquet
               </small>
             </span>
             <span class="st-onhand">
@@ -306,6 +331,7 @@ import { useShowMoreLocal } from "../../../../composables/useShowMore";
 import { useAssignment } from "../../../../composables/useAssignment";
 import { inventoryStockService } from "../../../../services/inventoryStockService";
 import { toast } from "@/utils/snackbar";
+import { flowerSwatch } from "../../../../utils/flowerColors.js";
 import "../../../../components/vendor/finance/finance.css";
 
 const STOCK_KINDS = [
@@ -780,6 +806,77 @@ onMounted(() => {
   flex-direction: row !important;
   align-items: center;
   gap: 6px !important;
+}
+
+/* A bouquet's flowers, under its name */
+.st-item small.st-compo {
+  display: block;
+  color: var(--v-muted);
+  font-size: 12px;
+}
+
+/* Flowers needed for bouquets */
+.st-bf {
+  margin-bottom: 16px;
+}
+.st-bf-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.st-bf-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 2fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 18px;
+  border-top: 1px solid var(--v-border);
+}
+.st-bf-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--v-text);
+}
+.st-bf-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.st-bf-for {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--v-text-2);
+  font-size: 12.5px;
+}
+.st-bf-for .muted {
+  color: var(--v-faint);
+}
+.st-bf-stems {
+  color: var(--v-text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.st-bf-stems small {
+  color: var(--v-faint);
+  font-size: 12px;
+  font-weight: 500;
+}
+@media (max-width: 640px) {
+  .st-bf-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .st-bf-for {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 /* History */

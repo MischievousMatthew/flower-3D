@@ -51,7 +51,7 @@ class InventoryStockService
             ->where('status', '!=', 'discontinued')
             ->orderBy('product_name')
             ->get(['id', 'product_name', 'sku', 'category', 'stock_kind', 'stock_unit', 'moderation_status', 'status',
-                'quantity_in_stock', 'min_stock_level', 'max_stock_level', 'supplier_lead_time', 'purchase_price']);
+                'quantity_in_stock', 'min_stock_level', 'max_stock_level', 'supplier_lead_time', 'purchase_price', 'selling_type', 'composition']);
         $ids = $products->pluck('id');
 
         // Still to come on approved purchase orders
@@ -145,6 +145,8 @@ class InventoryStockService
                 'batch_tracked' => isset($batchTracked[$p->id]),
                 'unit_cost'     => (float) ($buy?->price ?? $p->purchase_price ?? 0),
                 'suggestion'    => $this->suggest($onHand, $coming, $min, $target, $daily, $lead),
+                // A bouquet's flowers and how many of each: what procurement buys to make it
+                'composition'   => $p->selling_type === 'bouquet' ? self::compositionOf($p->composition) : [],
                 'last_supplier' => $buy && $buy->supplier_id ? [
                     'id' => $buy->supplier_id, 'name' => $buy->company_name, 'active' => $buy->supplier_status === 'active',
                     'price' => (float) $buy->price, 'unit' => $buy->unit, 'at' => $buy->created_at,
@@ -154,6 +156,7 @@ class InventoryStockService
 
         return [
             'items'  => $items->values(),
+            'bouquet_flowers' => self::bouquetFlowers($items),
             'counts' => [
                 'total'     => $items->count(),
                 'out'       => $items->where('state', 'out')->count(),
@@ -165,6 +168,46 @@ class InventoryStockService
                 'damaged_30d' => (int) $items->sum('damaged_30d'),
             ],
         ];
+    }
+
+    /** A bouquet's saved flowers as [{flower, color, count}] (the column is JSON) */
+    private static function compositionOf($raw): array
+    {
+        $list = is_string($raw) ? json_decode($raw, true) : $raw;
+
+        return collect(is_array($list) ? $list : [])
+            ->filter(fn ($f) => is_array($f) && trim((string) ($f['flower'] ?? '')) !== '' && (int) ($f['count'] ?? 0) > 0)
+            ->map(fn ($f) => [
+                'flower' => trim((string) $f['flower']),
+                'color'  => isset($f['color']) && trim((string) $f['color']) !== '' ? trim((string) $f['color']) : null,
+                'count'  => (int) $f['count'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The flowers to buy for the bouquets that need restocking: each bouquet's
+     * suggested amount × its stems, added up per flower and colour, e.g.
+     * [{flower: Rose, color: Red, stems: 60, bouquets: [{id, name, make: 5, per: 12}]}]
+     */
+    private static function bouquetFlowers($items): array
+    {
+        $totals = [];
+        foreach ($items as $item) {
+            $make = (int) ($item['suggestion']['qty'] ?? 0);
+            if ($make <= 0 || empty($item['composition'])) {
+                continue;
+            }
+            foreach ($item['composition'] as $f) {
+                $key = mb_strtolower($f['flower'] . '|' . ($f['color'] ?? ''));
+                $totals[$key] ??= ['flower' => Str::ucfirst($f['flower']), 'color' => $f['color'] ? Str::ucfirst($f['color']) : null, 'stems' => 0, 'bouquets' => []];
+                $totals[$key]['stems'] += $make * $f['count'];
+                $totals[$key]['bouquets'][] = ['id' => $item['id'], 'name' => $item['name'], 'make' => $make, 'per' => $f['count']];
+            }
+        }
+
+        return collect($totals)->sortByDesc('stems')->values()->all();
     }
 
     /**

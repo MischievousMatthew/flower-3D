@@ -207,6 +207,9 @@
               <span>{{ s.hint }}</span>
             </button>
           </div>
+          <div v-if="form.selling_type === 'bouquet'" data-change="composition" class="ap-gap">
+            <BouquetFlowersInput v-model="form.composition" :error="errors.composition || ''" @update:model-value="clear('composition')" />
+          </div>
           <div v-if="multiColor" data-change="colors" class="ap-gap">
             <ColorStockInputs :model-value="form.colors" :error="errors.color_stock || ''" @update:model-value="setColors" />
           </div>
@@ -366,6 +369,8 @@ import "../../components/vendor/shop/shop.css";
 import FlowerColorPicker from "../../components/vendor/shop/FlowerColorPicker.vue";
 import ColorStockInputs from "../../components/vendor/shop/ColorStockInputs.vue";
 import { colorFields, colorProblem, countsPerColor, totalOf } from "../../utils/flowerColors.js";
+import BouquetFlowersInput from "../../components/vendor/shop/BouquetFlowersInput.vue";
+import { compositionField, compositionProblem } from "../../utils/bouquetComposition.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -401,6 +406,7 @@ const blank = () => ({
   color: "",
   color_other: "",
   colors: [], // [{ value, name, quantity }]: every flower colour, the first is the main one
+  composition: [], // a bouquet's flowers: [{ flower, color, count }]
   purchase_price: null,
   selling_price: null,
   has_discount: false,
@@ -457,7 +463,7 @@ const FIELD_LABELS = [
   ["ap-basics", { product_name: "Product name", description: "Description", colors: "Flower colours", sku: "SKU" }],
   ["ap-organize", { category: "Category", flower_type: "Flower type", occasion_tags: "Occasions" }],
   ["ap-price", { selling_price: "Selling price", purchase_price: "Your cost", has_discount: "On sale", discount_price: "Sale price" }],
-  ["ap-stock", { selling_type: "How it's sold", quantity_in_stock: "In stock", min_stock_level: "Warn me at", max_stock_level: "Maximum stock", season: "Season", preparation_days: "Preparation time" }],
+  ["ap-stock", { selling_type: "How it's sold", composition: "Bouquet flowers", quantity_in_stock: "In stock", min_stock_level: "Warn me at", max_stock_level: "Maximum stock", season: "Season", preparation_days: "Preparation time" }],
   ["ap-extra", { is_fragile: "Fragile", requires_refrigeration: "Keep refrigerated", care_instructions: "Care instructions", supplier_name: "Supplier", supplier_contact: "Supplier contact", supplier_sku: "Supplier's code", notes: "Private notes" }],
 ];
 const { markClean } = useUnsavedChanges({
@@ -621,6 +627,8 @@ function validate(status) {
   else if (Number(form.selling_price) > 0 && profit.value <= 0) e.selling_price = "The selling price must be higher than your cost.";
   if (form.has_discount && !salePercent.value) e.discount_price = "The sale price must be above ₱0 and below the selling price.";
   if (!Number.isInteger(Number(form.quantity_in_stock)) || Number(form.quantity_in_stock) < 0) e.quantity_in_stock = "Enter how many you have.";
+  const flowersIssue = form.selling_type === "bouquet" ? compositionProblem(form.composition) : "";
+  if (flowersIssue) e.composition = flowersIssue;
   if (status === "active" && needsOccasion.value && !form.occasion_tags.length) e.occasion_tags = "Pick at least one occasion so customers can find it.";
 
   const first = Object.keys(e)[0];
@@ -629,7 +637,7 @@ function validate(status) {
     const anchor = {
       images: "ap-photos", product_name: "ap-basics", description: "ap-basics", sku: "ap-basics", color: "ap-basics", color_stock: "ap-stock",
       category: "ap-organize", flower_type: "ap-organize", occasion_tags: "ap-organize",
-      selling_price: "ap-price", purchase_price: "ap-price", discount_price: "ap-price", quantity_in_stock: "ap-stock",
+      selling_price: "ap-price", purchase_price: "ap-price", discount_price: "ap-price", quantity_in_stock: "ap-stock", composition: "ap-stock",
     }[first];
     if (anchor) jump(anchor);
   }
@@ -645,6 +653,8 @@ async function submit(status) {
       ...form,
       status,
       ...colorFields(form.colors),
+      // The bouquet's flowers (only bouquets keep them)
+      composition: form.selling_type === "bouquet" ? compositionField(form.composition) : "[]",
       discount_price: form.has_discount ? form.discount_price : "",
     };
     for (const [key, value] of Object.entries(fields)) {

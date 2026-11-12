@@ -226,12 +226,16 @@ class ProductController extends Controller
             if (isset($colorStock['errors'])) {
                 return response()->json(['success' => false, 'errors' => $colorStock['errors']], 422);
             }
+            $composition = $this->compositionFromRequest($request, $request->input('selling_type'));
+            if (isset($composition['errors'])) {
+                return response()->json(['success' => false, 'errors' => $composition['errors']], 422);
+            }
 
             // ── Strip file keys from validated data so they don't hit Product::create ──
             $data = collect($validator->validated())
                 ->except(['images', 'model_file'])
                 ->toArray();
-            $data = array_merge($data, $colorStock['attributes'] ?? []);
+            $data = array_merge($data, $colorStock['attributes'] ?? [], $composition['attributes'] ?? []);
 
             $data['owner_id'] = $ownerId;
 
@@ -357,6 +361,59 @@ class ProductController extends Controller
         ]];
     }
 
+    /**
+     * The flowers in a bouquet from the product form: composition as JSON
+     * [{flower, color?, count}]: what procurement buys to make it. Only kept
+     * for bouquets; anything else clears it. Returns null when not sent,
+     * ['errors' => …] or ['attributes' => ['composition' => …]].
+     */
+    private function compositionFromRequest(Request $request, ?string $sellingType): ?array
+    {
+        if (! $request->has('composition')) {
+            return null;
+        }
+        $fail = fn (string $message) => ['errors' => ['composition' => [$message]]];
+
+        $raw = $request->input('composition');
+        if (is_string($raw)) {
+            $raw = trim($raw) === '' ? [] : json_decode($raw, true);
+        }
+        if ($raw !== null && ! is_array($raw)) {
+            return $fail('Add the bouquet\'s flowers again.');
+        }
+        if ($sellingType !== 'bouquet') {
+            return ['attributes' => ['composition' => null]];
+        }
+
+        $list = [];
+        foreach ($raw ?? [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $flower = trim((string) ($row['flower'] ?? ''));
+            $color = trim((string) ($row['color'] ?? ''));
+            $count = $row['count'] ?? null;
+            if ($flower === '' && $color === '' && ($count === null || $count === '')) {
+                continue; // an empty row
+            }
+            if ($flower === '') {
+                return $fail('Name every flower in the bouquet.');
+            }
+            if (mb_strlen($flower) > 80 || mb_strlen($color) > 40) {
+                return $fail('Flower names can be up to 80 characters, colours up to 40.');
+            }
+            if (! is_numeric($count) || (float) $count != (int) $count || (int) $count < 1 || (int) $count > 1000) {
+                return $fail("Enter how many {$flower} are in the bouquet (1 to 1000).");
+            }
+            $list[] = ['flower' => $flower, 'color' => $color !== '' ? $color : null, 'count' => (int) $count];
+        }
+        if (count($list) > 30) {
+            return $fail('A bouquet can list up to 30 flowers.');
+        }
+
+        return ['attributes' => ['composition' => $list ?: null]];
+    }
+
     public function update(Request $request, $id)
     {
         try {
@@ -444,11 +501,15 @@ class ProductController extends Controller
             if (isset($colorStock['errors'])) {
                 return response()->json(['success' => false, 'errors' => $colorStock['errors']], 422);
             }
+            $composition = $this->compositionFromRequest($request, $request->input('selling_type') ?: $product->selling_type);
+            if (isset($composition['errors'])) {
+                return response()->json(['success' => false, 'errors' => $composition['errors']], 422);
+            }
 
             $data = collect($request->all())
-                ->except(['images', 'model_file', 'removed_image_ids', 'owner_id', '_method', 'color_options'])
+                ->except(['images', 'model_file', 'removed_image_ids', 'owner_id', '_method', 'color_options', 'composition'])
                 ->toArray();
-            $data = array_merge($data, $colorStock['attributes'] ?? []);
+            $data = array_merge($data, $colorStock['attributes'] ?? [], $composition['attributes'] ?? []);
 
             $hasDiscount   = isset($data['has_discount']) && in_array($data['has_discount'], [1, '1', true, 'true'], true);
             $discountPrice = null;
