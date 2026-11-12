@@ -185,6 +185,7 @@ class InventoryStockService
                 'color'  => isset($f['color']) && trim((string) $f['color']) !== '' ? trim((string) $f['color']) : null,
                 'count'  => (int) $f['count'],
                 'cost'   => isset($f['cost']) && is_numeric($f['cost']) ? (float) $f['cost'] : null, // paid per piece
+                'kind'   => ($f['kind'] ?? null) === 'wrapper' ? 'wrapper' : 'flower', // a wrapper's sheets
             ])
             ->values()
             ->all();
@@ -206,7 +207,7 @@ class InventoryStockService
             }
             foreach ($item['composition'] as $f) {
                 $key = mb_strtolower($f['flower'] . '|' . ($f['color'] ?? ''));
-                $totals[$key] ??= ['flower' => Str::ucfirst($f['flower']), 'color' => $f['color'] ? Str::ucfirst($f['color']) : null, 'stems' => 0, 'cost' => 0.0, 'priced_stems' => 0, 'bouquets' => []];
+                $totals[$key] ??= ['flower' => Str::ucfirst($f['flower']), 'color' => $f['color'] ? Str::ucfirst($f['color']) : null, 'kind' => $f['kind'], 'stems' => 0, 'cost' => 0.0, 'priced_stems' => 0, 'bouquets' => []];
                 $stems = $make * $f['count'];
                 $totals[$key]['stems'] += $stems;
                 if ($f['cost'] !== null) {

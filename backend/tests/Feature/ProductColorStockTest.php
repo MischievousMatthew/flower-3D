@@ -32,6 +32,10 @@ class ProductColorStockTest extends TestCase
             $t->string('color_other')->nullable();
             $t->json('color_options')->nullable();
             $t->json('composition')->nullable();
+            $t->string('stock_kind', 20)->nullable();
+            $t->string('stock_unit', 20)->nullable();
+            $t->string('pack_unit', 20)->nullable();
+            $t->unsignedInteger('pack_size')->nullable();
             $t->decimal('selling_price', 12, 2)->default(0);
             $t->decimal('purchase_price', 12, 2)->nullable();
             $t->integer('quantity_in_stock')->default(0);
@@ -203,6 +207,47 @@ class ProductColorStockTest extends TestCase
         DB::transaction(fn () => Product::takeStock($plan[0][0], $plan[0][2], $plan[0][1]));
         $this->assertSame([['Red' => 30, 'Pink' => 0], 30], $this->counts($rose));
         $this->assertSame(0, (int) $b->fresh()->quantity_in_stock);
+    }
+
+    public function test_a_bouquets_wrapper_sheets_come_from_the_shared_wrapper_stock(): void
+    {
+        $rose = $this->flower('Red rose', 100);
+        $kraft = Product::forceCreate([
+            'owner_id' => 1, 'product_name' => 'Kraft Paper', 'sku' => 'W-1', 'quantity_in_stock' => 9, 'min_stock_level' => 0,
+            'stock_kind' => 'wrapping', 'stock_unit' => 'sheet', 'moderation_status' => Product::MODERATION_INTERNAL, 'status' => 'active',
+        ]);
+        $b = $this->bouquet([
+            ['flower' => 'Rose', 'count' => 12, 'product_id' => $rose->id],
+            ['flower' => 'Kraft Paper', 'count' => 2, 'product_id' => $kraft->id, 'kind' => 'wrapper'],
+        ]);
+
+        // 100 roses ÷ 12 = 8, 9 sheets ÷ 2 = 4: the wrapper limits it
+        $this->assertSame(4, (int) $b->fresh()->quantity_in_stock);
+
+        // Selling 2 takes 24 roses and 4 sheets
+        $plan = Product::stockPlan([[$b->id, null, 2]]);
+        $this->assertSame([[$rose->id, null, 24, $b->id], [$kraft->id, null, 4, $b->id]], $plan);
+        DB::transaction(function () use ($plan) {
+            foreach ($plan as [$id, $color, $qty]) {
+                $this->assertNotNull(Product::takeStock($id, $qty, $color));
+            }
+        });
+        $this->assertSame([76, 5, 2], [(int) $rose->fresh()->quantity_in_stock, (int) $kraft->fresh()->quantity_in_stock, (int) $b->fresh()->quantity_in_stock]);
+
+        // The form: a wrapper row must be one of the shop's wrappers
+        $method = new \ReflectionMethod(ProductController::class, 'compositionFromRequest');
+        $method->setAccessible(true);
+        $read = fn ($rows) => $method->invoke(app(ProductController::class), Request::create('/', 'POST', ['composition' => json_encode($rows)]), 'bouquet', 1, 999);
+        $ok = $read([['flower' => 'Kraft Paper', 'count' => 2, 'product_id' => $kraft->id, 'kind' => 'wrapper', 'color' => 'ignored']]);
+        $this->assertSame(['flower' => 'Kraft Paper', 'color' => null, 'count' => 2, 'cost' => null, 'product_id' => $kraft->id, 'kind' => 'wrapper'], $ok['attributes']['composition'][0]);
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Kraft', 'count' => 2, 'kind' => 'wrapper']]), 'no wrapper picked');
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 2, 'product_id' => $rose->id, 'kind' => 'wrapper']]), 'a flower is not a wrapper');
+
+        // Customers don't see the wrapper in "What's inside"
+        $customer = new \ReflectionMethod(\App\Http\Controllers\Customer\CustomerProductController::class, 'composition');
+        $customer->setAccessible(true);
+        $inside = $customer->invoke(app(\App\Http\Controllers\Customer\CustomerProductController::class), $b->fresh()->composition);
+        $this->assertSame(['Rose'], array_column($inside, 'flower'));
     }
 
     public function test_links_must_be_the_shops_own_single_flowers(): void

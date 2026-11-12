@@ -8,16 +8,12 @@
       <span v-if="stems" class="bf-total">{{ stems }} {{ stems === 1 ? "stem" : "stems" }} in all</span>
     </div>
     <p class="bf-help">
-      List each flower, how many pieces go into one bouquet, and what you paid for one piece (your buying cost, not your
-      selling price). Procurement uses this to know how many stems to buy. Customers never see the costs.
-      <template v-if="flowers">
-        Link a flower to one of your single flowers to share its stock: the bouquet can then sell as many as its flowers
-        make, and selling one takes the pieces from them.
-      </template>
+      The flowers and how many go in one bouquet. Cost is what you paid for one (customers don't see it).
+      <template v-if="flowers">Link a flower to your stock and selling a bouquet takes it from there.</template>
     </p>
 
-    <ul v-if="modelValue.length" class="bf-list">
-      <li v-for="(row, i) in modelValue" :key="i" class="bf-row" :class="{ linked: !!row.product_id }">
+    <ul v-if="flowerRows.length" class="bf-list">
+      <li v-for="{ row, i } in flowerRows" :key="i" class="bf-row" :class="{ linked: !!row.product_id }">
         <label v-if="flowers" class="bf-field bf-link">
           <span>Take from stock <small>(optional)</small></span>
           <select
@@ -26,8 +22,8 @@
             :aria-label="`Link ${row.flower || 'this flower'} to a single flower in stock`"
             @change="setLink(i, $event.target.value)"
           >
-            <option value="">Not linked: just a note</option>
-            <option v-for="f in flowers" :key="f.id" :value="f.id">
+            <option value="">Not linked</option>
+            <option v-for="f in singleFlowers" :key="f.id" :value="f.id">
               {{ f.name }}{{ f.color && !f.colors?.length ? ` (${f.color})` : "" }} · {{ f.stock }} in stock
             </option>
           </select>
@@ -104,13 +100,64 @@
       </li>
     </ul>
 
+    <button type="button" class="bf-add" :disabled="modelValue.length >= 30" @click="add">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+      Add a flower
+    </button>
+
+    <!-- Wrappers: sheets of the shop's wrappers (the same stock as 3D Bouquet Management and Inventory) -->
+    <template v-if="flowers">
+      <div class="bf-head bf-head-wrap">
+        <span class="bf-label">Wrappers</span>
+        <span v-if="sheets" class="bf-total">{{ sheets }} {{ sheets === 1 ? "sheet" : "sheets" }}</span>
+      </div>
+      <ul v-if="wrapperRows.length" class="bf-list">
+        <li v-for="{ row, i } in wrapperRows" :key="i" class="bf-row bf-row-wrap linked">
+          <label class="bf-field">
+            <span>Wrapper</span>
+            <select
+              :value="row.product_id || ''"
+              class="fx-input"
+              :class="{ invalid: !!error && !row.product_id }"
+              aria-label="Which wrapper"
+              @change="setWrapper(i, $event.target.value)"
+            >
+              <option value="" disabled>Pick a wrapper</option>
+              <option v-for="w in wrappers" :key="w.id" :value="w.id">{{ w.name }} · {{ w.stock }} {{ w.stock === 1 ? "sheet" : "sheets" }}</option>
+            </select>
+          </label>
+          <label class="bf-field bf-count">
+            <span>Sheets</span>
+            <input
+              :value="row.count ?? ''"
+              type="number"
+              min="1"
+              max="1000"
+              step="1"
+              inputmode="numeric"
+              class="fx-input"
+              :class="{ invalid: !!error && !(Number(row.count) >= 1) }"
+              @input="update(i, { count: $event.target.value === '' ? '' : Math.floor(Number($event.target.value)) })"
+            />
+          </label>
+          <button type="button" class="bf-remove" :aria-label="`Remove ${row.flower || 'this wrapper'}`" @click="remove(i)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </li>
+      </ul>
+      <button v-if="wrappers.length" type="button" class="bf-add" :disabled="modelValue.length >= 30" @click="addWrapper">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        Add a wrapper
+      </button>
+      <small v-else class="bf-help">No wrappers in stock yet. Add one with its sheets in 3D Bouquet Management.</small>
+    </template>
+
     <p v-if="linkedMake !== null" class="bf-linked-note" role="status">
-      Stock comes from the linked flowers: <b>{{ linkedMake }} {{ linkedMake === 1 ? "bouquet" : "bouquets" }}</b> can be made now.
-      Selling one takes its pieces from those flowers.
+      You can make <b>{{ linkedMake }} {{ linkedMake === 1 ? "bouquet" : "bouquets" }}</b> with the stock you linked.
     </p>
 
     <div v-if="cost > 0" class="bf-sum">
-      <span>Flowers cost <b>{{ peso(cost) }}</b> per bouquet<template v-if="unpriced"> · {{ unpriced }} {{ unpriced === 1 ? "flower has" : "flowers have" }} no cost yet</template></span>
+      <span>{{ wrapperRows.length ? "Flowers and wrappers cost" : "Flowers cost" }} <b>{{ peso(cost) }}</b> per bouquet<template v-if="unpriced"> · {{ unpriced }} {{ unpriced === 1 ? "flower has" : "flowers have" }} no cost yet</template></span>
       <button
         v-if="costValue !== undefined && Math.abs(Number(costValue || 0) - cost) >= 0.005"
         type="button"
@@ -121,10 +168,6 @@
       </button>
     </div>
 
-    <button type="button" class="bf-add" :disabled="modelValue.length >= 30" @click="add">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-      Add a flower
-    </button>
     <small v-if="error" class="fx-error">{{ error }}</small>
 
     <datalist id="bf-flower-names">
@@ -162,7 +205,28 @@ const labelId = `bf-${Math.random().toString(36).slice(2, 8)}`;
 const FLOWER_NAMES = ["Rose", "Tulip", "Sunflower", "Lily", "Carnation", "Chrysanthemum", "Gerbera", "Orchid", "Hydrangea", "Peony", "Baby's breath", "Eucalyptus", "Statice", "Aster", "Daisy", "Lisianthus"];
 const COLOR_NAMES = FLOWER_COLORS.filter((c) => c.value !== "other").map((c) => c.label);
 
-const stems = computed(() => props.modelValue.reduce((sum, r) => sum + (Number(r.count) > 0 ? Number(r.count) : 0), 0));
+// Flower rows and wrapper rows live in one list; each keeps its index in it
+const isWrapperRow = (r) => r.kind === "wrapper";
+const flowerRows = computed(() => props.modelValue.map((row, i) => ({ row, i })).filter(({ row }) => !isWrapperRow(row)));
+const wrapperRows = computed(() => props.modelValue.map((row, i) => ({ row, i })).filter(({ row }) => isWrapperRow(row)));
+const singleFlowers = computed(() => (props.flowers || []).filter((f) => f.kind !== "wrapper"));
+const wrappers = computed(() => (props.flowers || []).filter((f) => f.kind === "wrapper"));
+
+const stems = computed(() => flowerRows.value.reduce((sum, { row }) => sum + (Number(row.count) > 0 ? Number(row.count) : 0), 0));
+const sheets = computed(() => wrapperRows.value.reduce((sum, { row }) => sum + (Number(row.count) > 0 ? Number(row.count) : 0), 0));
+
+/** A wrapper row: which of the shop's wrappers, and how many sheets one bouquet uses */
+const addWrapper = () => {
+  const first = wrappers.value[0];
+  emit("update:modelValue", [
+    ...props.modelValue,
+    { kind: "wrapper", flower: first?.name || "", color: "", count: 1, cost: first?.cost ?? "", product_id: first?.id ?? null },
+  ]);
+};
+function setWrapper(index, value) {
+  const w = wrappers.value.find((x) => x.id === Number(value));
+  if (w) update(index, { product_id: w.id, flower: w.name, cost: w.cost ?? "" });
+}
 
 const update = (index, patch) =>
   emit("update:modelValue", props.modelValue.map((r, i) => (i === index ? { ...r, ...patch } : r)));
@@ -288,6 +352,15 @@ const remove = (index) => emit("update:modelValue", props.modelValue.filter((_, 
 
 .bf-link {
   grid-column: 1 / -1;
+}
+
+/* Wrappers: which wrapper, sheets, remove */
+.bf-head-wrap {
+  margin-top: 6px;
+}
+
+.bf-row.bf-row-wrap {
+  grid-template-columns: minmax(0, 1fr) 96px 44px;
 }
 
 .bf-row.linked {
@@ -472,6 +545,14 @@ const remove = (index) => emit("update:modelValue", props.modelValue.filter((_, 
 
   .bf-cost {
     grid-column: 2 / 3;
+  }
+
+  .bf-row.bf-row-wrap {
+    grid-template-columns: minmax(0, 1fr) 88px 44px;
+  }
+
+  .bf-row-wrap .bf-count {
+    grid-column: auto;
   }
 }
 </style>

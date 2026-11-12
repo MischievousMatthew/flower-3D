@@ -76,7 +76,7 @@
             <small v-for="b in f.bouquets" :key="b.id">{{ b.make }} × {{ b.name }} <span class="muted">({{ b.per }} each{{ b.cost_each != null ? ` at ${money(b.cost_each)}` : "" }})</span></small>
           </span>
           <span class="st-bf-stems">
-            <b>{{ f.stems.toLocaleString("en-PH") }} <small>{{ f.stems === 1 ? "stem" : "stems" }}</small></b>
+            <b>{{ f.stems.toLocaleString("en-PH") }} <small>{{ f.kind === "wrapper" ? (f.stems === 1 ? "sheet" : "sheets") : f.stems === 1 ? "stem" : "stems" }}</small></b>
             <small v-if="f.priced_stems">{{ money(f.cost) }}<template v-if="f.priced_stems < f.stems"> · {{ f.stems - f.priced_stems }} not priced</template></small>
             <small v-else class="muted">No cost entered</small>
           </span>
@@ -115,7 +115,7 @@
                 <span v-if="it.sku">{{ it.sku }}</span>
               </small>
               <small v-if="it.composition?.length" class="st-compo" :title="'Flowers in one bouquet'">
-                {{ it.composition.map((f) => `${f.count} ${f.color ? `${f.color.toLowerCase()} ` : ""}${f.flower.toLowerCase()}`).join(" · ") }} per bouquet<template v-if="it.composition.some((f) => f.cost != null)"> · flowers {{ money(it.composition.reduce((s, f) => s + (f.cost != null ? f.cost * f.count : 0), 0)) }}</template>
+                {{ it.composition.map((f) => `${f.count} ${f.kind === "wrapper" ? `${f.count === 1 ? "sheet" : "sheets"} of ` : ""}${f.color ? `${f.color.toLowerCase()} ` : ""}${f.flower.toLowerCase()}`).join(" · ") }} per bouquet<template v-if="it.composition.some((f) => f.cost != null)"> · flowers {{ money(it.composition.reduce((s, f) => s + (f.cost != null ? f.cost * f.count : 0), 0)) }}</template>
               </small>
             </span>
             <span class="st-onhand">

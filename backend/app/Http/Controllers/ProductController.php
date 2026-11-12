@@ -66,10 +66,13 @@ class ProductController extends Controller
             ->where(fn ($q) => $q->whereNull('selling_type')->orWhere('selling_type', '!=', 'bouquet'))
             ->where('status', '!=', 'discontinued')
             ->orderBy('product_name')
-            ->get(['id', 'product_name', 'sku', 'color', 'color_other', 'color_options', 'quantity_in_stock', 'purchase_price', 'stock_unit'])
+            ->get(['id', 'product_name', 'sku', 'color', 'color_other', 'color_options', 'quantity_in_stock', 'purchase_price', 'stock_unit', 'stock_kind', 'moderation_status', 'pack_unit', 'pack_size'])
             ->map(fn (Product $p) => [
                 'id'       => $p->id,
                 'name'     => $p->product_name,
+                // "wrapper": a wrapping material counted in sheets (a bouquet's wrapper), else a flower
+                'kind'     => $p->isMaterial() && $p->stock_kind === 'wrapping' ? 'wrapper' : 'flower',
+                'pack_size' => $p->packSize() > 1 ? $p->packSize() : null,
                 'sku'      => $p->sku,
                 'color'    => $p->color === 'other' ? $p->color_other : ($p->color ? ucfirst($p->color) : null),
                 // Its colours with their own stock, when it counts each colour
@@ -448,25 +451,32 @@ class ProductController extends Controller
             // Optionally linked to one of the shop's single flowers: the bouquet's
             // stock then comes from it, and selling one takes these pieces from it
             $link = is_numeric($row['product_id'] ?? null) ? (int) $row['product_id'] : 0;
-            $list[] = [
+            // A wrapper row: sheets of one of the shop's wrappers (always linked)
+            $isWrapper = ($row['kind'] ?? null) === 'wrapper';
+            if ($isWrapper && $link <= 0) {
+                return $fail('Pick which wrapper the bouquet uses.');
+            }
+            $list[] = array_filter([
                 'flower'     => $flower,
-                'color'      => $color !== '' ? $color : null,
+                'color'      => $isWrapper ? null : ($color !== '' ? $color : null),
                 'count'      => (int) $count,
                 'cost'       => $cost === null || $cost === '' ? null : round((float) $cost, 2),
                 'product_id' => $link > 0 ? $link : null,
-            ];
+                'kind'       => $isWrapper ? 'wrapper' : null,
+            ], fn ($v, $k) => $k !== 'kind' || $v !== null, ARRAY_FILTER_USE_BOTH);
         }
         if (count($list) > 30) {
             return $fail('A bouquet can list up to 30 flowers.');
         }
 
-        // Linked flowers must be this shop's own single flowers (not a bouquet, not itself)
+        // Linked flowers must be this shop's own single flowers (not a bouquet, not
+        // itself); a wrapper row must be one of its wrappers (wrapping stock items)
         $ids = array_values(array_unique(array_filter(array_column($list, 'product_id'))));
         if ($ids) {
             $flowers = Product::query()
                 ->whereIn('id', $ids)
                 ->when($ownerId, fn ($q) => $q->where('owner_id', $ownerId))
-                ->get(['id', 'selling_type'])
+                ->get(['id', 'selling_type', 'stock_kind', 'moderation_status'])
                 ->keyBy('id');
             foreach ($ids as $id) {
                 $flower = $flowers->get($id);
@@ -475,6 +485,12 @@ class ProductController extends Controller
                 }
                 if ($flower->selling_type === 'bouquet') {
                     return $fail('A bouquet can\'t be linked as a flower of another bouquet.');
+                }
+            }
+            foreach ($list as $row) {
+                $item = ($row['kind'] ?? null) === 'wrapper' ? $flowers->get($row['product_id']) : null;
+                if ($item && ! ($item->moderation_status === Product::MODERATION_INTERNAL && $item->stock_kind === 'wrapping')) {
+                    return $fail('Pick one of your wrappers for the bouquet\'s wrapper.');
                 }
             }
         }

@@ -16,6 +16,7 @@ export const compositionFromProduct = (p) =>
     count: Number(f.count) || 1,
     cost: f.cost ?? "",
     product_id: f.product_id ?? null, // linked single flower (shares its stock)
+    ...(f.kind === "wrapper" ? { kind: "wrapper" } : {}), // sheets of one of the shop's wrappers
   }));
 
 /** How many of a linked flower a row can use: its colour's own stock when it counts colours */
@@ -60,12 +61,19 @@ export const compositionField = (rows) =>
         count: Math.floor(Number(r.count)),
         cost: hasCost(r) ? Math.round(Number(r.cost) * 100) / 100 : null,
         product_id: r.product_id ? Number(r.product_id) : null,
+        ...(r.kind === "wrapper" ? { kind: "wrapper" } : {}),
       })),
   );
 
 /** A form error for the rows, or "" when they're fine */
 export function compositionProblem(rows) {
   for (const r of rows || []) {
+    if (r.kind === "wrapper") {
+      if (!r.product_id) return "Pick which wrapper the bouquet uses, or remove that row.";
+      const n = Number(r.count);
+      if (!Number.isInteger(n) || n < 1 || n > 1000) return `Enter how many sheets of ${r.flower || "the wrapper"} one bouquet uses (1 or more).`;
+      continue;
+    }
     if (!filled(r)) continue;
     const name = String(r.flower || "").trim();
     if (!name) return "Name every flower in the bouquet, or remove the empty row.";
