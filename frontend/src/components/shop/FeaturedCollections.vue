@@ -35,6 +35,12 @@
         </button>
       </div>
 
+      <!-- Why these flowers are in this collection (not for In season) -->
+      <p v-if="tab.note" class="fc-note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path v-for="(d, i) in tab.icon" :key="i" :d="d" /></svg>
+        {{ tab.note }}
+      </p>
+
       <div id="fc-panel" role="tabpanel" :aria-labelledby="`fc-tab-${current}`" aria-live="polite">
         <div v-if="loading[current]" class="fc-grid" aria-label="Loading flowers">
           <span v-for="n in 4" :key="n" class="bc-skeleton fc-skel"></span>
@@ -83,10 +89,10 @@ const ICONS = {
 };
 const ALL_TABS = [
   { key: "season", label: "In season", sub: "Recommended by BloomCraft", tag: "recommended", icon: ICONS.leaf, view: "season", empty: "" },
-  { key: "best", label: "Best sellers", tag: "best_seller", icon: ICONS.medal, view: "best", params: { best_sellers: 1, sort_by: "popular_desc" }, empty: "Best sellers show up once flowers start selling." },
-  { key: "new", label: "New arrivals", tag: "new_arrival", icon: ICONS.spark, view: "new", params: { sort_by: "created_at_desc" }, empty: "New flowers show up here as shops add them." },
-  { key: "trending", label: "Trending", tag: "trending", icon: ICONS.trend, view: "trending", params: { sort_by: "popular_desc" }, empty: "Nothing is trending yet." },
-  { key: "top", label: "Top rated", tag: "top_rated", icon: ICONS.star, view: "top", params: { sort_by: "rating_desc" }, empty: "Top rated flowers show up once customers leave reviews." },
+  { key: "best", label: "Best sellers", tag: "best_seller", icon: ICONS.medal, view: "best", note: "The flowers customers buy the most, ranked by how many have sold.", params: { best_sellers: 1, sort_by: "popular_desc" }, empty: "Best sellers show up once flowers start selling." },
+  { key: "new", label: "New arrivals", tag: "new_arrival", icon: ICONS.spark, view: "new", note: "Just added by our shops. The newest flowers come first.", params: { sort_by: "created_at_desc" }, empty: "New flowers show up here as shops add them." },
+  { key: "trending", label: "Trending", tag: "trending", icon: ICONS.trend, view: "trending", note: "Getting the most orders across our shops right now.", params: { sort_by: "popular_desc" }, empty: "Nothing is trending yet." },
+  { key: "top", label: "Top rated", tag: "top_rated", icon: ICONS.star, view: "top", note: "Rated highest by customers who bought them, based on their reviews.", params: { sort_by: "rating_desc" }, empty: "Top rated flowers show up once customers leave reviews." },
 ];
 const tabs = computed(() => ALL_TABS.filter((t) => t.key !== "season" || props.featured.length));
 const current = ref(props.featured.length ? "season" : "best");
@@ -222,6 +228,28 @@ function move(step) {
   height: 16px;
   fill: none;
   stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.fc-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: -6px 0 22px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.fc-note svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--leaf-deep);
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
