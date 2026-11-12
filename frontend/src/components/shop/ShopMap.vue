@@ -723,9 +723,11 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   background: var(--leaf-deep);
   color: var(--paper);
-  font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 500;
+  /* Plain numbers: the display font draws 0 like a small "o" */
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .smap-stat > span {
