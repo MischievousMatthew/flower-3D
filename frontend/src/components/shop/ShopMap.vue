@@ -1,88 +1,110 @@
 <template>
   <section class="smap" aria-labelledby="smap-title">
     <div class="bc-container">
-      <div class="smap-head">
+      <header class="bc-sec-head">
         <div>
-          <h2 id="smap-title">Flower shops <em>around you</em></h2>
+          <p class="bc-sec-eyebrow">Flower shops around you</p>
+          <h2 id="smap-title" class="bc-sec-title">Local florists <em>near you</em></h2>
           <p class="smap-lede">
             Every shop on BloomCraft, pinned where it is.
             <template v-if="hasPin">The circle shows how far you'd like to look from your address.</template>
           </p>
         </div>
-        <label class="smap-radius" :class="{ off: !hasPin }">
-          <span>Within</span>
-          <select v-model.number="radiusKm" :disabled="!hasPin" aria-label="Show shops within this distance of your address">
-            <option v-for="km in RADII" :key="km" :value="km">{{ km }} km</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="smap-frame">
-        <div ref="mapEl" class="smap-map" role="region" aria-label="Map of flower shops"></div>
-        <div v-if="loading" class="smap-cover">
-          <span class="bc-skeleton smap-skel"></span>
+        <!-- How far to look: one pill per distance -->
+        <div class="smap-radius" :class="{ off: !hasPin }" role="radiogroup" aria-label="Show shops within this distance of your address">
+          <span class="smap-radius-label">Within</span>
+          <button
+            v-for="km in RADII"
+            :key="km"
+            type="button"
+            role="radio"
+            :aria-checked="radiusKm === km"
+            :class="{ on: radiusKm === km }"
+            :disabled="!hasPin"
+            @click="radiusKm = km"
+          >
+            {{ km }} km
+          </button>
         </div>
-        <div v-else-if="error" class="smap-cover smap-cover--note">
-          <p>We couldn't load the shop map right now.</p>
-          <button type="button" class="smap-btn" @click="load">Try again</button>
-        </div>
-      </div>
+      </header>
 
-      <!-- Shops inside the circle, nearest first -->
-      <div v-if="!loading && !error && hasPin" class="smap-range" aria-live="polite">
-        <div class="smap-range-head">
-          <p class="smap-range-title">
-            <strong>{{ inRange.length }}</strong> {{ inRange.length === 1 ? "shop" : "shops" }} within {{ radiusKm }} km of your address
-            <span class="smap-sep" aria-hidden="true">·</span> {{ shops.length }} on the map
-          </p>
+      <div class="smap-layout" :class="{ solo: loading || error || !hasPin }">
+        <div class="smap-frame">
+          <div ref="mapEl" class="smap-map" role="region" aria-label="Map of flower shops"></div>
+          <div v-if="loading" class="smap-cover">
+            <span class="bc-skeleton smap-skel"></span>
+          </div>
+          <div v-else-if="error" class="smap-cover smap-cover--note">
+            <p>We couldn't load the shop map right now.</p>
+            <button type="button" class="smap-btn" @click="load">Try again</button>
+          </div>
+
+          <!-- Without a pinned address: how to get the circle -->
+          <div v-if="!loading && !error && !hasPin" class="smap-hint">
+            <span class="smap-hint-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></svg>
+            </span>
+            <p>
+              <strong>{{ shops.length }} {{ shops.length === 1 ? "shop" : "shops" }} on the map.</strong>
+              <template v-if="isAuthenticated">
+                <router-link :to="{ name: 'Profile' }" class="smap-link">Pin your address</router-link> to see the shops around you.
+              </template>
+              <template v-else>Log in and pin your address to see the shops around you.</template>
+            </p>
+          </div>
+        </div>
+
+        <!-- Shops inside the circle, nearest first -->
+        <aside v-if="!loading && !error && hasPin" class="smap-panel" aria-live="polite">
+          <div class="smap-stat">
+            <strong>{{ inRange.length }}</strong>
+            <span>
+              {{ inRange.length === 1 ? "shop" : "shops" }} within {{ radiusKm }} km
+              <small>{{ shops.length }} on the map in all</small>
+            </span>
+          </div>
+
           <label class="smap-only">
             <input type="checkbox" :checked="pageFilter" @change="$emit('update:pageFilter', $event.target.checked)" />
             <span class="smap-only-track" aria-hidden="true"></span>
             <span>Show only these shops' flowers on this page</span>
           </label>
-        </div>
 
-        <ul v-if="inRange.length" class="smap-cards">
-          <li v-for="item in inRange" :key="item.shop.id">
-            <article class="smap-card" :class="{ active: focusedId === item.shop.id }">
-              <button type="button" class="smap-card-main" :aria-label="`Show ${item.shop.store_name} on the map`" @click="focusShop(item.shop)">
-                <span class="smap-card-logo">
-                  <img v-if="item.shop.store_logo_path" :src="item.shop.store_logo_path" alt="" loading="lazy" />
-                  <span v-else aria-hidden="true">{{ item.shop.store_name?.charAt(0) || "B" }}</span>
-                </span>
-                <span class="smap-card-text">
-                  <strong>{{ item.shop.store_name }}</strong>
-                  <small>{{ item.km.toFixed(1) }} km away<template v-if="item.shop.taking_orders === false"> · not taking orders now</template></small>
-                </span>
-              </button>
-              <button type="button" class="smap-card-visit" @click="$emit('visit', item.shop.id)">Visit</button>
-            </article>
-          </li>
-        </ul>
+          <ul v-if="inRange.length" class="smap-cards">
+            <li v-for="item in inRange" :key="item.shop.id">
+              <article class="smap-card" :class="{ active: focusedId === item.shop.id }">
+                <button type="button" class="smap-card-main" :aria-label="`Show ${item.shop.store_name} on the map`" @click="focusShop(item.shop)">
+                  <span class="smap-card-logo">
+                    <img v-if="item.shop.store_logo_path" :src="item.shop.store_logo_path" alt="" loading="lazy" />
+                    <span v-else aria-hidden="true">{{ item.shop.store_name?.charAt(0) || "B" }}</span>
+                  </span>
+                  <span class="smap-card-text">
+                    <strong>{{ item.shop.store_name }}</strong>
+                    <small>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></svg>
+                      {{ item.km.toFixed(1) }} km away<template v-if="item.shop.taking_orders === false"> · not taking orders now</template>
+                    </small>
+                  </span>
+                </button>
+                <button type="button" class="smap-card-visit" @click="$emit('visit', item.shop.id)">Visit</button>
+              </article>
+            </li>
+          </ul>
 
-        <div v-else class="smap-none">
-          <template v-if="nearest">
-            <p>
-              No shops within {{ radiusKm }} km. The nearest is <strong>{{ nearest.shop.store_name }}</strong>, {{ nearest.km.toFixed(1) }} km away.
-            </p>
-            <button v-if="reachKm" type="button" class="smap-btn" @click="radiusKm = reachKm">Show shops within {{ reachKm }} km</button>
-            <button v-else type="button" class="smap-btn smap-btn--ghost" @click="focusShop(nearest.shop)">See it on the map</button>
-          </template>
-          <p v-else>No shops have pinned their location yet.</p>
-        </div>
+          <div v-else class="smap-none">
+            <template v-if="nearest">
+              <p>
+                No shops within {{ radiusKm }} km. The nearest is <strong>{{ nearest.shop.store_name }}</strong>, {{ nearest.km.toFixed(1) }} km away.
+              </p>
+              <button v-if="reachKm" type="button" class="smap-btn" @click="radiusKm = reachKm">Show shops within {{ reachKm }} km</button>
+              <button v-else type="button" class="smap-btn smap-btn--ghost" @click="focusShop(nearest.shop)">See it on the map</button>
+            </template>
+            <p v-else>No shops have pinned their location yet.</p>
+          </div>
+        </aside>
       </div>
 
-      <p v-if="loading || error || !hasPin" class="smap-foot" aria-live="polite">
-        <template v-if="loading">Finding shops</template>
-        <template v-else-if="error"></template>
-        <template v-else-if="isAuthenticated">
-          {{ shops.length }} {{ shops.length === 1 ? "shop" : "shops" }} on the map.
-          <router-link :to="{ name: 'Profile' }" class="smap-link">Pin your address in your profile</router-link> to see the shops around you.
-        </template>
-        <template v-else>
-          {{ shops.length }} {{ shops.length === 1 ? "shop" : "shops" }} on the map. Log in and pin your address to see the shops around you.
-        </template>
-      </p>
+      <p v-if="loading" class="smap-foot" aria-live="polite">Finding shops</p>
     </div>
   </section>
 </template>
@@ -460,8 +482,18 @@ watch(isAuthenticated, async () => {
   if (!loading.value && !error.value) render();
 });
 
-onMounted(load);
+// The side panel appears beside the map once shops load, so the map gets
+// narrower: redraw the tiles at the new size
+let resizeWatch = null;
+onMounted(() => {
+  load();
+  if (mapEl.value && typeof ResizeObserver !== "undefined") {
+    resizeWatch = new ResizeObserver(() => map?.invalidateSize());
+    resizeWatch.observe(mapEl.value);
+  }
+});
 onBeforeUnmount(() => {
+  resizeWatch?.disconnect();
   map?.remove();
   map = null;
   shopLayer = null;
@@ -470,84 +502,102 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .smap {
-  padding: clamp(24px, 3vw, 40px) 0;
-}
-
-.smap-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px 24px;
-  margin-bottom: 18px;
-}
-
-.smap-head h2 {
-  margin: 4px 0 0;
-  font-family: var(--font-display);
-  font-size: clamp(30px, 3.6vw, 44px);
-  font-weight: 500;
-  line-height: 1.1;
-  color: var(--ink);
-}
-
-.smap-head h2 em {
-  color: var(--leaf-deep);
+  padding: clamp(24px, 3vw, 40px) 0 0;
 }
 
 .smap-lede {
-  margin: 8px 0 0;
   max-width: 56ch;
+  margin: 10px 0 0;
   font-size: 14.5px;
   color: var(--ink-soft);
 }
 
+/* Distance pills */
 .smap-radius {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--paper);
+}
+
+.smap-radius-label {
+  padding: 0 10px 0 12px;
+  font-size: 13px;
   color: var(--ink-soft);
 }
 
-.smap-radius select {
-  min-height: 44px;
-  padding: 0 38px 0 16px;
-  border: 1px solid var(--line);
+.smap-radius button {
+  min-width: 52px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
   border-radius: 999px;
-  background: #fff
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23363f4e' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
-    no-repeat right 14px center / 16px;
+  background: transparent;
   color: var(--ink);
-  font: inherit;
-  font-weight: 500;
-  appearance: none;
+  font: 500 13px var(--font-sans);
   cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-.smap-radius select:focus-visible {
-  outline: 2px solid var(--leaf);
-  outline-offset: 2px;
+.smap-radius button:hover:not(:disabled):not(.on) {
+  background: var(--ivory);
 }
 
-.smap-radius.off select {
+.smap-radius button.on {
+  background: var(--leaf-deep);
+  color: var(--paper);
+}
+
+.smap-radius.off button {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.45;
+}
+
+/* Map beside the list of nearby shops */
+.smap-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.smap-layout.solo {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .smap-frame {
   position: relative;
   width: 100%;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: var(--ivory);
+  border: 1px solid var(--line-soft);
+  border-radius: 28px;
+  background: var(--ivory-deep);
+  isolation: isolate;
 }
 
 .smap-map {
-  width: 100%;
-  height: clamp(320px, 46vh, 460px);
   z-index: 0;
+  width: 100%;
+  height: clamp(380px, 52vh, 540px);
+}
+
+.smap-frame :deep(.leaflet-control-zoom) {
+  overflow: hidden;
+  margin: 16px 0 0 16px;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px -10px rgba(38, 45, 57, 0.45);
+}
+
+.smap-frame :deep(.leaflet-control-zoom a) {
+  width: 36px;
+  height: 36px;
+  border-color: var(--line-soft);
+  color: var(--ink);
+  font: 500 18px/36px var(--font-sans);
 }
 
 .smap-cover {
@@ -576,6 +626,55 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
+/* No pinned address: a card floating on the map */
+.smap-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(440px, calc(100% - 32px));
+  padding: 12px 16px 12px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: rgba(250, 251, 250, 0.96);
+  box-shadow: 0 16px 36px -20px rgba(38, 45, 57, 0.55);
+}
+
+.smap-hint-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #e9f5ed;
+  color: var(--leaf-deep);
+}
+
+.smap-hint-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+
+.smap-hint p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.smap-hint strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .smap-btn {
   min-height: 44px;
   padding: 0 22px;
@@ -589,36 +688,70 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.smap-range {
-  margin-top: 16px;
+.smap-btn--ghost {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
 }
 
-.smap-range-head {
+/* The panel beside the map */
+.smap-panel {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 20px;
-  margin-bottom: 14px;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  max-height: clamp(380px, 52vh, 540px);
+  padding: 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: 28px;
+  background: var(--paper);
 }
 
-.smap-range-title {
-  margin: 0;
-  font-size: 14px;
+.smap-stat {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.smap-stat > strong {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 56px;
+  height: 56px;
+  padding: 0 10px;
+  border-radius: 18px;
+  background: var(--leaf-deep);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 500;
+}
+
+.smap-stat > span {
+  display: grid;
+  gap: 2px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.smap-stat small {
+  font-size: 12.5px;
+  font-weight: 400;
   color: var(--ink-soft);
 }
 
-.smap-range-title strong {
-  color: var(--ink);
-  font-weight: 600;
-}
-
 .smap-only {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   min-height: 44px;
-  font-size: 13.5px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--ivory);
+  font-size: 13px;
+  line-height: 1.4;
   color: var(--ink);
   cursor: pointer;
 }
@@ -667,28 +800,32 @@ onBeforeUnmount(() => {
 
 .smap-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-  gap: 10px;
-  margin: 0;
-  padding: 0;
+  flex: 1;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  margin: 0 -6px;
+  padding: 0 6px 4px;
+  overflow-y: auto;
   list-style: none;
+  scrollbar-width: thin;
 }
 
 .smap-card {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px 8px 8px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  padding: 8px 8px 8px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: var(--paper);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .smap-card:hover,
 .smap-card.active {
   border-color: var(--leaf);
-  box-shadow: 0 10px 24px -18px rgba(46, 122, 79, 0.6);
+  background: #f3f9f5;
 }
 
 .smap-card-main {
@@ -711,10 +848,10 @@ onBeforeUnmount(() => {
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   overflow: hidden;
-  border-radius: 50%;
+  border-radius: 14px;
   background: var(--ivory);
   font-family: var(--font-display);
   font-size: 20px;
@@ -729,55 +866,70 @@ onBeforeUnmount(() => {
 
 .smap-card-text {
   display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
 .smap-card-text strong {
   overflow: hidden;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .smap-card-text small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12.5px;
   color: var(--leaf-deep);
 }
 
+.smap-card-text small svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+}
+
 .smap-card-visit {
   flex-shrink: 0;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink);
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--paper);
   font: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  transition: background 0.2s ease;
 }
 
 .smap-card-visit:hover {
-  border-color: var(--ink);
+  background: var(--leaf-deep);
 }
 
 .smap-card-main:focus-visible,
-.smap-card-visit:focus-visible {
+.smap-card-visit:focus-visible,
+.smap-radius button:focus-visible,
+.smap-btn:focus-visible,
+.smap-link:focus-visible {
   outline: 2px solid var(--leaf);
   outline-offset: 2px;
-  border-radius: 10px;
 }
 
 .smap-none {
   display: grid;
   justify-items: start;
   gap: 10px;
-  padding: 18px 20px;
+  padding: 16px;
   border: 1px dashed var(--line);
-  border-radius: 14px;
-  background: #fff;
+  border-radius: 16px;
   font-size: 14px;
   color: var(--ink-soft);
 }
@@ -791,35 +943,64 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-.smap-btn--ghost {
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink);
-}
-
 .smap-foot {
   margin: 12px 2px 0;
   font-size: 13.5px;
   color: var(--ink-soft);
 }
 
-.smap-foot strong {
-  color: var(--ink);
+.smap-link {
+  color: var(--leaf-deep);
   font-weight: 600;
 }
 
-.smap-sep {
-  margin: 0 6px;
-}
+@media (max-width: 1024px) {
+  .smap-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
-.smap-link {
-  color: var(--leaf-deep);
-  font-weight: 500;
+  .smap-panel {
+    max-height: none;
+  }
+
+  .smap-cards {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+    max-height: 360px;
+  }
 }
 
 @media (max-width: 600px) {
-  .smap-frame {
-    border-radius: 16px;
+  .smap-frame,
+  .smap-panel {
+    border-radius: 20px;
+  }
+
+  .smap-map {
+    height: 340px;
+  }
+
+  .smap-radius {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .smap-radius-label {
+    display: none;
+  }
+
+  .smap-radius button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smap-radius button,
+  .smap-card,
+  .smap-only-track,
+  .smap-only-track::after {
+    transition: none;
   }
 }
 </style>
