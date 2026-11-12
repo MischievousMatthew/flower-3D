@@ -372,41 +372,26 @@
 
           <!-- Wrapper stock: the same sheets ERP Stock & replenishment and Inventory show -->
           <div v-if="activeTab === 'wrapper'" class="cz-field cz-stock">
-            <span class="cz-label">Stock <small>(counted in sheets)</small></span>
-            <select :value="form.stockItem" class="cz-input" :class="{ invalid: errors.stock_item }" aria-label="Stock item" @change="pickStockItem($event.target.value)">
-              <option value="none">Don't count this wrapper's stock</option>
-              <option value="new">New stock item: {{ form.name.trim() || "this wrapper" }}</option>
-              <optgroup v-if="wrappingItems.length" label="Your wrapping stock">
-                <option v-for="w in wrappingItems" :key="w.id" :value="String(w.id)">{{ w.name }} · {{ w.on_hand }} {{ w.on_hand === 1 ? "sheet" : "sheets" }}</option>
-              </optgroup>
-            </select>
-            <span v-if="errors.stock_item" class="cz-error">{{ errors.stock_item }}</span>
-
-            <template v-if="form.stockItem !== 'none'">
-              <div class="cz-stock-grid">
-                <label class="cz-field">
-                  <span class="cz-label">Sheets in stock</span>
-                  <input v-model="form.stockSheets" class="cz-input" :class="{ invalid: errors.stock_sheets }" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 120" />
-                  <span v-if="errors.stock_sheets" class="cz-error">{{ errors.stock_sheets }}</span>
-                </label>
-                <label class="cz-field">
-                  <span class="cz-label">Sheets in one roll <small>(optional)</small></span>
-                  <input v-model="form.packSize" class="cz-input" :class="{ invalid: errors.pack_size }" type="number" min="2" step="1" inputmode="numeric" placeholder="e.g. 50" />
-                  <span v-if="errors.pack_size" class="cz-error">{{ errors.pack_size }}</span>
-                </label>
-              </div>
-              <div v-if="Number(form.packSize) >= 2" class="cz-stock-rolls">
-                <input v-model="form.addRolls" class="cz-input" type="number" min="1" step="1" inputmode="numeric" placeholder="Rolls" aria-label="Rolls to add" />
-                <button type="button" class="cz-btn cz-btn-ghost" :disabled="!(Number(form.addRolls) > 0)" @click="addRollsToSheets">
-                  Add {{ Number(form.addRolls) > 0 ? `${form.addRolls} × ${form.packSize} sheets` : "rolls" }}
-                </button>
-              </div>
-              <span class="cz-hint">
-                <template v-if="pickedStockItem">Shared with ERP Stock &amp; replenishment and Inventory: changing it here changes it there.</template>
-                <template v-else>Saving makes a wrapping stock item named "{{ form.name.trim() || "this wrapper" }}" in ERP Stock &amp; replenishment and Inventory.</template>
-                Each 3D bouquet uses 1 sheet of each wrapper layer. With no sheets left, customers can't pick this wrapper.
-              </span>
-            </template>
+            <span class="cz-label">Stock <small>(optional)</small></span>
+            <div class="cz-stock-grid">
+              <label class="cz-field">
+                <span class="cz-label">Sheets on hand</span>
+                <input v-model="form.stockSheets" class="cz-input" :class="{ invalid: errors.stock_sheets }" type="number" min="0" step="1" inputmode="numeric" placeholder="Leave blank to skip" />
+                <span v-if="errors.stock_sheets" class="cz-error">{{ errors.stock_sheets }}</span>
+              </label>
+              <label class="cz-field">
+                <span class="cz-label">Sheets per roll</span>
+                <input v-model="form.packSize" class="cz-input" :class="{ invalid: errors.pack_size }" type="number" min="2" step="1" inputmode="numeric" placeholder="e.g. 50" />
+                <span v-if="errors.pack_size" class="cz-error">{{ errors.pack_size }}</span>
+              </label>
+            </div>
+            <div v-if="Number(form.packSize) >= 2" class="cz-stock-rolls">
+              <input v-model="form.addRolls" class="cz-input" type="number" min="1" step="1" inputmode="numeric" placeholder="Rolls" aria-label="Rolls to add" />
+              <button type="button" class="cz-btn cz-btn-ghost" :disabled="!(Number(form.addRolls) > 0)" @click="addRollsToSheets">
+                {{ Number(form.addRolls) > 0 ? `Add ${Number(form.addRolls) * Number(form.packSize)} sheets` : "Add rolls" }}
+              </button>
+            </div>
+            <span class="cz-hint">Each bouquet uses 1 sheet. This count is the same one in Inventory.</span>
           </div>
 
           <div class="cz-form-actions">
@@ -632,30 +617,18 @@ const form = reactive({
   limitType: "words",
   limit: "",
   sizes: [{ label: "Small", price: "" }],
-  // Wrappers: their wrapping stock item (shared with ERP Stock and Inventory), counted in sheets
-  stockItem: "none", // "none", "new" or a wrapping item's id
+  // Wrappers: sheets on hand (blank = not tracked), kept on the wrapper's own
+  // wrapping stock item, the same one Inventory and ERP Stock show
+  stockItemId: null, // that item, once the wrapper has one
   stockSheets: "",
   packSize: "",
   addRolls: "",
 });
 const hexInput = ref("D3B18F");
 
-// The shop's wrapping stock items (the same ones ERP Stock & replenishment and Inventory show)
+// The shop's wrapping stock items (kept up to date from the API)
 const wrappingItems = ref([]);
-const pickedStockItem = computed(() => wrappingItems.value.find((w) => String(w.id) === String(form.stockItem)) || null);
-/** Picking an existing item fills in its sheets and sheets per roll */
-function pickStockItem(value) {
-  form.stockItem = value;
-  form.addRolls = "";
-  const item = wrappingItems.value.find((w) => String(w.id) === String(value));
-  if (item) {
-    form.stockSheets = String(item.on_hand);
-    form.packSize = item.pack_size ? String(item.pack_size) : "";
-  } else if (value === "new") {
-    form.stockSheets = "";
-  }
-}
-/** "Add 2 rolls" adds 2 × sheets per roll to the sheets in stock */
+/** "Add 2 rolls" adds 2 × sheets per roll to the sheets on hand */
 function addRollsToSheets() {
   const rolls = Math.floor(Number(form.addRolls));
   const perRoll = Math.floor(Number(form.packSize));
@@ -853,7 +826,7 @@ function setPrint(key) {
 
 function resetForm() {
   editingId.value = null;
-  form.stockItem = "none";
+  form.stockItemId = null;
   form.stockSheets = "";
   form.packSize = "";
   form.addRolls = "";
@@ -885,7 +858,7 @@ function startEdit(item) {
   form.price = Number(item.price) ? String(item.price) : "";
   form.modelUrl = item.model_url || null;
   if (item.stock_item) {
-    form.stockItem = String(item.stock_item.id);
+    form.stockItemId = item.stock_item.id;
     form.stockSheets = String(item.stock_item.on_hand);
     form.packSize = item.stock_item.pack_size ? String(item.stock_item.pack_size) : "";
   }
@@ -981,9 +954,10 @@ function validate() {
   if (current.value.hasColor && !/^#[0-9a-f]{6}$/i.test(form.color)) errors.color_hex = "Enter a 6-digit hex code.";
   if (activeTab.value === "wrapper" && form.pattern === "words" && !form.patternText.trim()) errors.pattern_text = "Type the word to print, like love.";
   if (current.value.hasModel && !form.modelFile && !form.modelUrl) errors.model_file = `Upload a 3D model for this ${current.value.singular}.`;
-  if (activeTab.value === "wrapper" && form.stockItem !== "none") {
-    if (form.stockSheets === "" || !(Number(form.stockSheets) >= 0) || !Number.isInteger(Number(form.stockSheets))) errors.stock_sheets = "Enter how many sheets you have (0 or more).";
-    if (form.packSize !== "" && !(Number(form.packSize) >= 2)) errors.pack_size = "A roll holds at least 2 sheets, or leave it empty.";
+  if (activeTab.value === "wrapper") {
+    const sheets = String(form.stockSheets ?? "").trim();
+    if (sheets !== "" && !(Number.isInteger(Number(sheets)) && Number(sheets) >= 0)) errors.stock_sheets = "Enter a whole number of sheets, or leave it blank.";
+    if (String(form.packSize ?? "").trim() !== "" && !(Number(form.packSize) >= 2)) errors.pack_size = "A roll holds at least 2 sheets, or leave it blank.";
   }
   return !Object.keys(errors).length;
 }
@@ -1015,11 +989,13 @@ async function submitForm() {
   }
   if (form.modelFile) payload.append("model_file", form.modelFile);
   // The wrapper's sheets live on its wrapping stock item (shared with ERP Stock and Inventory)
+  // Blank sheets: not tracked. A number: tracked on the wrapper's own stock item (made the first time)
   if (type === "wrapper") {
-    payload.append("stock_item", String(form.stockItem));
-    if (form.stockItem !== "none") {
-      payload.append("stock_sheets", String(Math.floor(Number(form.stockSheets)) || 0));
-      payload.append("pack_size", form.packSize === "" ? "" : String(Math.floor(Number(form.packSize))));
+    const sheets = String(form.stockSheets ?? "").trim();
+    payload.append("stock_item", sheets === "" ? "none" : form.stockItemId ? String(form.stockItemId) : "new");
+    if (sheets !== "") {
+      payload.append("stock_sheets", String(Math.floor(Number(sheets))));
+      payload.append("pack_size", String(form.packSize ?? "").trim() === "" ? "" : String(Math.floor(Number(form.packSize))));
     }
   }
 
