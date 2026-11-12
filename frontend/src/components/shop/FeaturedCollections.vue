@@ -28,7 +28,10 @@
           @keydown.left.prevent="move(-1)"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true"><path v-for="(d, i) in t.icon" :key="i" :d="d" /></svg>
-          {{ t.label }}
+          <span class="fc-tab-text">
+            {{ t.label }}
+            <small v-if="t.sub">{{ t.sub }}</small>
+          </span>
         </button>
       </div>
 
@@ -79,7 +82,7 @@ const ICONS = {
   star: ["M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"],
 };
 const ALL_TABS = [
-  { key: "season", label: "In season", tag: "recommended", icon: ICONS.leaf, view: "season", empty: "" },
+  { key: "season", label: "In season", sub: "Recommended by BloomCraft", tag: "recommended", icon: ICONS.leaf, view: "season", empty: "" },
   { key: "best", label: "Best sellers", tag: "best_seller", icon: ICONS.medal, view: "best", params: { best_sellers: 1, sort_by: "popular_desc" }, empty: "Best sellers show up once flowers start selling." },
   { key: "new", label: "New arrivals", tag: "new_arrival", icon: ICONS.spark, view: "new", params: { sort_by: "created_at_desc" }, empty: "New flowers show up here as shops add them." },
   { key: "trending", label: "Trending", tag: "trending", icon: ICONS.trend, view: "trending", params: { sort_by: "popular_desc" }, empty: "Nothing is trending yet." },
@@ -156,6 +159,7 @@ function move(step) {
 
 .fc-tabs {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin: 0 0 22px;
   overflow-x: auto;
@@ -190,6 +194,27 @@ function move(step) {
   border-color: var(--leaf-deep);
   background: var(--leaf-deep);
   color: var(--paper);
+}
+
+.fc-tab-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
+.fc-tab-text small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.fc-tab.on .fc-tab-text small {
+  color: rgba(250, 251, 250, 0.85);
+}
+
+.fc-tab:has(small) {
+  padding-block: 6px;
 }
 
 .fc-tab svg {
