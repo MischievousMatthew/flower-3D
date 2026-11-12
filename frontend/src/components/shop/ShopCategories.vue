@@ -27,13 +27,23 @@
         </div>
       </header>
 
-      <div id="sc-panel" role="tabpanel" :aria-labelledby="`sc-tab-${current}`">
+      <div id="sc-panel" role="tabpanel" class="sc-rail" :aria-labelledby="`sc-tab-${current}`">
+        <!-- One row that scrolls sideways; arrows when it doesn't all fit -->
+        <template v-if="!loading && scrollable">
+          <button type="button" class="sc-arrow prev" aria-label="Scroll back" :disabled="atStart" @click="slide(-1)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+          </button>
+          <button type="button" class="sc-arrow next" aria-label="Scroll for more" :disabled="atEnd" @click="slide(1)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+          </button>
+        </template>
+
         <ul v-if="loading" class="sc-grid" aria-label="Loading categories">
-          <li v-for="n in 6" :key="n"><span class="bc-skeleton sc-skel"></span></li>
+          <li v-for="n in 10" :key="n"><span class="bc-skeleton sc-skel"></span></li>
         </ul>
 
         <!-- Colors: a swatch for each -->
-        <ul v-else-if="current === 'color' && items.length" class="sc-swatches">
+        <ul v-else-if="current === 'color' && items.length" ref="railEl" class="sc-swatches" @scroll.passive="measure">
           <li v-for="item in items" :key="item.value">
             <button type="button" class="sc-swatch" :class="{ on: isActive(item) }" :aria-pressed="isActive(item)" @click="pick(item)">
               <span class="sc-dot" :style="{ background: swatch(item.value) }" aria-hidden="true"></span>
@@ -43,7 +53,7 @@
         </ul>
 
         <!-- Flower types, occasions and arrangements: picture tiles -->
-        <ul v-else-if="items.length" class="sc-grid">
+        <ul v-else-if="items.length" ref="railEl" class="sc-grid" @scroll.passive="measure">
           <li v-for="(item, i) in items" :key="item.value">
             <button type="button" class="sc-tile" :class="{ on: isActive(item) }" :aria-pressed="isActive(item)" @click="pick(item)">
               <span class="sc-photo" :style="{ '--tint': TINTS[i % TINTS.length] }">
@@ -63,7 +73,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { occasionIconFor } from "../../constants/occasionIcons.js";
 import { flowerSwatch } from "../../utils/flowerColors.js";
 
@@ -115,6 +125,40 @@ function move(step) {
   document.getElementById(`sc-tab-${current.value}`)?.focus();
 }
 
+// ── The sideways row: arrows, and whether they can go further ──
+const railEl = ref(null);
+const scrollable = ref(false);
+const atStart = ref(true);
+const atEnd = ref(false);
+function measure() {
+  const el = railEl.value;
+  if (!el) return (scrollable.value = false);
+  scrollable.value = el.scrollWidth > el.clientWidth + 4;
+  atStart.value = el.scrollLeft <= 4;
+  atEnd.value = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+}
+function slide(direction) {
+  const el = railEl.value;
+  if (!el) return;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  el.scrollBy({ left: direction * Math.max(el.clientWidth * 0.8, 200), behavior: reduce ? "auto" : "smooth" });
+}
+let resize = null;
+onMounted(() => {
+  if (typeof ResizeObserver !== "undefined") resize = new ResizeObserver(measure);
+});
+onBeforeUnmount(() => resize?.disconnect());
+watch(railEl, (el, old) => {
+  if (old) resize?.unobserve(old);
+  if (el) resize?.observe(el);
+});
+// A new tab or new items: start at the left and check again
+watch(() => [current.value, items.value.length, props.loading], async () => {
+  await nextTick();
+  if (railEl.value) railEl.value.scrollLeft = 0;
+  measure();
+});
+
 const isActive = (item) => (props.active[current.value] || []).includes(item.value);
 const pick = (item) => emit("pick", { type: current.value, value: item.value });
 
@@ -157,13 +201,86 @@ const swatch = flowerSwatch;
   color: var(--paper);
 }
 
-.sc-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
+/* One row of tiles that scrolls left and right */
+.sc-rail {
+  position: relative;
+}
+
+.sc-grid,
+.sc-swatches {
+  display: flex;
+  gap: 14px;
   margin: 0;
-  padding: 0;
+  padding: 2px 2px 8px;
+  overflow-x: auto;
   list-style: none;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 2px;
+  scrollbar-width: none;
+}
+
+.sc-grid::-webkit-scrollbar,
+.sc-swatches::-webkit-scrollbar {
+  display: none;
+}
+
+.sc-grid > li {
+  flex: 0 0 112px;
+  scroll-snap-align: start;
+}
+
+.sc-swatches > li {
+  flex: none;
+  scroll-snap-align: start;
+}
+
+.sc-arrow {
+  position: absolute;
+  top: 38px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 8px 20px -12px rgba(38, 45, 57, 0.5);
+  cursor: pointer;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.sc-arrow:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.sc-arrow:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sc-arrow.prev {
+  left: -14px;
+}
+
+.sc-arrow.next {
+  right: -14px;
+}
+
+.sc-arrow svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+.sc-rail:has(.sc-swatches) .sc-arrow {
+  top: 4px;
 }
 
 .sc-tile {
@@ -186,10 +303,10 @@ const swatch = flowerSwatch;
   place-items: center;
   width: 100%;
   aspect-ratio: 1;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   overflow: hidden;
   border: 2px solid transparent;
-  border-radius: 20px;
+  border-radius: 18px;
   background: var(--tint);
   transition: border-color 0.2s ease, box-shadow 0.25s ease;
 }
@@ -218,8 +335,8 @@ const swatch = flowerSwatch;
 }
 
 .sc-icon :deep(svg) {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.4;
@@ -227,26 +344,30 @@ const swatch = flowerSwatch;
 
 .sc-initial {
   font-family: var(--font-display);
-  font-size: 54px;
+  font-size: 42px;
   font-style: italic;
   color: var(--leaf-deep);
 }
 
 .sc-name {
-  font-size: 14px;
+  width: 100%;
+  overflow: hidden;
+  font-size: 13px;
   font-weight: 500;
   color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sc-count {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ink-soft);
 }
 
 .sc-skel {
   display: block;
   aspect-ratio: 1;
-  border-radius: 20px;
+  border-radius: 18px;
 }
 
 .sc-swatches {
@@ -311,17 +432,13 @@ const swatch = flowerSwatch;
     flex: none;
   }
 
-  .sc-grid {
-    display: flex;
-    overflow-x: auto;
-    padding-bottom: 6px;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
+  .sc-grid > li {
+    flex-basis: 96px;
   }
 
-  .sc-grid > li {
-    flex: 0 0 132px;
-    scroll-snap-align: start;
+  /* Phones scroll by swiping */
+  .sc-arrow {
+    display: none;
   }
 }
 
