@@ -298,7 +298,9 @@ class VendorAccountController extends Controller
         $days = (int) $data['lead_time_days'];
 
         $shop->fill([
-            'delivery_handled_by' => 'self',
+            // The shop delivers itself. Stored as "vendor": the hosted database only allows
+            // vendor / platform here (the profile page saves it the same way)
+            'delivery_handled_by' => 'vendor',
             'same_day_delivery'   => $data['same_day_delivery'],
             'lead_time'           => $days === 0 ? 'Same day' : ($days === 1 ? '1 day' : "{$days} days"),
             'max_orders_per_day'  => $data['max_orders_per_day'],
