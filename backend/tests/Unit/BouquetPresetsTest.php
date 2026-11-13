@@ -82,6 +82,29 @@ class BouquetPresetsTest extends TestCase
         BouquetPresets::normalize($allOff);
     }
 
+    public function test_each_occasion_sets_how_much_wrapper_filler_and_ribbon_one_bouquet_uses(): void
+    {
+        // 1 of each unless the shop sets more
+        $this->assertSame(['wrapper' => 1, 'filler' => 1, 'ribbon' => 1], BouquetPresets::merge(null)[1]['uses']);
+
+        $saved = BouquetPresets::normalize(['romance' => ['sizes' => [6, 12], 'uses' => ['wrapper' => 2, 'filler' => 3, 'ribbon' => '2']]]);
+        $this->assertSame(['wrapper' => 2, 'filler' => 3, 'ribbon' => 2], $saved['romance']['uses']);
+
+        // A bouquet records its occasion's amounts, so its stock is taken by them
+        $result = BouquetPresets::check(BouquetPresets::merge($saved), $this->bouquet(['key' => 'romance', 'size' => 6], 3));
+        $this->assertSame(['wrapper' => 2, 'filler' => 3, 'ribbon' => 2], $result['customizations']['preset']['uses']);
+
+        // 0, fractions and too many are refused
+        foreach ([0, 1.5, BouquetPresets::MAX_USE + 1] as $bad) {
+            try {
+                BouquetPresets::normalize(['romance' => ['sizes' => [6], 'uses' => ['filler' => $bad]]]);
+                $this->fail("{$bad} should be refused");
+            } catch (ValidationException $e) {
+                $this->assertArrayHasKey('romance.uses', $e->errors());
+            }
+        }
+    }
+
     public function test_check_accepts_a_bouquet_within_its_size(): void
     {
         $result = BouquetPresets::check(BouquetPresets::merge(null), $this->bouquet(['key' => 'romance', 'size' => 12], 12));

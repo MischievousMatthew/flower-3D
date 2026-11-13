@@ -26,6 +26,26 @@ class BouquetPresets
     public const MAX_CUSTOM = 10;
     public const MAX_BASE_PRICE = 100000;
 
+    /**
+     * How much of each material one bouquet of an occasion takes from stock:
+     * sheets per wrapper layer, per filler the customer places (2 clicks = 2 ×),
+     * and of the ribbon. 1 each unless the shop sets more (a grand bouquet).
+     */
+    public const USE_PARTS = ['wrapper', 'filler', 'ribbon'];
+    public const MAX_USE = 50;
+
+    /** An occasion's amounts, each a whole number from 1 to MAX_USE (1 when missing or wrong) */
+    public static function cleanUses($uses): array
+    {
+        $out = [];
+        foreach (self::USE_PARTS as $part) {
+            $n = is_array($uses) ? ($uses[$part] ?? null) : null;
+            $out[$part] = is_numeric($n) && (int) $n == $n ? max(1, min(self::MAX_USE, (int) $n)) : 1;
+        }
+
+        return $out;
+    }
+
     /** Bouquets saved before presets existed allowed this many flowers. */
     public const LEGACY_MAX_FLOWERS = 3;
 
@@ -121,6 +141,8 @@ class BouquetPresets
             'enabled' => array_key_exists('enabled', $own) ? (bool) $own['enabled'] : true,
             'sizes' => $sizes ?: $default['sizes'],
             'base_price' => is_numeric($own['base_price'] ?? null) ? round(max(0, min(self::MAX_BASE_PRICE, (float) $own['base_price'])), 2) : 0.0,
+            // Stock one bouquet takes: sheets per wrapper layer, per filler placed, ribbon
+            'uses' => self::cleanUses($own['uses'] ?? null),
             'custom' => $custom,
             'icon' => $default['icon'],
             'description' => $default['description'],
@@ -272,6 +294,15 @@ class BouquetPresets
             }
             sort($sizes);
 
+            $uses = is_array($row['uses'] ?? null) ? $row['uses'] : [];
+            foreach (self::USE_PARTS as $part) {
+                $n = $uses[$part] ?? 1;
+                if (! is_numeric($n) || (int) $n != $n || $n < 1 || $n > self::MAX_USE) {
+                    $errors["$key.uses"][] = "$label: each bouquet uses 1 to " . self::MAX_USE . " of the {$part}.";
+                    continue 2;
+                }
+            }
+
             $can = self::parts($design);
             $out[$key] = $stored + [
                 'enabled' => (bool) ($row['enabled'] ?? true),
@@ -280,6 +311,7 @@ class BouquetPresets
                 'design' => $design,
                 'wrapper' => $can['wrapper'] && (bool) ($row['wrapper'] ?? ($isCustom ? true : self::DEFAULTS[$key]['wrapper'])),
                 'ribbon' => $can['ribbon'] && (bool) ($row['ribbon'] ?? ($isCustom ? true : self::DEFAULTS[$key]['ribbon'])),
+                'uses' => self::cleanUses($uses),
             ];
         }
 
@@ -357,7 +389,12 @@ class BouquetPresets
         }
 
         $base = (float) ($occasion['base_price'] ?? 0);
-        $customizations['preset'] = ['key' => $occasion['key'], 'size' => $size, 'label' => $occasion['label'], 'base_price' => $base];
+        // The occasion's amounts go with the order, so its stock is taken (and put
+        // back) by what the shop had set when it was bought
+        $customizations['preset'] = [
+            'key' => $occasion['key'], 'size' => $size, 'label' => $occasion['label'], 'base_price' => $base,
+            'uses' => self::cleanUses($occasion['uses'] ?? null),
+        ];
         // The bouquet's design follows its occasion (the viewer rebuilds it from this)
         $customizations['design'] = $occasion['design'];
         // A shop's own 3D wrapper: the viewer loads it from here

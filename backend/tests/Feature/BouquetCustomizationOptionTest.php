@@ -225,11 +225,16 @@ class BouquetCustomizationOptionTest extends TestCase
             ->assertOk()->json('data');
         $this->assertNull($fern['stock_item']);
 
-        // One bouquet with 4 sprigs of baby's breath and a fern, ordered twice: 2 portions, the fern takes nothing
-        $lines = BouquetCustomizationOption::stockLinesFor([(object) ['quantity' => 2, 'customizations' => ['fillers' => [
-            ['id' => $breath['id']], ['id' => $breath['id']], ['id' => $breath['id']], ['id' => $breath['id']], ['id' => $fern['id']],
-        ]]]]);
-        $this->assertSame([[$item->id, null, 2]], $lines);
+        // Baby's breath placed 4 times and a fern, ordered twice: 4 × 1 × 2 = 8; the uncounted fern takes nothing
+        $fillers = [['id' => $breath['id']], ['id' => $breath['id']], ['id' => $breath['id']], ['id' => $breath['id']], ['id' => $fern['id']]];
+        $lines = BouquetCustomizationOption::stockLinesFor([(object) ['quantity' => 2, 'customizations' => ['fillers' => $fillers]]]);
+        $this->assertSame([[$item->id, null, 8]], $lines);
+
+        // The occasion says each filler placed uses 2: 4 × 2 × 2 = 16
+        $lines = BouquetCustomizationOption::stockLinesFor([(object) ['quantity' => 2, 'customizations' => [
+            'fillers' => $fillers, 'preset' => ['key' => 'romance', 'size' => 6, 'uses' => ['wrapper' => 1, 'filler' => 2, 'ribbon' => 1]],
+        ]]]);
+        $this->assertSame([[$item->id, null, 16]], $lines);
 
         $available = fn () => BouquetCustomizationOption::query()->available()->where('type', 'filler')->pluck('name')->sort()->values()->all();
         $this->assertSame(["Baby's breath", 'Fern'], $available());

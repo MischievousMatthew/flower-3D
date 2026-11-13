@@ -108,6 +108,27 @@
           </label>
         </div>
 
+        <!-- What one bouquet of this occasion takes from stock -->
+        <fieldset class="bp-uses">
+          <legend class="bp-label">Stock one bouquet uses</legend>
+          <div class="bp-uses-grid">
+            <label class="bp-use" :class="{ na: !p.wrapper }">
+              <span>Wrapper sheets <small>per layer</small></span>
+              <input v-model.number="p.uses.wrapper" class="sp-input" type="number" min="1" :max="MAX_USE" step="1" inputmode="numeric" :disabled="!p.wrapper" />
+            </label>
+            <label class="bp-use">
+              <span>Fillers <small>each one placed</small></span>
+              <input v-model.number="p.uses.filler" class="sp-input" type="number" min="1" :max="MAX_USE" step="1" inputmode="numeric" />
+            </label>
+            <label class="bp-use" :class="{ na: !p.ribbon }">
+              <span>Ribbon <small>per bouquet</small></span>
+              <input v-model.number="p.uses.ribbon" class="sp-input" type="number" min="1" :max="MAX_USE" step="1" inputmode="numeric" :disabled="!p.ribbon" />
+            </label>
+          </div>
+          <small class="bp-uses-note" role="status">{{ usesNote(p) }}</small>
+          <small v-if="errors[`${p.key}.uses`]" class="sp-error">{{ errors[`${p.key}.uses`] }}</small>
+        </fieldset>
+
         <div class="bp-sizes" :aria-label="`${p.label} sizes`">
           <span class="bp-label">Sizes (flowers per bouquet)</span>
           <ul>
@@ -171,7 +192,17 @@ function styleLabel(design) {
 }
 
 const MAX_CUSTOM = 10;
-const EDITABLE = ["enabled", "sizes", "base_price", "design", "wrapper", "ribbon", "label", "icon", "description"];
+const EDITABLE = ["enabled", "sizes", "base_price", "design", "wrapper", "ribbon", "uses", "label", "icon", "description"];
+
+// Stock one bouquet takes: sheets per wrapper layer, per filler placed, ribbon (1 to 50)
+const MAX_USE = 50;
+const usesOf = (uses) => ({ wrapper: Number(uses?.wrapper) || 1, filler: Number(uses?.filler) || 1, ribbon: Number(uses?.ribbon) || 1 });
+/** "Red fillers placed twice take 2 (2 × 1)": worked out as the shop types */
+function usesNote(p) {
+  const f = Number(p.uses?.filler);
+  if (!Number.isInteger(f) || f < 1) return "Type how much of each filler one placement uses.";
+  return `A customer who places a filler twice uses ${2 * f} of it (2 × ${f}).`;
+}
 
 const presets = ref(null);
 const saved = ref("[]");
@@ -189,7 +220,7 @@ const { markClean, dirty } = useUnsavedChanges({
     (presets.value ?? []).map((p) => ({
       key: p.key,
       label: p.label || "New occasion",
-      value: EDITABLE.map((f) => (f === "base_price" ? Number(p.base_price || 0) : p[f])),
+      value: EDITABLE.map((f) => (f === "base_price" ? Number(p.base_price || 0) : f === "uses" ? { ...p.uses } : p[f])),
       fallback: "#cz-panel-presets",
     })),
   save: () => save(),
@@ -217,7 +248,7 @@ function clearErrors() {
 }
 
 function setPresets(list) {
-  presets.value = list.map((p) => ({ ...p, sizes: [...p.sizes], base_price: Number(p.base_price || 0) || "" }));
+  presets.value = list.map((p) => ({ ...p, sizes: [...p.sizes], base_price: Number(p.base_price || 0) || "", uses: usesOf(p.uses) }));
   saved.value = snapshot();
   markClean();
   emit("count", enabledCount.value);
@@ -271,6 +302,7 @@ async function addOccasion() {
   presets.value.push({
     key, label: "", custom: true, icon: "flower", description: "",
     enabled: true, sizes: [6, 12], base_price: "", design: "classic", wrapper: true, ribbon: true,
+    uses: usesOf(null),
   });
   await nextTick();
   const card = cards[key];
@@ -476,6 +508,8 @@ onMounted(load);
 }
 .bp-field {
   display: grid;
+  /* Rows keep their own height: the price box doesn't stretch to match the style column */
+  align-content: start;
   gap: 6px;
   min-width: 0;
 }
@@ -486,13 +520,22 @@ onMounted(load);
 .bp-row {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: start;
   gap: 10px;
+}
+/* Narrow cards: price above style, so nothing overlaps */
+@media (max-width: 520px) {
+  .bp-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .bp-money {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 42px;
+  /* Stays inside its column (a number box would otherwise push it wider) */
+  min-width: 0;
+  min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--v-border);
   border-radius: 10px;
@@ -507,6 +550,7 @@ onMounted(load);
 }
 .bp-money input {
   flex: 1;
+  width: 100%;
   min-width: 0;
   border: 0;
   background: none;
@@ -604,6 +648,56 @@ onMounted(load);
   .bp-row {
     grid-template-columns: 1fr;
   }
+}
+/* Stock one bouquet uses: wrapper sheets, fillers, ribbon */
+.bp-uses {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.bp-uses legend {
+  margin-bottom: 8px;
+  padding: 0;
+}
+.bp-uses-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 520px) {
+  .bp-uses-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.bp-use {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+.bp-use > span {
+  display: grid;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.bp-use small {
+  font-weight: 400;
+  color: var(--v-muted);
+}
+.bp-use .sp-input {
+  width: 100%;
+  min-height: 44px;
+}
+.bp-use.na > span {
+  color: var(--v-muted);
+}
+.bp-uses-note {
+  color: var(--v-muted);
+  font-size: 12px;
 }
 .bp-upload-link {
   justify-self: start;

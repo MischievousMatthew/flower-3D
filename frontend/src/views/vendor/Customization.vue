@@ -749,14 +749,14 @@ const STOCK_WORDS = {
     onHand: "Sheets on hand",
     onHandPlaceholder: "Blank = don't count",
     onHandTip:
-      "How many sheets of this wrapper you have right now. Each bouquet a customer orders takes 1 sheet off, and at 0 the wrapper hides from customers. Leave it blank if you'd rather not count; then use the Shown / Hidden switch on the wrapper.",
+      "How many sheets of this wrapper you have right now. Each custom 3D bouquet takes the sheets set on its occasion (1 per layer unless you change it), and at 0 the wrapper hides from customers. Leave it blank if you'd rather not count; then use the Shown / Hidden switch on the wrapper.",
     perPack: "Sheets per roll",
     perPackTip: "How many sheets one roll gives you. Fill it in to add stock by the roll below; we work out the sheets for you.",
     perPackPlaceholder: "e.g. 50",
     packs: "rolls",
     packsTitle: "Rolls",
     addLabel: (n) => `Add ${n} sheets`,
-    hint: "Each bouquet uses 1 sheet. This count is the same one in Inventory.",
+    hint: "A custom 3D bouquet uses the sheets set on its occasion (1 per layer unless you change it). Same count as in Inventory.",
   },
   // The vendor gives two numbers: bouquets per sack (a guess) and sacks on
   // hand; the stock is sacks × per sack (3 × 20 = 60). A custom 3D bouquet
@@ -765,7 +765,7 @@ const STOCK_WORDS = {
     onHand: "How many sacks do you have?",
     onHandPlaceholder: "e.g. 3 (blank = don't count)",
     onHandTip:
-      "The sacks of this filler you have now (half a sack? type 0.5). We multiply: 3 sacks × 20 = 60 in stock. A bouquet in Products that uses 2 of this filler can then be made 30 times, and each custom 3D bouquet uses 1. Leave it blank if you'd rather not count; then use the Available / Sold out switch on the filler.",
+      "The sacks of this filler you have now (half a sack? type 0.5). We multiply: 3 sacks × 20 = 60 in stock. A bouquet in Products that uses 2 of this filler can then be made 30 times. In custom 3D bouquets, each time a customer places this filler it uses the amount set on the occasion (1 unless you change it in Occasions & sizes). Leave it blank if you'd rather not count; then use the Available / Sold out switch on the filler.",
     perPack: "How many bouquets can 1 sack fill?",
     perPackTip: "Your best guess is fine, no need to count pieces. If one sack usually covers about 20 bouquets, type 20.",
     perPackPlaceholder: "Your best guess, e.g. 20",
@@ -777,7 +777,7 @@ const STOCK_WORDS = {
     onHand: "How many rolls do you have?",
     onHandPlaceholder: "e.g. 4 (blank = don't count)",
     onHandTip:
-      "The rolls of this ribbon you have now (half a roll? type 0.5). We multiply: 4 rolls × 25 = 100 in stock. A bouquet in Products that uses 1 of this ribbon can then be made 100 times, and each custom 3D bouquet uses 1. Leave it blank if you'd rather not count; then use the Available / Sold out switch on the ribbon.",
+      "The rolls of this ribbon you have now (half a roll? type 0.5). We multiply: 4 rolls × 25 = 100 in stock. A bouquet in Products that uses 1 of this ribbon can then be made 100 times. A custom 3D bouquet uses the amount set on its occasion (1 unless you change it in Occasions & sizes). Leave it blank if you'd rather not count; then use the Available / Sold out switch on the ribbon.",
     perPack: "How many bouquets can 1 roll tie?",
     perPackTip: "Your best guess is fine, no need to measure. If one roll usually ties about 25 bouquets, type 25.",
     perPackPlaceholder: "Your best guess, e.g. 25",

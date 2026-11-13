@@ -68,12 +68,10 @@ class BouquetCustomizationOption extends Model
 
     protected $hidden = ['model_path', 'image_path'];
 
-    // One custom bouquet uses one sheet of each wrapper layer (outer and inner)
+    // What one custom bouquet takes comes from its occasion (BouquetPresets
+    // "uses"): sheets per wrapper layer, per filler placed, and of the ribbon.
+    // A bouquet made before occasions had amounts takes 1 of each.
     public const SHEETS_PER_LAYER = 1;
-    // ...and one portion ("one bouquet's worth") of each different filler in it,
-    // however many copies are placed: the shop only guesses how many bouquets a
-    // sack makes, so nobody has to count pieces
-    public const PORTIONS_PER_FILLER = 1;
 
     /**
      * Types whose stock can be counted, and how: the kind of stock item, what
@@ -94,9 +92,10 @@ class BouquetCustomizationOption extends Model
     }
 
     /**
-     * What custom bouquets take from stock: for each order item, a sheet of its
-     * outer and inner wrapper, a portion of each different filler and a portion
-     * of its ribbon (those with a stock item), as [stock item id, null, amount × quantity].
+     * What custom bouquets take from stock (options with a stock item), as
+     * [stock item id, null, amount × quantity], using the bouquet's occasion
+     * amounts: sheets of each wrapper layer, the ribbon, and every filler placed
+     * (Red fillers clicked twice at 1 each = 2).
      */
     public static function stockLinesFor(iterable $items): array
     {
@@ -110,19 +109,18 @@ class BouquetCustomizationOption extends Model
                 continue;
             }
             $qty = max(1, (int) ($item->quantity ?? 1));
-            // A sheet per wrapper layer, and one portion of the ribbon
-            foreach (['wrapper.id', 'inner_wrapper.id', 'ribbon.id'] as $path) {
-                $id = (int) data_get($c, $path, 0);
+            $per = \App\Support\BouquetPresets::cleanUses(data_get($c, 'preset.uses'));
+            $add = function (int $id, int $amount) use (&$uses) {
                 if ($id > 0) {
-                    $uses[$id] = ($uses[$id] ?? 0) + self::SHEETS_PER_LAYER * $qty;
+                    $uses[$id] = ($uses[$id] ?? 0) + $amount;
                 }
-            }
-            $fillers = data_get($c, 'fillers', []);
-            $fillerIds = is_array($fillers)
-                ? array_unique(array_filter(array_map(fn ($f) => (int) data_get($f, 'id', 0), $fillers)))
-                : [];
-            foreach ($fillerIds as $id) {
-                $uses[$id] = ($uses[$id] ?? 0) + self::PORTIONS_PER_FILLER * $qty;
+            };
+            $add((int) data_get($c, 'wrapper.id', 0), $per['wrapper'] * $qty);
+            $add((int) data_get($c, 'inner_wrapper.id', 0), $per['wrapper'] * $qty);
+            $add((int) data_get($c, 'ribbon.id', 0), $per['ribbon'] * $qty);
+            // Each filler the customer placed counts (pieces of one filler are one placement)
+            foreach ((array) data_get($c, 'fillers', []) as $filler) {
+                $add((int) data_get($filler, 'id', 0), $per['filler'] * $qty);
             }
         }
         if (! $uses) {
