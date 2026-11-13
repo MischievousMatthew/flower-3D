@@ -42,10 +42,10 @@ class VendorCustomizationOptionController extends Controller
         ]);
     }
 
-    /** The option with its wrapping stock item, as the page shows it */
+    /** The option with its stock item (a wrapper's sheets, a filler's portions), as the page shows it */
     private function withStock(Option $option): array
     {
-        $item = $option->type === Option::TYPE_WRAPPER ? $option->stockItem : null;
+        $item = isset(Option::STOCK[$option->type]) ? $option->stockItem : null;
 
         // The relation would serialize as the whole product under the same key: send the summary instead
         return array_merge($option->withoutRelations()->toArray(), ['stock_item' => $item ? $this->stockItemData($item) : null]);
@@ -77,14 +77,17 @@ class VendorCustomizationOptionController extends Controller
     }
 
     /**
-     * The wrapper form's Stock section: stock_item is "none", "new" (a wrapping
-     * item named like the wrapper) or the id of one of the shop's wrapping
-     * items; stock_sheets is the count on hand and pack_size the sheets per
-     * roll. A changed count is saved as a stock count in the item's history.
+     * The wrapper or filler form's Stock section: stock_item is "none" (not
+     * counted), "new" (a stock item named like the option) or the id of one of
+     * the shop's items of that kind; stock_on_hand (stock_sheets for wrappers)
+     * is the count on hand, in sheets or portions, and pack_size how many of
+     * them a roll or sack gives. A changed count is saved as a stock count in
+     * the item's history.
      */
-    private function saveWrapperStock(Request $request, Option $option, int $ownerId): void
+    private function saveStock(Request $request, Option $option, int $ownerId): void
     {
-        if ($option->type !== Option::TYPE_WRAPPER || ! $request->has('stock_item')) {
+        $how = Option::STOCK[$option->type] ?? null;
+        if (! $how || ! $request->has('stock_item')) {
             return;
         }
         $choice = (string) $request->input('stock_item');
@@ -93,32 +96,33 @@ class VendorCustomizationOptionController extends Controller
             return;
         }
 
-        $sheets = $request->filled('stock_sheets') ? max(0, (int) $request->input('stock_sheets')) : null;
+        $field = $request->filled('stock_on_hand') ? 'stock_on_hand' : 'stock_sheets';
+        $onHand = $request->filled($field) ? max(0, (int) $request->input($field)) : null;
         $packSize = (int) $request->input('pack_size') >= 2 ? (int) $request->input('pack_size') : null;
         $stock = app(\App\Services\InventoryStockService::class);
 
         if ($choice === 'new') {
             $item = $stock->createMaterial($ownerId, [
                 'name'       => $option->name,
-                'stock_kind' => 'wrapping',
-                'stock_unit' => 'sheet',
-                'pack_unit'  => $packSize ? 'roll' : null,
+                'stock_kind' => $how['kind'],
+                'stock_unit' => $how['unit'],
+                'pack_unit'  => $packSize ? $how['pack'] : null,
                 'pack_size'  => $packSize,
-                'on_hand'    => $sheets ?? 0,
+                'on_hand'    => $onHand ?? 0,
             ], $request->user());
         } else {
             $item = Product::query()
                 ->whereKey((int) $choice)
                 ->where('owner_id', $ownerId)
                 ->where('moderation_status', Product::MODERATION_INTERNAL)
-                ->where('stock_kind', 'wrapping')
+                ->where('stock_kind', $how['kind'])
                 ->first();
             if (! $item) {
-                throw new \InvalidArgumentException('Pick one of your wrapping items.');
+                throw new \InvalidArgumentException($option->type === Option::TYPE_WRAPPER ? 'Pick one of your wrapping items.' : 'Pick one of your filler stock items.');
             }
-            $item->update(['pack_unit' => $packSize ? ($item->pack_unit ?: 'roll') : null, 'pack_size' => $packSize]);
-            if ($sheets !== null && $sheets !== (int) $item->quantity_in_stock) {
-                $stock->adjust($item, 'set', $sheets, 'count', "Counted in 3D Bouquet Management ({$option->name})", $request->user());
+            $item->update(['pack_unit' => $packSize ? ($item->pack_unit ?: $how['pack']) : null, 'pack_size' => $packSize]);
+            if ($onHand !== null && $onHand !== (int) $item->quantity_in_stock) {
+                $stock->adjust($item, 'set', $onHand, 'count', "Counted in 3D Bouquet Management ({$option->name})", $request->user());
             }
         }
 
@@ -157,7 +161,7 @@ class VendorCustomizationOptionController extends Controller
             }
 
             $option->save();
-            $this->saveWrapperStock($request, $option, $ownerId);
+            $this->saveStock($request, $option, $ownerId);
 
             return response()->json(['success' => true, 'data' => $this->withStock($option->refresh()->load('stockItem')), 'wrapping_items' => $this->wrappingItems($ownerId), 'message' => ($type === Option::TYPE_WRAP_MODEL ? '3D wrapper' : ucfirst($type)) . ' added.'], 201);
         } catch (\InvalidArgumentException $e) {
@@ -200,7 +204,7 @@ class VendorCustomizationOptionController extends Controller
 
             $option->save();
             $ownerId = $this->resolveOwnerId($request);
-            $this->saveWrapperStock($request, $option, $ownerId);
+            $this->saveStock($request, $option, $ownerId);
 
             if ($previousModelPath && $previousModelPath !== $option->model_path) {
                 $this->destroyModel($previousModelPath);
@@ -220,13 +224,13 @@ class VendorCustomizationOptionController extends Controller
 
     /**
      * PATCH /api/vendor/customization-options/{id}/active
-     * Wrappers only: switched-off wrappers are hidden from the customizer.
+     * Wrappers and fillers: switched off, they're hidden from the customizer (a filler whose stock isn't counted is marked sold out this way).
      */
     public function setActive(Request $request, $id)
     {
         $option = Option::forOwner($this->resolveOwnerId($request))->find($id);
-        if (!$option || $option->type !== Option::TYPE_WRAPPER) {
-            return response()->json(['success' => false, 'message' => 'Wrapper not found.'], 404);
+        if (!$option || ! isset(Option::STOCK[$option->type])) {
+            return response()->json(['success' => false, 'message' => 'Item not found.'], 404);
         }
 
         $validator = Validator::make($request->all(), ['is_active' => 'required|boolean']);
@@ -288,6 +292,14 @@ class VendorCustomizationOptionController extends Controller
             // GLB is often sent as application/octet-stream, so check the
             // extension instead of the MIME type (as products do).
             $rules['model_file'] = ($creating ? 'required' : 'nullable') . '|file|max:51200';
+            $rules['is_active'] = 'nullable|boolean';
+        }
+
+        if (isset(Option::STOCK[$type])) {
+            // Sheets or portions on hand (blank = not counted) and how many a roll or sack gives
+            $rules['stock_on_hand'] = 'nullable|integer|min:0|max:1000000';
+            $rules['stock_sheets'] = 'nullable|integer|min:0|max:1000000';
+            $rules['pack_size'] = 'nullable|integer|min:2|max:100000';
         }
 
         if ($type === Option::TYPE_WRAP_MODEL) {
@@ -338,7 +350,7 @@ class VendorCustomizationOptionController extends Controller
         if ($request->has('color_hex') && !in_array($type, Option::MODEL_TYPES, true)) {
             $data['color_hex'] = strtolower($request->input('color_hex'));
         }
-        if ($request->has('is_active') && $type === Option::TYPE_WRAPPER) {
+        if ($request->has('is_active') && isset(Option::STOCK[$type])) {
             $data['is_active'] = $request->boolean('is_active');
         }
         if ($request->has('pattern') && $type === Option::TYPE_WRAPPER) {

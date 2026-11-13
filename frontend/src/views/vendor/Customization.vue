@@ -370,28 +370,31 @@
             <span class="cz-counter">{{ form.description.length }}/500</span>
           </label>
 
-          <!-- Wrapper stock: the same sheets ERP Stock & replenishment and Inventory show -->
-          <div v-if="activeTab === 'wrapper'" class="cz-field cz-stock">
+          <!-- Wrapper sheets / filler portions: the same count ERP Stock & replenishment and Inventory show -->
+          <div v-if="stockWords" class="cz-field cz-stock">
             <span class="cz-label">Stock <small>(optional)</small></span>
+            <!-- A filler asks the one guess first: how many bouquets a sack makes -->
             <div class="cz-stock-grid">
-              <label class="cz-field">
-                <span class="cz-label">Sheets on hand</span>
-                <input v-model="form.stockSheets" class="cz-input" :class="{ invalid: errors.stock_sheets }" type="number" min="0" step="1" inputmode="numeric" placeholder="Leave blank to skip" />
-                <span v-if="errors.stock_sheets" class="cz-error">{{ errors.stock_sheets }}</span>
-              </label>
-              <label class="cz-field">
-                <span class="cz-label">Sheets per roll</span>
-                <input v-model="form.packSize" class="cz-input" :class="{ invalid: errors.pack_size }" type="number" min="2" step="1" inputmode="numeric" placeholder="e.g. 50" />
-                <span v-if="errors.pack_size" class="cz-error">{{ errors.pack_size }}</span>
-              </label>
+              <template v-for="field in stockFieldOrder" :key="field">
+                <label v-if="field === 'onHand'" class="cz-field">
+                  <span class="cz-label">{{ stockWords.onHand }}</span>
+                  <input v-model="form.stockSheets" class="cz-input" :class="{ invalid: errors.stock_sheets }" type="number" min="0" step="1" inputmode="numeric" placeholder="Leave blank to skip" />
+                  <span v-if="errors.stock_sheets" class="cz-error">{{ errors.stock_sheets }}</span>
+                </label>
+                <label v-else class="cz-field">
+                  <span class="cz-label">{{ stockWords.perPack }}</span>
+                  <input v-model="form.packSize" class="cz-input" :class="{ invalid: errors.pack_size }" type="number" min="2" step="1" inputmode="numeric" :placeholder="stockWords.perPackPlaceholder" />
+                  <span v-if="errors.pack_size" class="cz-error">{{ errors.pack_size }}</span>
+                </label>
+              </template>
             </div>
             <div v-if="Number(form.packSize) >= 2" class="cz-stock-rolls">
-              <input v-model="form.addRolls" class="cz-input" type="number" min="1" step="1" inputmode="numeric" placeholder="Rolls" aria-label="Rolls to add" />
+              <input v-model="form.addRolls" class="cz-input" type="number" min="1" step="1" inputmode="numeric" :placeholder="stockWords.packsTitle" :aria-label="`${stockWords.packsTitle} to add`" />
               <button type="button" class="cz-btn cz-btn-ghost" :disabled="!(Number(form.addRolls) > 0)" @click="addRollsToSheets">
-                {{ Number(form.addRolls) > 0 ? `Add ${Number(form.addRolls) * Number(form.packSize)} sheets` : "Add rolls" }}
+                {{ Number(form.addRolls) > 0 ? stockWords.addLabel(Number(form.addRolls) * Number(form.packSize)) : `Add ${stockWords.packs}` }}
               </button>
             </div>
-            <span class="cz-hint">Each bouquet uses 1 sheet. This count is the same one in Inventory.</span>
+            <span class="cz-hint">{{ stockWords.hint }}</span>
           </div>
 
           <div class="cz-form-actions">
@@ -432,7 +435,7 @@
               v-for="item in currentItems"
               :key="item.id"
               class="cz-row"
-              :class="{ editing: editingId === item.id, off: item.type === 'wrapper' && !item.is_active }"
+              :class="{ editing: editingId === item.id, off: isStocked(item) && !item.is_active }"
             >
               <img v-if="item.type === 'card' && item.image_url" :src="item.image_url" alt="" class="cz-card-thumb" />
               <span
@@ -449,11 +452,13 @@
                   <span v-if="item.type === 'card'" class="cz-price">{{ itemPriceLabel(item) }}</span>
                 </div>
                 <p v-if="item.color_hex" class="cz-hexline">{{ item.color_hex.toUpperCase() }}</p>
-                <p v-if="item.type === 'wrapper' && item.stock_item" class="cz-stockline" :class="{ out: item.stock_item.on_hand < 1 }">
+                <p v-if="isStocked(item) && item.stock_item" class="cz-stockline" :class="{ out: item.stock_item.on_hand < 1 }">
                   <template v-if="item.stock_item.on_hand < 1">Sold out · hidden from customers</template>
-                  <template v-else>{{ sheetsText(item.stock_item) }} in stock</template>
+                  <template v-else>{{ stockText(item) }}</template>
                 </p>
-                <p v-else-if="item.type === 'wrapper'" class="cz-stockline muted">Stock not counted</p>
+                <p v-else-if="isStocked(item)" class="cz-stockline muted">
+                  {{ item.type === "filler" ? "Not counted · switch to Sold out when it runs out" : "Stock not counted" }}
+                </p>
                 <div v-if="item.type === 'wrapper' && item.pattern" class="cz-meta">
                   <span class="cz-chip">{{ item.pattern === "newspaper" ? "Newspaper print" : `Print: “${item.pattern_text}”` }}</span>
                 </div>
@@ -468,7 +473,7 @@
                 </p>
 
                 <div class="cz-row-foot">
-                  <label v-if="item.type === 'wrapper'" class="cz-switch">
+                  <label v-if="isStocked(item)" class="cz-switch">
                     <input
                       type="checkbox"
                       :checked="item.is_active"
@@ -476,7 +481,7 @@
                       @change="toggleWrapper(item, $event.target.checked)"
                     />
                     <span class="cz-switch-track" aria-hidden="true"></span>
-                    <span class="cz-switch-text">{{ item.is_active ? "Shown in customizer" : "Hidden" }}</span>
+                    <span class="cz-switch-text">{{ switchText(item) }}</span>
                   </label>
 
                   <div class="cz-actions">
@@ -644,6 +649,56 @@ function sheetsText(item) {
   const rolls = Math.floor(n / item.pack_size);
   const rest = n % item.pack_size;
   return `${sheets} · ≈ ${rolls} ${rolls === 1 ? "roll" : "rolls"}${rest ? ` + ${rest}` : ""}`;
+}
+
+// Wrappers and fillers can have their stock counted; with no count, the
+// switch is how the shop marks them out (a filler: Available / Sold out)
+const STOCKED_TYPES = ["wrapper", "filler"];
+const isStocked = (item) => STOCKED_TYPES.includes(item.type);
+const switchText = (item) =>
+  item.type === "filler"
+    ? item.is_active ? "Available" : "Sold out · hidden"
+    : item.is_active ? "Shown in customizer" : "Hidden";
+
+/**
+ * A filler is counted in portions: one bouquet's worth. The shop guesses how
+ * many bouquets a sack makes; each bouquet with that filler uses one portion,
+ * however many sprigs are placed. Nobody counts pieces.
+ */
+const STOCK_WORDS = {
+  wrapper: {
+    onHand: "Sheets on hand",
+    perPack: "Sheets per roll",
+    perPackPlaceholder: "e.g. 50",
+    packs: "rolls",
+    packsTitle: "Rolls",
+    addLabel: (n) => `Add ${n} sheets`,
+    hint: "Each bouquet uses 1 sheet. This count is the same one in Inventory.",
+  },
+  filler: {
+    onHand: "Bouquets it can still fill",
+    perPack: "Bouquets one sack makes",
+    perPackPlaceholder: "Your best guess, e.g. 20",
+    packs: "sacks",
+    packsTitle: "Sacks",
+    addLabel: (n) => `Add ${n} bouquets' worth`,
+    hint: "No counting pieces: each bouquet with this filler takes 1 off, however much is placed. Leave it blank to skip counting, then switch it to Sold out when the sack runs out. Same count as in Inventory.",
+  },
+};
+const stockWords = computed(() => STOCK_WORDS[activeTab.value] || null);
+const stockFieldOrder = computed(() => (activeTab.value === "filler" ? ["pack", "onHand"] : ["onHand", "pack"]));
+
+/** "Enough for 45 bouquets · ≈ 2 sacks + 5" for a filler, sheets and rolls for a wrapper */
+function stockText(item) {
+  const s = item.stock_item;
+  if (item.type !== "filler") return `${sheetsText(s)} in stock`;
+  const n = Number(s.on_hand) || 0;
+  const text = `Enough for ${n.toLocaleString("en-PH")} ${n === 1 ? "bouquet" : "bouquets"}`;
+  if (!s.pack_size) return text;
+  const sacks = Math.floor(n / s.pack_size);
+  const rest = n % s.pack_size;
+  if (!sacks) return `${text} · less than 1 sack`;
+  return `${text} · ≈ ${sacks} ${sacks === 1 ? "sack" : "sacks"}${rest ? ` + ${rest}` : ""}`;
 }
 const hsl = reactive({ h: 0, s: 0, l: 0 });
 
@@ -959,6 +1014,11 @@ function validate() {
     if (sheets !== "" && !(Number.isInteger(Number(sheets)) && Number(sheets) >= 0)) errors.stock_sheets = "Enter a whole number of sheets, or leave it blank.";
     if (String(form.packSize ?? "").trim() !== "" && !(Number(form.packSize) >= 2)) errors.pack_size = "A roll holds at least 2 sheets, or leave it blank.";
   }
+  if (activeTab.value === "filler") {
+    const left = String(form.stockSheets ?? "").trim();
+    if (left !== "" && !(Number.isInteger(Number(left)) && Number(left) >= 0)) errors.stock_sheets = "Enter a whole number of bouquets, or leave it blank.";
+    if (String(form.packSize ?? "").trim() !== "" && !(Number.isInteger(Number(form.packSize)) && Number(form.packSize) >= 2)) errors.pack_size = "Enter at least 2 bouquets, or leave it blank.";
+  }
   return !Object.keys(errors).length;
 }
 
@@ -988,9 +1048,9 @@ async function submitForm() {
     }
   }
   if (form.modelFile) payload.append("model_file", form.modelFile);
-  // The wrapper's sheets live on its wrapping stock item (shared with ERP Stock and Inventory)
-  // Blank sheets: not tracked. A number: tracked on the wrapper's own stock item (made the first time)
-  if (type === "wrapper") {
+  // A wrapper's sheets / a filler's portions live on its own stock item (shared with ERP Stock and Inventory)
+  // Blank: not tracked. A number: tracked on that stock item (made the first time)
+  if (STOCKED_TYPES.includes(type)) {
     const sheets = String(form.stockSheets ?? "").trim();
     payload.append("stock_item", sheets === "" ? "none" : form.stockItemId ? String(form.stockItemId) : "new");
     if (sheets !== "") {
@@ -1012,10 +1072,10 @@ async function submitForm() {
     });
     const saved = data.data;
     if (Array.isArray(data.wrapping_items)) wrappingItems.value = data.wrapping_items;
-    // Wrappers sharing the stock item show its new count too
-    if (saved.stock_item) {
-      options.wrapper.forEach((w, i) => {
-        if (w.stock_item?.id === saved.stock_item.id) options.wrapper.splice(i, 1, { ...w, stock_item: saved.stock_item });
+    // Others sharing the stock item show its new count too
+    if (saved.stock_item && options[type]) {
+      options[type].forEach((w, i) => {
+        if (w.stock_item?.id === saved.stock_item.id) options[type].splice(i, 1, { ...w, stock_item: saved.stock_item });
       });
     }
     const list = options[type];
@@ -1044,10 +1104,11 @@ async function toggleWrapper(item, isActive) {
   item.is_active = isActive;
   try {
     await api.patch(`/vendor/customization-options/${item.id}/active`, { is_active: isActive });
-    toast.success(isActive ? `${item.name} is shown in the customizer.` : `${item.name} is hidden from the customizer.`);
+    if (item.type === "filler") toast.success(isActive ? `${item.name} is available again.` : `${item.name} is marked sold out and hidden from customers.`);
+    else toast.success(isActive ? `${item.name} is shown in the customizer.` : `${item.name} is hidden from the customizer.`);
   } catch (error) {
     item.is_active = previous;
-    toast.error("Could not update the wrapper.");
+    toast.error(`Could not update the ${item.type === "filler" ? "filler" : "wrapper"}.`);
   } finally {
     togglingId.value = null;
   }

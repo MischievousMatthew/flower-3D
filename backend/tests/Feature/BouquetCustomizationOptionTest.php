@@ -205,6 +205,50 @@ class BouquetCustomizationOptionTest extends TestCase
             ->assertOk()->assertJsonPath('data.stock_item', null);
     }
 
+    public function test_a_filler_is_counted_in_bouquet_portions_or_switched_to_sold_out(): void
+    {
+        $vendor = $this->vendor();
+        $make = fn ($name) => BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'filler', 'name' => $name, 'model_url' => 'https://example.com/f.glb']);
+
+        // Counted: a sack makes about 20 bouquets, 3 sacks on hand
+        $breath = $this->as($vendor)->postJson('/api/vendor/customization-options/' . $make("Baby's breath")->id, [
+            'stock_item' => 'new', 'stock_on_hand' => 60, 'pack_size' => 20,
+        ])->assertOk()->json('data');
+
+        $item = \App\Models\Product::findOrFail($breath['stock_item']['id']);
+        $this->assertSame(["Baby's breath", 'greenery', 'portion', 'sack', 20, 60],
+            [$item->product_name, $item->stock_kind, $item->stock_unit, $item->pack_unit, (int) $item->pack_size, (int) $item->quantity_in_stock]);
+
+        // Not counted: just a sold-out switch
+        $fern = $this->as($vendor)->postJson('/api/vendor/customization-options/' . $make('Fern')->id, ['stock_item' => 'none'])
+            ->assertOk()->json('data');
+        $this->assertNull($fern['stock_item']);
+
+        // One bouquet with 4 sprigs of baby's breath and a fern, ordered twice: 2 portions, the fern takes nothing
+        $lines = BouquetCustomizationOption::stockLinesFor([(object) ['quantity' => 2, 'customizations' => ['fillers' => [
+            ['id' => $breath['id']], ['id' => $breath['id']], ['id' => $breath['id']], ['id' => $breath['id']], ['id' => $fern['id']],
+        ]]]]);
+        $this->assertSame([[$item->id, null, 2]], $lines);
+
+        $available = fn () => BouquetCustomizationOption::query()->available()->where('type', 'filler')->pluck('name')->sort()->values()->all();
+        $this->assertSame(["Baby's breath", 'Fern'], $available());
+
+        // Run out of portions: hidden
+        $item->update(['quantity_in_stock' => 0]);
+        $this->assertSame(['Fern'], $available());
+
+        // The shop marks the uncounted fern sold out
+        $this->as($vendor)->patchJson("/api/vendor/customization-options/{$fern['id']}/active", ['is_active' => false])->assertOk();
+        $this->assertSame([], $available());
+        $this->as($vendor)->patchJson("/api/vendor/customization-options/{$fern['id']}/active", ['is_active' => true])->assertOk();
+        $this->assertSame(['Fern'], $available());
+
+        // A wrapping item can't hold a filler's portions
+        $wrap = \App\Models\Product::forceCreate(['owner_id' => $vendor->id, 'product_name' => 'Kraft', 'quantity_in_stock' => 5, 'stock_kind' => 'wrapping', 'moderation_status' => 'internal']);
+        $this->as($vendor)->postJson("/api/vendor/customization-options/{$fern['id']}", ['stock_item' => (string) $wrap->id, 'stock_on_hand' => 5])
+            ->assertStatus(422)->assertJsonValidationErrors('stock_item');
+    }
+
     public function test_validation_requires_a_hex_colour_and_a_filler_model(): void
     {
         $vendor = $this->vendor();

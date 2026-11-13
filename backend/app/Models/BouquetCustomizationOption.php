@@ -51,8 +51,8 @@ class BouquetCustomizationOption extends Model
         'card_limit',
         'card_sizes',
         'sort_order',
-        // Wrappers: their wrapping stock item (counted in sheets), the same
-        // stock ERP Stock & replenishment and the vendor's Inventory show
+        // Wrappers and fillers: their stock item (wrapping in sheets, a filler in
+        // portions), the same stock ERP Stock & replenishment and Inventory show
         'stock_product_id',
     ];
 
@@ -70,20 +70,35 @@ class BouquetCustomizationOption extends Model
 
     // One custom bouquet uses one sheet of each wrapper layer (outer and inner)
     public const SHEETS_PER_LAYER = 1;
+    // ...and one portion ("one bouquet's worth") of each different filler in it,
+    // however many copies are placed: the shop only guesses how many bouquets a
+    // sack makes, so nobody has to count pieces
+    public const PORTIONS_PER_FILLER = 1;
 
-    /** A wrapper's stock item (a wrapping material counted in sheets) */
+    /**
+     * Types whose stock can be counted, and how: the kind of stock item, what
+     * one unit is and what it's bought in. With no stock item the count isn't
+     * tracked: the shop just switches the option off when it runs out.
+     */
+    public const STOCK = [
+        self::TYPE_WRAPPER => ['kind' => 'wrapping', 'unit' => 'sheet', 'pack' => 'roll'],
+        self::TYPE_FILLER  => ['kind' => 'greenery', 'unit' => 'portion', 'pack' => 'sack'],
+    ];
+
+    /** A wrapper's or filler's stock item (wrapping in sheets, a filler in portions) */
     public function stockItem(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Product::class, 'stock_product_id');
     }
 
     /**
-     * The wrapper sheets custom bouquets use: for each order item's outer and
-     * inner wrapper that has a stock item, [stock item id, null, sheets × quantity].
+     * What custom bouquets take from stock: for each order item, a sheet of its
+     * outer and inner wrapper and a portion of each different filler (those
+     * with a stock item), as [stock item id, null, amount × quantity].
      */
     public static function stockLinesFor(iterable $items): array
     {
-        $uses = []; // wrapper option id => layers used
+        $uses = []; // option id => amount used
         foreach ($items as $item) {
             $c = $item->customizations ?? null;
             if (is_string($c)) {
@@ -96,8 +111,15 @@ class BouquetCustomizationOption extends Model
             foreach (['wrapper.id', 'inner_wrapper.id'] as $path) {
                 $id = (int) data_get($c, $path, 0);
                 if ($id > 0) {
-                    $uses[$id] = ($uses[$id] ?? 0) + $qty;
+                    $uses[$id] = ($uses[$id] ?? 0) + self::SHEETS_PER_LAYER * $qty;
                 }
+            }
+            $fillers = data_get($c, 'fillers', []);
+            $fillerIds = is_array($fillers)
+                ? array_unique(array_filter(array_map(fn ($f) => (int) data_get($f, 'id', 0), $fillers)))
+                : [];
+            foreach ($fillerIds as $id) {
+                $uses[$id] = ($uses[$id] ?? 0) + self::PORTIONS_PER_FILLER * $qty;
             }
         }
         if (! $uses) {
@@ -106,10 +128,11 @@ class BouquetCustomizationOption extends Model
 
         return static::query()
             ->whereIn('id', array_keys($uses))
-            ->where('type', self::TYPE_WRAPPER)
+            ->whereIn('type', array_keys(self::STOCK))
             ->whereNotNull('stock_product_id')
+            ->orderBy('id')
             ->get()
-            ->map(fn (self $w) => [(int) $w->stock_product_id, null, self::SHEETS_PER_LAYER * $uses[$w->id]])
+            ->map(fn (self $o) => [(int) $o->stock_product_id, null, $uses[$o->id]])
             ->values()
             ->all();
     }
@@ -133,16 +156,18 @@ class BouquetCustomizationOption extends Model
     }
 
     /**
-     * Options a customer can pick: wrappers only when switched on and not out
-     * of sheets, and fillers only when they have a 3D model.
+     * Options a customer can pick: wrappers and fillers only when switched on
+     * and, when their stock is counted, not run out; fillers only with a 3D model.
      */
     public function scopeAvailable(Builder $query): Builder
     {
+        $stocked = array_keys(self::STOCK);
+
         return $query
-            ->where(fn ($q) => $q->where('type', '!=', self::TYPE_WRAPPER)->orWhere('is_active', true))
-            ->where(fn ($q) => $q->where('type', '!=', self::TYPE_WRAPPER)
+            ->where(fn ($q) => $q->whereNotIn('type', $stocked)->orWhere('is_active', true))
+            ->where(fn ($q) => $q->whereNotIn('type', $stocked)
                 ->orWhereNull('stock_product_id')
-                ->orWhereHas('stockItem', fn ($p) => $p->where('quantity_in_stock', '>=', self::SHEETS_PER_LAYER)))
+                ->orWhereHas('stockItem', fn ($p) => $p->where('quantity_in_stock', '>=', 1)))
             ->where(fn ($q) => $q->whereNotIn('type', self::MODEL_TYPES)->orWhereNotNull('model_url'));
     }
 

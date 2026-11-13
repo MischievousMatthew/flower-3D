@@ -412,8 +412,8 @@ const MODES = [
   { value: "add", label: "Add" },
   { value: "set", label: "Count" },
 ];
-const UNIT_HINTS = ["stem", "sheet", "piece", "bunch", "meter"];
-const PACK_HINTS = ["roll", "box", "bundle", "pack", "bunch"];
+const UNIT_HINTS = ["stem", "sheet", "portion", "piece", "bunch", "meter"];
+const PACK_HINTS = ["roll", "sack", "box", "bundle", "pack", "bunch"];
 
 // ─── Bought in packs: stock counts the smallest unit (sheets), a pack (roll) holds pack_size ───
 const cap = (s) => String(s || "").charAt(0).toUpperCase() + String(s || "").slice(1);
