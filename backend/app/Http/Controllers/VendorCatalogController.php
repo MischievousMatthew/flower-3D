@@ -22,7 +22,8 @@ class VendorCatalogController extends Controller
     use ResolvesOwner;
 
     private const STATUSES = ['active', 'draft', 'inactive', 'discontinued'];
-    private const MAX_OCCASIONS = 2;
+    // As many occasions as fit the product (same as the product form); this only stops a runaway list
+    private const MAX_OCCASIONS = 50;
 
     /** GET /vendor/catalog/products — every product the shop has, with what each screen needs. */
     public function products(Request $request): JsonResponse

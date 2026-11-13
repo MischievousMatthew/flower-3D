@@ -561,20 +561,18 @@
                 <div class="form-group full-width">
                   <label class="form-label"
                     >Occasion Tags
-                    <span class="optional-label">(Select up to 2)</span></label
+                    <span class="optional-label">(Select every one that fits)</span></label
                   >
                   <div class="tag-selector">
                     <label
                       v-for="tag in occasionTags"
                       :key="tag"
                       class="tag-option"
-                      :class="{ disabled: isTagDisabled(tag) }"
                     >
                       <input
                         type="checkbox"
                         :value="tag"
                         v-model="formData.occasion_tags"
-                        :disabled="isTagDisabled(tag)"
                         @change="handleTagChange"
                       />
                       <span>{{ tag }}</span>
@@ -787,15 +785,8 @@ const handleDiscountToggle = () => {
   }
 };
 
-const handleTagChange = () => {
-  if (formData.occasion_tags.length > 2) {
-    formData.occasion_tags = formData.occasion_tags.slice(0, 2);
-    toast.warning("You can only select up to 2 occasion tags");
-  }
-  clearError("occasion_tags");
-};
-const isTagDisabled = (tag) =>
-  formData.occasion_tags.length >= 2 && !formData.occasion_tags.includes(tag);
+// A product can be tagged with every occasion it suits
+const handleTagChange = () => clearError("occasion_tags");
 
 // 3D model
 const trigger3DFileInput = () => {
@@ -980,11 +971,6 @@ const validateForm = () => {
       isValid = false;
       if (!firstError) firstError = "discount_price";
     }
-  }
-
-  if (formData.occasion_tags.length > 2) {
-    errors.occasion_tags = "You can only select up to 2 occasion tags";
-    isValid = false;
   }
 
   if (productImages.value.length === 0) {

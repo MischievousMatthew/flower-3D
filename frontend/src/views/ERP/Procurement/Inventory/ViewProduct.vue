@@ -1263,21 +1263,18 @@
                     </div>
                     <div class="form-group full-width">
                       <label class="form-label"
-                        >Occasion Tags (Select up to 2)</label
+                        >Occasion Tags (Select every one that fits)</label
                       >
                       <div class="tag-selector">
                         <label
                           v-for="tag in occasionTags"
                           :key="tag"
                           class="tag-option"
-                          :class="{ disabled: isEditTagDisabled(tag) }"
                         >
                           <input
                             type="checkbox"
                             :value="tag"
                             v-model="editFormData.occasion_tags"
-                            :disabled="isEditTagDisabled(tag)"
-                            @change="onEditTagChange"
                           />
                           <span>{{ tag }}</span>
                         </label>
@@ -2024,13 +2021,6 @@ const onEditDiscountToggle = () => {
     editFormData.discount_price = null;
     delete editErrors.discount_price;
   }
-};
-const isEditTagDisabled = (tag) =>
-  editFormData.occasion_tags.length >= 2 &&
-  !editFormData.occasion_tags.includes(tag);
-const onEditTagChange = () => {
-  if (editFormData.occasion_tags.length > 2)
-    editFormData.occasion_tags = editFormData.occasion_tags.slice(0, 2);
 };
 const triggerEditFileInput = () => editFileInput.value?.click();
 const handleEditFileSelect = (e) => addEditImages(Array.from(e.target.files));

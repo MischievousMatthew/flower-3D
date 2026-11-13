@@ -115,7 +115,7 @@
 
             <!-- Occasions -->
             <section class="sp-section">
-              <h4>Occasions <span class="pe-count">up to 2</span></h4>
+              <h4>Occasions <span class="pe-count">{{ form.occasion_tags.length ? `${form.occasion_tags.length} picked` : "pick every one it suits" }}</span></h4>
               <div class="pe-picks">
                 <button
                   v-for="o in withCurrentList(taxonomies.occasions, form.occasion_tags)"
@@ -123,7 +123,7 @@
                   type="button"
                   class="sp-pick"
                   :class="{ on: form.occasion_tags.includes(o.value) }"
-                  :disabled="!form.occasion_tags.includes(o.value) && form.occasion_tags.length >= 2"
+                  :aria-pressed="form.occasion_tags.includes(o.value)"
                   @click="toggleOccasion(o.value)"
                 >
                   {{ o.label }}
@@ -341,7 +341,7 @@ function toggleOccasion(value) {
   const tags = form.value.occasion_tags;
   const i = tags.indexOf(value);
   if (i >= 0) tags.splice(i, 1);
-  else if (tags.length < 2) tags.push(value);
+  else tags.push(value);
 }
 function addImages(event) {
   delete errors.images;

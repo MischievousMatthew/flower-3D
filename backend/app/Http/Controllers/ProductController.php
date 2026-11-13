@@ -88,6 +88,9 @@ class ProductController extends Controller
         return response()->json(['success' => true, 'data' => $flowers]);
     }
 
+    /** A product can be tagged with as many occasions as fit it; this only stops a runaway save */
+    private const MAX_OCCASIONS = 50;
+
     /** Bouquet rows that take from a material instead of a flower: the row kind and the stock kind it needs */
     private const MATERIAL_ROWS = ['wrapper' => 'wrapping', 'filler' => 'greenery', 'ribbon' => 'ribbons'];
 
@@ -237,7 +240,7 @@ class ProductController extends Controller
                 'supplier_contact'       => 'nullable|string|max:100',
                 'supplier_sku'           => 'nullable|string|max:255',
                 'care_instructions'      => 'nullable|string',
-                'occasion_tags'          => 'nullable|array|max:2',
+                'occasion_tags'          => 'nullable|array|max:' . self::MAX_OCCASIONS,
                 'occasion_tags.*'        => ['string', Rule::in(ProductTaxonomy::activeValues(ProductTaxonomy::OCCASION))],
                 'notes'                  => 'nullable|string',
                 'is_fragile'             => 'nullable|boolean',
@@ -250,7 +253,7 @@ class ProductController extends Controller
             ], [
                 'selling_price.gt'  => 'Selling price must be greater than purchase price',
                 'discount_price.lt' => 'Discount price must be less than selling price',
-                'occasion_tags.max' => 'You can only select up to 2 occasion tags',
+                'occasion_tags.max' => 'You can select up to ' . self::MAX_OCCASIONS . ' occasions.',
                 'category.in'       => 'Choose one of the listed categories.',
                 'flower_type.in'    => 'Choose one of the listed flower types.',
                 'occasion_tags.*.in' => 'Choose occasions from the list.',
@@ -557,7 +560,7 @@ class ProductController extends Controller
                 'supplier_contact'       => 'nullable|string|max:100',
                 'supplier_sku'           => 'nullable|string|max:255',
                 'care_instructions'      => 'nullable|string',
-                'occasion_tags'          => 'nullable|array|max:2',
+                'occasion_tags'          => 'nullable|array|max:' . self::MAX_OCCASIONS,
                 'occasion_tags.*'        => ['string', Rule::in([...ProductTaxonomy::activeValues(ProductTaxonomy::OCCASION), ...((array) $product->occasion_tags)])],
                 'notes'                  => 'nullable|string',
                 'is_fragile'             => 'nullable|boolean',

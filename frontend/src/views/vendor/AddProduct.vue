@@ -123,7 +123,7 @@
           </div>
           <div data-change="occasion_tags" class="sp-field ap-gap">
             <span class="sp-label">
-              Occasions <em class="ap-count" :class="{ full: form.occasion_tags.length === 2 }">{{ form.occasion_tags.length }}/2</em>
+              Occasions <em v-if="form.occasion_tags.length" class="ap-count">{{ form.occasion_tags.length }} picked</em>
             </span>
             <div class="ap-chips">
               <button
@@ -133,14 +133,13 @@
                 class="sp-pick ap-occasion"
                 :class="{ on: form.occasion_tags.includes(o.value) }"
                 :aria-pressed="form.occasion_tags.includes(o.value)"
-                :disabled="!form.occasion_tags.includes(o.value) && form.occasion_tags.length >= 2"
                 @click="toggleOccasion(o.value)"
               >
                 <span v-if="form.occasion_tags.includes(o.value)" v-html="ICONS.check"></span>{{ o.label }}
               </button>
             </div>
             <small v-if="errors.occasion_tags" class="sp-error">{{ errors.occasion_tags }}</small>
-            <small v-else>Pick 1 or 2. Customers use “Shop by occasion”, and products without one don't show up there.</small>
+            <small v-else>Pick every occasion it suits. Customers use “Shop by occasion”, and products without one don't show up there.</small>
           </div>
         </section>
 
@@ -531,7 +530,7 @@ function setColors(list) {
 function toggleOccasion(value) {
   const i = form.occasion_tags.indexOf(value);
   if (i >= 0) form.occasion_tags.splice(i, 1);
-  else if (form.occasion_tags.length < 2) form.occasion_tags.push(value);
+  else form.occasion_tags.push(value);
   clear("occasion_tags");
 }
 function generateSku() {

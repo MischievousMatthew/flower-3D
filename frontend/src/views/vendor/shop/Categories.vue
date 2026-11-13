@@ -16,7 +16,7 @@
 
     <p class="sp-hint kind-note">
       <template v-if="kind === 'category'">Each product sits in one category. The list is shared by every BloomCraft shop; to suggest a new one, contact support.</template>
-      <template v-else>A product can be tagged with up to 2 occasions. Customers filter by these when they shop for an event.</template>
+      <template v-else>A product can be tagged with every occasion it suits. Customers filter by these when they shop for an event.</template>
     </p>
 
     <div v-if="needsAttention" class="sp-banner warn">
@@ -130,8 +130,8 @@
             </label>
             <ul class="pick-list">
               <li v-for="p in pickable" :key="p.id">
-                <label :class="{ disabled: full(p) }">
-                  <input type="checkbox" :value="p.id" v-model="picked" :disabled="full(p)" />
+                <label>
+                  <input type="checkbox" :value="p.id" v-model="picked" />
                   <img v-if="p.image" :src="p.image" :alt="p.name" class="sp-thumb" loading="lazy" />
                   <span v-else class="sp-thumb blank" v-html="ICONS.image"></span>
                   <span class="cat-item-main">
@@ -203,12 +203,11 @@ const active = computed(() =>
 );
 const activeItems = computed(() => (active.value ? (products.value ?? []).filter((p) => inGroup(p, active.value.value)) : []));
 
-const full = (p) => kind.value === "occasion" && p.occasion_tags.length >= 2;
 const pickable = computed(() => {
   const q = pickSearch.value.trim().toLowerCase();
   return (products.value ?? [])
     .filter((p) => !inGroup(p, active.value.value) && (!q || p.name.toLowerCase().includes(q)))
-    .sort((a, b) => Number(full(a)) - Number(full(b)) || a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name));
 });
 
 function setKind(k) {
