@@ -17,7 +17,7 @@
         <div class="sp-stat"><span class="sp-stat-icon tone-green" v-html="ICONS.play"></span><div><strong>{{ byState.running }}</strong><span>Running now</span></div></div>
         <div class="sp-stat"><span class="sp-stat-icon tone-blue" v-html="ICONS.calendar"></span><div><strong>{{ byState.scheduled }}</strong><span>Scheduled</span></div></div>
         <div class="sp-stat"><span class="sp-stat-icon tone-violet" v-html="ICONS.percent"></span><div><strong>{{ onSale.length }}</strong><span>Products on sale now</span></div></div>
-        <div class="sp-stat"><span class="sp-stat-icon tone-slate" v-html="ICONS.history"></span><div><strong>{{ byState.ended + byState.paused }}</strong><span>Paused or ended</span></div></div>
+        <div class="sp-stat"><span class="sp-stat-icon tone-slate" v-html="ICONS.history"></span><div><strong>{{ byState.ended + byState.paused + byState.full }}</strong><span>Paused, full or ended</span></div></div>
       </template>
     </section>
 
@@ -59,6 +59,16 @@
               <template v-else-if="p.state === 'scheduled'"> · starts {{ relative(p.starts_at) }}</template>
             </div>
             <div v-if="p.state === 'running'" class="promo-progress"><span :style="{ width: `${progress(p)}%` }"></span></div>
+            <!-- People who used it, out of the limit -->
+            <p class="promo-uses" :class="{ full: p.state === 'full' }">
+              <span v-html="ICONS.users"></span>
+              <template v-if="p.max_uses">
+                {{ p.uses_count }} of {{ p.max_uses }} {{ p.max_uses === 1 ? "person" : "people" }} used it
+                <template v-if="p.state === 'full'"> · full, customers see the regular price</template>
+                <template v-else> · {{ p.spots_left }} {{ p.spots_left === 1 ? "spot" : "spots" }} left</template>
+              </template>
+              <template v-else>{{ p.uses_count }} {{ p.uses_count === 1 ? "person" : "people" }} used it · no limit</template>
+            </p>
             <p class="promo-products">
               <template v-if="p.product_count">
                 {{ p.product_count }} live {{ p.product_count === 1 ? "product" : "products" }}: {{ p.product_names.join(", ") }}<template v-if="p.product_count > p.product_names.length">…</template>
@@ -175,6 +185,29 @@
                 <span>Ends</span>
                 <input v-model="editor.ends_at" type="datetime-local" class="sp-input" :min="editor.starts_at" required />
               </label>
+              <!-- How many people can use it, once each (blank = no limit) -->
+              <div class="sp-field sp-span-all">
+                <span class="promo-label-row">
+                  <label for="promo-max-uses" class="sp-label">How many people can use it</label>
+                  <InfoTip label="About how many people can use it" align="start">
+                    The first {{ Number(editor.max_uses) > 0 ? editor.max_uses : "people" }} customers who order get the promotion
+                    price, each only once. After that, everyone sees the regular price. A cancelled order gives its spot back to
+                    the next customer. Leave it blank for no limit.
+                  </InfoTip>
+                </span>
+                <input
+                  id="promo-max-uses"
+                  v-model.number="editor.max_uses"
+                  type="number"
+                  :min="Math.max(1, editor.uses_count || 0)"
+                  max="100000"
+                  step="1"
+                  inputmode="numeric"
+                  class="sp-input"
+                  placeholder="No limit"
+                />
+                <small v-if="editor.uses_count" class="sp-hint">{{ editor.uses_count }} {{ editor.uses_count === 1 ? "person has" : "people have" }} used it already, so it can't go lower than that.</small>
+              </div>
             </div>
 
             <div class="promo-preview">
@@ -221,6 +254,7 @@ import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import SalePriceModal from "../../../components/vendor/shop/SalePriceModal.vue";
+import InfoTip from "../../../components/vendor/shop/InfoTip.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage, formatDate, money, useVendorCatalog } from "../../../components/vendor/shop/useVendorCatalog";
 import "../../../components/vendor/shop/shop.css";
@@ -230,6 +264,8 @@ const { products, error: catalogError, load, replace, taxonomies, categoryLabel 
 const STATE = {
   running: { label: "Running", tone: "green" },
   scheduled: { label: "Scheduled", tone: "blue" },
+  // Every spot taken (a cancelled order frees one)
+  full: { label: "Full", tone: "violet" },
   paused: { label: "Paused", tone: "amber" },
   ended: { label: "Ended", tone: "slate" },
 };
@@ -284,7 +320,7 @@ function loadAll() {
 }
 
 const byState = computed(() => {
-  const counts = { running: 0, scheduled: 0, paused: 0, ended: 0 };
+  const counts = { running: 0, scheduled: 0, full: 0, paused: 0, ended: 0 };
   (promotions.value ?? []).forEach((p) => counts[p.state]++);
   return counts;
 });
@@ -379,6 +415,8 @@ function openEditor(p = null, preset = null) {
       targets: p.targets.map(String),
       starts_at: toLocal(p.starts_at),
       ends_at: toLocal(p.ends_at),
+      max_uses: p.max_uses ?? "",
+      uses_count: p.uses_count || 0,
     };
     return;
   }
@@ -393,6 +431,8 @@ function openEditor(p = null, preset = null) {
     targets: [],
     starts_at: toLocal(start),
     ends_at: toLocal(end),
+    max_uses: "", // no limit
+    uses_count: 0,
   };
   if (preset) applyPreset(preset);
 }
@@ -454,6 +494,15 @@ async function savePromotion() {
     editorError.value = "Choose at least one to apply it to.";
     return;
   }
+  const limit = e.max_uses === "" || e.max_uses === null ? null : Number(e.max_uses);
+  if (limit !== null && !(Number.isInteger(limit) && limit >= 1)) {
+    editorError.value = "Enter how many people can use it (1 or more), or leave it blank for no limit.";
+    return;
+  }
+  if (limit !== null && limit < (e.uses_count || 0)) {
+    editorError.value = `${e.uses_count} people already used it, so the limit can't be lower than that.`;
+    return;
+  }
   saving.value = true;
   try {
     const body = {
@@ -464,6 +513,7 @@ async function savePromotion() {
       targets: e.applies_to === "all" ? [] : e.targets,
       starts_at: new Date(e.starts_at).toISOString(),
       ends_at: new Date(e.ends_at).toISOString(),
+      max_uses: limit, // null = no limit
     };
     const { data } = e.id ? await api.put(`vendor/promotions/${e.id}`, body) : await api.post("vendor/promotions", body);
     toast.success(data.message);
@@ -578,6 +628,30 @@ onMounted(loadAll);
   width: 14px;
   height: 14px;
   color: var(--v-faint);
+}
+/* "12 of 50 people used it · 38 spots left" */
+.promo-uses {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--v-text-2);
+}
+.promo-uses :deep(svg) {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--v-faint);
+}
+.promo-uses.full {
+  color: var(--v-purple-text);
+}
+/* Label and its ? side by side */
+.promo-label-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .promo-progress {
   height: 5px;

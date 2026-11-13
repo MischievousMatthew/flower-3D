@@ -27,9 +27,17 @@ class CheckoutRetryTest extends TestCase
     {
         parent::setUp();
         config(['services.paymongo.secret_key' => null]);
-        foreach (['order_items', 'orders', 'products', 'reservation_availability_cache', 'users'] as $t) {
+        foreach (['promotion_redemptions', 'order_items', 'orders', 'products', 'reservation_availability_cache', 'users'] as $t) {
             Schema::dropIfExists($t);
         }
+        // Giving an order's stock back also gives back its promotion spots
+        Schema::create('promotion_redemptions', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('promotion_id');
+            $t->unsignedBigInteger('user_id');
+            $t->unsignedBigInteger('order_id');
+            $t->timestamps();
+        });
         Schema::create('users', function (Blueprint $t) {
             $t->id();
             $t->string('name')->nullable();

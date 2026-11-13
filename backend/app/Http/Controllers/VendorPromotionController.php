@@ -26,7 +26,7 @@ class VendorPromotionController extends Controller
             ->orderByDesc('starts_at')
             ->get()
             ->map(fn (VendorPromotion $p) => $this->format($p, $products))
-            ->sortBy(fn ($p) => array_search($p['state'], ['running', 'scheduled', 'paused', 'ended'], true))
+            ->sortBy(fn ($p) => array_search($p['state'], ['running', 'scheduled', 'full', 'paused', 'ended'], true))
             ->values();
 
         return response()->json(['success' => true, 'data' => $promotions]);
@@ -49,7 +49,7 @@ class VendorPromotionController extends Controller
     {
         $ownerId = $this->resolveOwnerId($request);
         $promotion = $this->find($ownerId, $id);
-        $promotion->update($this->validated($request, $ownerId));
+        $promotion->update($this->validated($request, $ownerId, $promotion));
         VendorPromotion::forgetCache($ownerId);
 
         return response()->json([
@@ -85,7 +85,8 @@ class VendorPromotionController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────
 
-    private function validated(Request $request, int $ownerId): array
+    /** $editing: the promotion being changed (its limit can't go below the people who used it) */
+    private function validated(Request $request, int $ownerId, ?VendorPromotion $editing = null): array
     {
         $data = $request->validate([
             'name' => 'required|string|min:3|max:120',
@@ -96,9 +97,19 @@ class VendorPromotionController extends Controller
             'targets.*' => 'string|max:100',
             'starts_at' => 'required|date',
             'ends_at' => 'required|date|after:starts_at',
+            // How many people can use it, once each; blank = no limit
+            'max_uses' => 'nullable|integer|min:1|max:100000',
         ], [
             'ends_at.after' => 'The promotion must end after it starts.',
+            'max_uses.min' => 'Let at least 1 person use it, or leave it blank for no limit.',
+            'max_uses.integer' => 'Enter a whole number of people, or leave it blank for no limit.',
         ]);
+        $data['max_uses'] = isset($data['max_uses']) && $data['max_uses'] !== '' ? (int) $data['max_uses'] : null;
+
+        // Can't go below the people who already used it
+        if ($editing && $data['max_uses'] !== null && $data['max_uses'] < (int) $editing->uses_count) {
+            throw ValidationException::withMessages(['max_uses' => "{$editing->uses_count} people already used it, so the limit can't be lower than that."]);
+        }
 
         if ($data['discount_type'] === VendorPromotion::PERCENT && $data['discount_value'] > 90) {
             throw ValidationException::withMessages(['discount_value' => 'A percentage discount can be at most 90%.']);
@@ -154,6 +165,10 @@ class VendorPromotionController extends Controller
             'ends_at' => $promotion->ends_at->toIso8601String(),
             'is_active' => $promotion->is_active,
             'state' => $promotion->state(),
+            // How many people can use it (null = no limit), and how many have
+            'max_uses' => $promotion->max_uses,
+            'uses_count' => (int) $promotion->uses_count,
+            'spots_left' => $promotion->spotsLeft(),
             'product_count' => $live->count(),
             'product_names' => $live->pluck('product_name')->take(4)->values(),
             // Fixed amounts larger than a product's price don't apply to it

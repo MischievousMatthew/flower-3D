@@ -631,7 +631,9 @@ class CheckoutController extends Controller
                 // Calculate totals (NO TAX)
                 $subtotal = 0;
                 $itemsData = [];
-                
+                // Shop promotions that set a price in this order: each takes one of its spots
+                $promotionIds = [];
+
                 foreach ($cartItems as $item) {
                     $isCustomBouquet = data_get($item->customizations, 'type') === 'custom_flower_bouquet';
                     $price = $isCustomBouquet
@@ -642,6 +644,12 @@ class CheckoutController extends Controller
 
                     if (!$price) {
                         throw new \Exception("Price not found for product: " . $item->product->product_name);
+                    }
+
+                    // This price came from a shop promotion (not the product's own sale)
+                    $promotion = $isCustomBouquet ? null : $item->product->runningPromotion();
+                    if ($promotion && abs($promotion['price'] - $price) < 0.005) {
+                        $promotionIds[] = $promotion['promotion']->id;
                     }
 
                     $itemSubtotal = $price * $item->quantity;
@@ -739,6 +747,13 @@ class CheckoutController extends Controller
                 // gives it back. Throws OutOfStockException if it's gone.
                 app(VendorFinanceService::class)->deductOrderStock($order);
 
+                // A spot of each promotion used, in this same transaction: if the
+                // last spot was just taken (or this customer already used it), the
+                // whole order rolls back. Given back when the order is cancelled.
+                if ($promotionIds) {
+                    \App\Models\VendorPromotion::claim($promotionIds, (int) $user->id, (int) $order->id);
+                }
+
                 // Update reservation cache
                 ReservationAvailabilityCache::updateForDate($vendorId, $reservationDate->toDateString());
 
@@ -820,6 +835,12 @@ class CheckoutController extends Controller
                 ReservationAvailabilityCache::updateForDate($vendorId, $reservationDate->toDateString());
 
                 return response()->json(['success' => false, 'code' => 'out_of_stock', 'message' => $e->getMessage()], 409);
+            } catch (\App\Exceptions\PromotionUnavailableException $e) {
+                // The promotion's last spot went to someone else first (or was already used)
+                DB::rollBack();
+                ReservationAvailabilityCache::updateForDate($vendorId, $reservationDate->toDateString());
+
+                return response()->json(['success' => false, 'code' => 'promotion_unavailable', 'message' => $e->getMessage()], 409);
             } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
                 // The same checkout arrived twice at the same moment: answer with the first
                 DB::rollBack();

@@ -52,6 +52,8 @@ class VendorFinanceService
             foreach ($this->takenLines($locked) as [$productId, $color, $quantity]) {
                 Product::putBackStock($productId, $quantity, $color);
             }
+            // Its promotion spots go back too, so the next customer can have them
+            \App\Models\VendorPromotion::release((int) $locked->id);
 
             $locked->update(['stock_restored_at' => now()]);
         });
@@ -97,6 +99,8 @@ class VendorFinanceService
                     Product::putBackStock($productId, $quantity, $color);
                 }
             }
+            // A cancelled order gives its promotion spots back (safe if already given back)
+            \App\Models\VendorPromotion::release((int) $lockedOrder->id);
 
             $lockedOrder->update([
                 'status'            => 'cancelled',
