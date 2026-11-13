@@ -1,8 +1,24 @@
 <template>
   <ShopLayout title="Inventory" subtitle="Stock on hand, quick adjustments with a reason, and alerts before you run out.">
     <template #actions>
-      <router-link :to="{ name: 'VendorAddProduct' }" class="sp-btn sp-btn-ghost"><span v-html="ICONS.plus"></span>Add product</router-link>
+      <router-link v-if="tab === 'products'" :to="{ name: 'VendorAddProduct' }" class="sp-btn sp-btn-ghost"><span v-html="ICONS.plus"></span>Add product</router-link>
+      <router-link v-else :to="{ name: 'VendorCustomization' }" class="sp-btn sp-btn-ghost"><span v-html="ICONS.plus"></span>Add in 3D Bouquet Management</router-link>
     </template>
+
+    <!-- What to show: the products, or the wrappers, fillers and ribbons the shop uses -->
+    <nav class="inv-tabs" role="tablist" aria-label="Inventory sections">
+      <button
+        v-for="t in tabs"
+        :key="t.key"
+        type="button"
+        role="tab"
+        :aria-selected="tab === t.key"
+        :class="{ on: tab === t.key }"
+        @click="setTab(t.key)"
+      >
+        {{ t.label }}<span v-if="products" class="count">{{ t.count }}</span>
+      </button>
+    </nav>
 
     <div v-if="error && !products" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
@@ -15,9 +31,9 @@
         <div v-for="n in 4" :key="n" class="sp-stat"><div class="bc-skeleton sp-stat-icon"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
       </template>
       <template v-else>
-        <button type="button" class="sp-stat" :class="{ on: filter === 'all' && !search }" title="Show all products" @click="showAll">
+        <button type="button" class="sp-stat" :class="{ on: filter === 'all' && !search }" :title="`Show all ${tabInfo.noun}`" @click="showAll">
           <span class="sp-stat-icon tone-green" v-html="ICONS.box"></span>
-          <div><strong>{{ totals.units.toLocaleString() }}</strong><span>Items in stock</span></div>
+          <div><strong>{{ totals.units.toLocaleString() }}</strong><span>{{ tab === "products" ? "Items" : "Left" }} in stock</span></div>
         </button>
         <div class="sp-stat">
           <span class="sp-stat-icon tone-blue" v-html="ICONS.tag"></span>
@@ -45,7 +61,7 @@
           </div>
           <label class="sp-search">
             <span v-html="ICONS.search"></span>
-            <input v-model="search" class="sp-input" type="search" placeholder="Search products" aria-label="Search products" />
+            <input v-model="search" class="sp-input" type="search" :placeholder="`Search ${tabInfo.noun}`" :aria-label="`Search ${tabInfo.noun}`" />
           </label>
         </div>
 
@@ -54,8 +70,9 @@
         </div>
         <div v-else-if="!rows.length" class="sp-empty">
           <span class="sp-empty-icon" v-html="ICONS.check"></span>
-          <h3>{{ products.length ? "Nothing here" : "No products yet" }}</h3>
-          <p>{{ products.length ? (filter === "all" ? "No products match your search." : "No products in this group right now.") : "Add a product and its stock shows up here." }}</p>
+          <h3>{{ tabItems.length ? "Nothing here" : `No ${tabInfo.noun} yet` }}</h3>
+          <p>{{ tabItems.length ? (filter === "all" ? `No ${tabInfo.noun} match your search.` : `No ${tabInfo.noun} in this group right now.`) : tabInfo.empty }}</p>
+          <router-link v-if="!tabItems.length && tab !== 'products'" :to="{ name: 'VendorCustomization' }" class="sp-btn sp-btn-ghost sp-btn-sm">Open 3D Bouquet Management</router-link>
         </div>
         <ul v-else class="inv-rows">
           <li v-for="p in rows" :key="p.id" class="inv-row" :data-change="`stock_${p.id}`" :class="{ focus: historyFor?.id === p.id, pending: pending[p.id] }">
@@ -66,7 +83,7 @@
                 <strong>{{ p.name }}</strong>
                 <span class="sp-chip" :class="STATE[p.stock_state].tone">{{ STATE[p.stock_state].label }}</span>
                 <span v-if="p.status !== 'active'" class="sp-chip slate">{{ p.status === "draft" ? "Draft" : "Archived" }}</span>
-                <span v-if="p.material" class="sp-chip slate" title="A material the shop uses, not sold on its own">{{ p.stock_kind === "wrapping" ? "Wrapping" : "Material" }}</span>
+                <span v-if="p.material && tab === 'other'" class="sp-chip slate" title="A material the shop uses, not sold on its own">{{ p.stock_kind === "wrapping" ? "Wrapping" : "Material" }}</span>
               </div>
               <div class="inv-meter" :title="meterTitle(p)">
                 <span :class="p.stock_state" :style="{ width: `${meter({ ...p, stock: shown(p) })}%` }"></span>
@@ -74,7 +91,7 @@
               </div>
               <div class="inv-sub">
                 <span>
-                  <strong>{{ shown(p) }}</strong> {{ p.unit ? `${unitWord(p, shown(p))} ` : "" }}in stock
+                  <strong>{{ shown(p) }}</strong> {{ unitLabel(p, shown(p)) }}in stock
                   <em v-if="p.pack_size" class="inv-packs">{{ packText(p, shown(p)) }} · {{ p.pack_size }} per {{ p.pack_unit }}</em>
                   <em v-if="pending[p.id]" class="inv-pending" :class="pending[p.id] > 0 ? 'up' : 'down'" :title="`Was ${p.stock}. Not saved yet`">
                     {{ pending[p.id] > 0 ? "+" : "−" }}{{ Math.abs(pending[p.id]) }} not saved
@@ -220,6 +237,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
@@ -269,7 +287,39 @@ const loadMaterials = () =>
     .get("vendor/catalog/materials")
     .then(({ data }) => (materials.value = data.data ?? []))
     .catch(() => {}); // the products still show
-const items = computed(() => (products.value ? [...products.value, ...materials.value] : null));
+const allItems = computed(() => (products.value ? [...products.value, ...materials.value] : null));
+
+// ─── Sections: Products, and the wrappers, fillers and ribbons from 3D Bouquet Management ───
+const TABS = {
+  products: { label: "Products", noun: "products", empty: "Add a product and its stock shows up here." },
+  wrappers: { label: "Wrappers", noun: "wrappers", empty: "Wrappers show here once their sheets are counted in 3D Bouquet Management." },
+  fillers: { label: "Fillers", noun: "fillers", empty: "Fillers show here once their sacks are counted in 3D Bouquet Management." },
+  ribbons: { label: "Ribbons", noun: "ribbons", empty: "Ribbons show here once their rolls are counted in 3D Bouquet Management." },
+  other: { label: "Other materials", noun: "materials", empty: "Other materials you count in ERP Stock show here." },
+};
+const KIND_TAB = { wrapping: "wrappers", greenery: "fillers", ribbons: "ribbons" };
+const tabOf = (p) => (!p.material ? "products" : KIND_TAB[p.stock_kind] || "other");
+
+const route = useRoute();
+const router = useRouter();
+const tab = ref(TABS[route.query.tab] ? String(route.query.tab) : "products");
+function setTab(key) {
+  tab.value = key;
+  filter.value = "all";
+  search.value = "";
+  historyFor.value = null;
+  // Kept in the address, so a refresh or a shared link opens the same section
+  router.replace({ query: { ...route.query, tab: key === "products" ? undefined : key } }).catch(() => {});
+}
+const tabInfo = computed(() => TABS[tab.value]);
+const tabs = computed(() =>
+  Object.entries(TABS)
+    .map(([key, t]) => ({ key, label: t.label, count: (allItems.value ?? []).filter((p) => tabOf(p) === key).length }))
+    // "Other materials" only when the shop has some (vases, supplies… from ERP Stock)
+    .filter((t) => t.key !== "other" || t.count > 0 || tab.value === "other"),
+);
+const tabItems = computed(() => (allItems.value ?? []).filter((p) => tabOf(p) === tab.value));
+const items = computed(() => (allItems.value ? tabItems.value : null));
 /** Put an item returned by the API back in its list */
 function replaceItem(p) {
   if (!p.material) return replace(p);
@@ -278,13 +328,16 @@ function replaceItem(p) {
 }
 const plural = (word, n) => (n === 1 || /s$/i.test(String(word || "")) ? word : `${word}s`);
 /** What it's counted in: "sheets" for a wrapper, nothing extra for products */
-const unitWord = (p, n) => (p.unit ? plural(p.unit, n) : n === 1 ? "item" : "items");
+// A filler or ribbon is counted in "portions" behind the scenes; shops just see units (and sacks / rolls)
+const unitWord = (p, n) => (p.unit === "portion" ? plural("unit", n) : p.unit ? plural(p.unit, n) : n === 1 ? "item" : "items");
+/** "sheets " before "in stock"; nothing for products, or for fillers and ribbons (just "60 in stock") */
+const unitLabel = (p, n) => (p.unit && p.unit !== "portion" ? `${unitWord(p, n)} ` : "");
 /** 95 sheets of 50 per roll → "≈ 1 roll + 45 sheets" */
 function packText(p, n) {
   const packs = Math.floor(n / p.pack_size);
   const rest = n % p.pack_size;
   if (!packs) return `less than 1 ${p.pack_unit}`;
-  return `≈ ${packs} ${plural(p.pack_unit, packs)}${rest ? ` + ${rest} ${unitWord(p, rest)}` : ""}`;
+  return `≈ ${packs} ${plural(p.pack_unit, packs)}${rest ? ` + ${rest} ${unitLabel(p, rest)}`.trimEnd() : ""}`;
 }
 
 const counts = computed(() => {
@@ -480,6 +533,67 @@ onMounted(() => {
 <style scoped>
 .grow {
   flex: 1;
+}
+
+/* Sections: Products · Wrappers · Fillers · Ribbons (underlined tabs, scroll sideways on a phone) */
+.inv-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--v-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.inv-tabs::-webkit-scrollbar {
+  display: none;
+}
+.inv-tabs button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: -1px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--v-text-2);
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.inv-tabs button:hover {
+  color: var(--v-text);
+}
+.inv-tabs button.on {
+  border-bottom-color: var(--bc-accent);
+  color: var(--v-text);
+  font-weight: 600;
+}
+.inv-tabs button:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: -2px;
+  border-radius: 8px 8px 0 0;
+}
+.inv-tabs .count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--v-subtle-2, rgba(0, 0, 0, 0.06));
+  color: var(--v-text-2);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.inv-tabs button.on .count {
+  background: var(--bc-accent-muted);
+  color: var(--bc-accent-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-tabs button {
+    transition: none;
+  }
 }
 .inv-layout {
   display: grid;
