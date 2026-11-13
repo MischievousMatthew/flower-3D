@@ -105,7 +105,7 @@
 
     <!-- Grid -->
     <div v-else-if="view === 'grid'" class="p-grid">
-      <article v-for="p in visible" :key="p.id" class="p-card" :class="{ picked: isSelected(p), dim: p.status !== 'active' }">
+      <article v-for="p in visible" :key="p.id" class="p-card" :class="{ picked: isSelected(p), dim: p.status !== 'active', 'menu-open': menuFor === p.id }">
         <div class="p-media" @click="editing = p.id">
           <img v-if="p.image" :src="p.image" :alt="p.name" loading="lazy" class="p-img" />
           <span v-else class="p-img blank" v-html="ICONS.image"></span>
@@ -488,6 +488,11 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   background: var(--v-surface);
   overflow: visible;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+/* The card with its ⋮ menu open sits above the cards after it, so the menu isn't covered */
+.p-card.menu-open {
+  position: relative;
+  z-index: 20;
 }
 .p-card:hover {
   border-color: var(--bc-accent-muted);
