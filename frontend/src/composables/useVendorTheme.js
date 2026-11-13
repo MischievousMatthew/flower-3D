@@ -12,6 +12,7 @@ import {
   ACCENT_PRESETS,
   DEFAULT_ACCENT,
   MODE_KEY,
+  RENAMED_ACCENTS,
   inkFor,
   isHex,
   readMode,
@@ -41,7 +42,9 @@ const save = (key, value) => {
 const readAccent = () => {
   try {
     const saved = localStorage.getItem(ACCENT_KEY);
-    return isHex(saved) ? saved.toLowerCase() : DEFAULT_ACCENT;
+    if (!isHex(saved)) return DEFAULT_ACCENT;
+    // A preset that changed shade (the old Charcoal) moves to its new one
+    return RENAMED_ACCENTS[saved.toLowerCase()] ?? saved.toLowerCase();
   } catch (_) {
     return DEFAULT_ACCENT;
   }

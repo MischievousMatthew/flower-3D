@@ -39,7 +39,21 @@ test("the default light shades are the original greens", () => {
     border: "#9ae6b4",
     solid: "#22543d",
     "solid-hover": "#2f855a",
+    switch: "#48bb78",
   });
+});
+
+test("a switch that's on never looks like one that's off", () => {
+  const off = { dark: "#3a4555", light: "#cbd5e0" };
+  for (const { name, value } of ACCENT_PRESETS) {
+    const dark = shadesFor(value, true).switch;
+    const light = shadesFor(value, false).switch;
+    assert.ok(contrast(dark, "#161c25") >= 3, `${name}: on stands out from a dark card`);
+    assert.ok(contrast(dark, off.dark) >= 1.8, `${name}: on differs from off in dark mode`);
+    assert.ok(contrast(light, off.light) >= 1.5, `${name}: on differs from off in light mode`);
+  }
+  // Charcoal is grey like the off track, so it needs a clear step: 3:1 in dark mode
+  assert.ok(contrast(shadesFor("#1e293b", true).switch, off.dark) >= 3);
 });
 
 test("accent text shades stay readable on dark cards", () => {

@@ -2235,7 +2235,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-switch input:checked + .cz-switch-track {
-  background: var(--bc-accent);
+  background: var(--bc-accent-switch, var(--bc-accent));
 }
 
 .cz-switch input:checked + .cz-switch-track::after {

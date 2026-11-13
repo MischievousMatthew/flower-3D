@@ -242,7 +242,8 @@
   transition: transform 0.2s;
 }
 .sp-switch input:checked + span {
-  background: var(--bc-accent);
+  /* The accent, or a lighter / darker step when it would look like "off" (vendorThemeCore switchColor) */
+  background: var(--bc-accent-switch, var(--bc-accent));
 }
 .sp-switch input:checked + span::after {
   transform: translateX(16px);

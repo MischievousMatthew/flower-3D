@@ -15,8 +15,11 @@ export const ACCENT_PRESETS = [
   { name: "Rose", value: "#e11d6b" },
   { name: "Coral", value: "#f97316" },
   { name: "Gold", value: "#ca8a04" },
-  { name: "Charcoal", value: "#334155" },
+  { name: "Charcoal", value: "#1e293b" },
 ];
+
+/** Charcoal used to be #334155; a vendor who picked it gets the darker one */
+export const RENAMED_ACCENTS = { "#334155": "#1e293b" };
 
 // Status colors: each has a soft background and a text color
 export const HUES = ["red", "amber", "blue", "green", "purple", "pink", "teal"];
@@ -125,6 +128,43 @@ const solidFrom = (hex, start) => {
   return "#000000";
 };
 
+/** How colourful a colour is, 0 (grey) to 1 (HSL saturation) */
+const saturation = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return 0;
+  const l = (max + min) / 2;
+  return (max - min) / (l > 0.5 ? 2 - max - min : max + min);
+};
+
+/**
+ * A switch's "on" track: the accent, unless it would look like the grey "off"
+ * track. On dark pages a dark accent (Charcoal) is lightened until it stands
+ * out from the card (3:1, the bar for controls); on light pages an accent too
+ * close to the off grey is darkened. Bright accents are left as they are.
+ */
+export function switchColor(hex, dark) {
+  if (dark) {
+    // A grey-ish accent (Charcoal) looks like the grey off track, so it needs a
+    // clear step from it; a vivid colour already reads as "on" by its hue
+    const offGap = saturation(hex) < 0.4 ? 3 : 1.8;
+    const reads = (c) => contrast(c, DARK_TOKENS.surface) >= 3 && contrast(c, DARK_TOKENS["border-strong"]) >= offGap;
+    if (reads(hex)) return hex;
+    for (let amount = 0.1; amount < 1; amount += 0.05) {
+      const c = mix(hex, "#ffffff", amount);
+      if (reads(c)) return c;
+    }
+    return "#ffffff";
+  }
+  if (contrast(hex, LIGHT_TOKENS["border-strong"]) >= 1.5) return hex;
+  for (let amount = 0.1; amount < 1; amount += 0.05) {
+    const c = mix(hex, "#000000", amount);
+    if (contrast(c, LIGHT_TOKENS["border-strong"]) >= 1.5) return c;
+  }
+  return "#000000";
+}
+
 // The default light set keeps the exact greens the pages were designed with
 const DEFAULT_LIGHT = {
   hover: "#38a169",
@@ -139,8 +179,9 @@ const DEFAULT_LIGHT = {
 
 export function shadesFor(hex, dark) {
   if (!dark) {
-    if (hex === DEFAULT_ACCENT) return { ...DEFAULT_LIGHT };
+    if (hex === DEFAULT_ACCENT) return { ...DEFAULT_LIGHT, switch: switchColor(hex, false) };
     return {
+      switch: switchColor(hex, false),
       hover: mix(hex, "#000000", 0.15),
       deep: mix(hex, "#000000", 0.35),
       strong: mix(hex, "#000000", 0.55),
@@ -152,6 +193,7 @@ export function shadesFor(hex, dark) {
     };
   }
   return {
+    switch: switchColor(hex, true),
     hover: mix(hex, "#000000", 0.15),
     deep: readableOnDark(hex, 0.25),
     strong: readableOnDark(hex, 0.45),
