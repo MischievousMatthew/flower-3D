@@ -168,11 +168,11 @@
               @change="setMaterial(i, fillers, $event.target.value)"
             >
               <option value="" disabled>Pick a filler</option>
-              <option v-for="f in fillers" :key="f.id" :value="f.id">{{ f.name }} · enough for {{ f.stock }} {{ f.stock === 1 ? "bouquet" : "bouquets" }}</option>
+              <option v-for="f in fillers" :key="f.id" :value="f.id">{{ f.name }} · {{ f.stock }} left</option>
             </select>
           </label>
           <label class="bf-field bf-count">
-            <span>Bouquets' worth</span>
+            <span>Per bouquet</span>
             <input
               :value="row.count ?? ''"
               type="number"
@@ -182,7 +182,7 @@
               inputmode="numeric"
               class="fx-input"
               :class="{ invalid: !!error && !(Number(row.count) >= 1) }"
-              :aria-label="`How much of ${row.flower || 'this filler'} one bouquet uses, in bouquets' worth`"
+              :aria-label="`How many ${row.flower || 'of this filler'} one bouquet uses`"
               @input="update(i, { count: $event.target.value === '' ? '' : Math.floor(Number($event.target.value)) })"
             />
           </label>
@@ -191,12 +191,12 @@
           </button>
         </li>
       </ul>
-      <small v-if="fillerRows.length" class="bf-help">1 = what a normal bouquet uses; type 2 for a big one. Selling this bouquet takes that much off the filler.</small>
+      <small v-if="fillerRows.length" class="bf-help">How many of the filler one bouquet uses. With 60 left and 2 per bouquet, you can make 30.</small>
       <button v-if="fillers.length" type="button" class="bf-add" :disabled="modelValue.length >= 30" @click="addMaterial('filler', fillers)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         Add a filler
       </button>
-      <small v-else class="bf-help">No counted fillers yet. In 3D Bouquet Management, fill in a filler's "Bouquets left" to count its stock.</small>
+      <small v-else class="bf-help">No counted fillers yet. In 3D Bouquet Management, fill in a filler's sacks to count its stock.</small>
     </template>
 
     <p v-if="linkedMake !== null" class="bf-linked-note" role="status">
@@ -261,7 +261,7 @@ const singleFlowers = computed(() => (props.flowers || []).filter((f) => !MATERI
 const wrappers = computed(() => (props.flowers || []).filter((f) => f.kind === "wrapper"));
 const fillers = computed(() => (props.flowers || []).filter((f) => f.kind === "filler"));
 
-/** A filler row: which of the shop's fillers, and how many bouquets' worth one bouquet uses */
+/** A filler row: which of the shop's fillers, and how many of it one bouquet uses */
 function addMaterial(kind, list) {
   const first = list[0];
   emit("update:modelValue", [

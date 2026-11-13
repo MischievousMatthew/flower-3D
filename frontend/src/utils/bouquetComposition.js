@@ -80,7 +80,7 @@ export function compositionProblem(rows) {
     if (r.kind === "filler") {
       if (!r.product_id) return "Pick which filler the bouquet uses, or remove that row.";
       const n = Number(r.count);
-      if (!Number.isInteger(n) || n < 1 || n > 1000) return `Enter how many bouquets' worth of ${r.flower || "the filler"} one bouquet uses (1 or more).`;
+      if (!Number.isInteger(n) || n < 1 || n > 1000) return `Enter how many ${r.flower || "of the filler"} one bouquet uses (1 or more).`;
       continue;
     }
     if (!filled(r)) continue;

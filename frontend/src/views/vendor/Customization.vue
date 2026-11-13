@@ -393,8 +393,18 @@
                     </span>
                   </span>
                 </div>
+                <!-- A filler: sacks you have (part of a sack is fine); the count is sacks × bouquets per sack -->
                 <input
-                  v-if="field === 'onHand'"
+                  v-if="field === 'onHand' && activeTab === 'filler'"
+                  id="cz-stock-onHand"
+                  v-model="form.sacks"
+                  class="cz-input"
+                  :class="{ invalid: errors.stock_sheets }"
+                  type="number" min="0" step="any" inputmode="decimal"
+                  :placeholder="stockWords.onHandPlaceholder"
+                />
+                <input
+                  v-else-if="field === 'onHand'"
                   id="cz-stock-onHand"
                   v-model="form.stockSheets"
                   class="cz-input"
@@ -415,7 +425,12 @@
                 <span v-if="field === 'pack' && errors.pack_size" class="cz-error">{{ errors.pack_size }}</span>
               </div>
             </div>
-            <div v-if="Number(form.packSize) >= 2" class="cz-stock-rolls">
+            <!-- 3 sacks × 20 = 60 in stock: worked out for the vendor -->
+            <p v-if="activeTab === 'filler' && fillerTotal !== null" class="cz-stock-total" role="status">
+              = <b>{{ fillerTotal.toLocaleString("en-PH") }} in stock</b>
+              <span v-if="fillerTotalNote">{{ fillerTotalNote }}</span>
+            </p>
+            <div v-if="activeTab === 'wrapper' && Number(form.packSize) >= 2" class="cz-stock-rolls">
               <input v-model="form.addRolls" class="cz-input" type="number" min="1" step="1" inputmode="numeric" :placeholder="stockWords.packsTitle" :aria-label="`${stockWords.packsTitle} to add`" />
               <button type="button" class="cz-btn cz-btn-ghost" :disabled="!(Number(form.addRolls) > 0)" @click="addRollsToSheets">
                 {{ Number(form.addRolls) > 0 ? stockWords.addLabel(Number(form.addRolls) * Number(form.packSize)) : `Add ${stockWords.packs}` }}
@@ -655,6 +670,12 @@ const form = reactive({
   stockSheets: "",
   packSize: "",
   addRolls: "",
+  // Fillers: sacks on hand × bouquets one sack fills (packSize) = the stock.
+  // While both boxes are as they were loaded, the exact count is kept.
+  sacks: "",
+  sacksOriginal: "",
+  packSizeOriginal: "",
+  onHandOriginal: null,
 });
 const hexInput = ref("D3B18F");
 
@@ -706,35 +727,50 @@ const STOCK_WORDS = {
     addLabel: (n) => `Add ${n} sheets`,
     hint: "Each bouquet uses 1 sheet. This count is the same one in Inventory.",
   },
+  // The vendor gives two numbers: bouquets per sack (a guess) and sacks on
+  // hand; the stock is sacks × per sack (3 × 20 = 60). A custom 3D bouquet
+  // takes 1 of it; a bouquet in Products takes what it lists under Fillers.
   filler: {
-    onHand: "Bouquets left (your stock)",
-    onHandPlaceholder: "Blank = don't count",
+    onHand: "How many sacks do you have?",
+    onHandPlaceholder: "e.g. 3 (blank = don't count)",
     onHandTip:
-      "How many more bouquets you can still make with the filler you have now. A custom 3D bouquet with this filler takes 1 off, no matter how much of it the customer places. A bouquet in Products that lists this filler takes off the amount you typed there. At 0 it shows as Sold out. Leave it blank if you'd rather not count; then use the Available / Sold out switch on the filler.",
+      "The sacks of this filler you have now (half a sack? type 0.5). We multiply: 3 sacks × 20 = 60 in stock. A bouquet in Products that uses 2 of this filler can then be made 30 times, and each custom 3D bouquet uses 1. Leave it blank if you'd rather not count; then use the Available / Sold out switch on the filler.",
     perPack: "How many bouquets can 1 sack fill?",
-    perPackTip:
-      "Your best guess is fine, no need to count pieces. If one sack usually covers about 20 bouquets, type 20. Then you can add stock by the sack below and we do the math.",
+    perPackTip: "Your best guess is fine, no need to count pieces. If one sack usually covers about 20 bouquets, type 20.",
     perPackPlaceholder: "Your best guess, e.g. 20",
-    packs: "sacks",
-    packsTitle: "Sacks",
-    addLabel: (n) => `Add ${n} bouquets' worth`,
-    hint: "Custom 3D bouquets take 1 off; bouquets in Products take what you set under their Fillers. Same count as in Inventory.",
+    hint: "Bought more? Just change the number of sacks. Same stock as in Inventory.",
   },
 };
 const stockWords = computed(() => STOCK_WORDS[activeTab.value] || null);
 const stockFieldOrder = computed(() => (activeTab.value === "filler" ? ["pack", "onHand"] : ["onHand", "pack"]));
 
-/** "Enough for 45 bouquets · ≈ 2 sacks + 5" for a filler, sheets and rolls for a wrapper */
+// A filler's stock, worked out from its two boxes
+const sacksEntered = () => String(form.sacks ?? "").trim() !== "";
+const fillerUntouched = () => form.stockItemId && form.sacks === form.sacksOriginal && form.packSize === form.packSizeOriginal;
+/** The count the filler will have: kept as it is while untouched, else sacks × bouquets per sack */
+const fillerTotal = computed(() => {
+  if (activeTab.value !== "filler") return null;
+  if (fillerUntouched()) return form.onHandOriginal;
+  const sacks = Number(form.sacks);
+  const per = Number(form.packSize);
+  if (!sacksEntered() || !(sacks >= 0) || !(per >= 1)) return null;
+  return Math.round(sacks * per);
+});
+const fillerTotalNote = computed(() => {
+  const per = Number(form.packSize);
+  if (fillerUntouched() || !(per >= 1) || !sacksEntered()) return "";
+  return `(${Number(form.sacks).toLocaleString("en-PH")} ${Number(form.sacks) === 1 ? "sack" : "sacks"} × ${per})`;
+});
+
+/** "60 left · 3 sacks" for a filler, sheets and rolls for a wrapper */
 function stockText(item) {
   const s = item.stock_item;
   if (item.type !== "filler") return `${sheetsText(s)} in stock`;
   const n = Number(s.on_hand) || 0;
-  const text = `Enough for ${n.toLocaleString("en-PH")} ${n === 1 ? "bouquet" : "bouquets"}`;
+  const text = `${n.toLocaleString("en-PH")} left`;
   if (!s.pack_size) return text;
-  const sacks = Math.floor(n / s.pack_size);
-  const rest = n % s.pack_size;
-  if (!sacks) return `${text} · less than 1 sack`;
-  return `${text} · ≈ ${sacks} ${sacks === 1 ? "sack" : "sacks"}${rest ? ` + ${rest}` : ""}`;
+  const sacks = Math.round((n / s.pack_size) * 10) / 10;
+  return `${text} · ${Number.isInteger(n / s.pack_size) ? "" : "≈ "}${sacks} ${sacks === 1 ? "sack" : "sacks"}`;
 }
 const hsl = reactive({ h: 0, s: 0, l: 0 });
 
@@ -927,6 +963,10 @@ function resetForm() {
   form.stockSheets = "";
   form.packSize = "";
   form.addRolls = "";
+  form.sacks = "";
+  form.sacksOriginal = "";
+  form.packSizeOriginal = "";
+  form.onHandOriginal = null;
   form.pattern = "none";
   form.patternText = "";
   form.patternSize = 100;
@@ -958,6 +998,14 @@ function startEdit(item) {
     form.stockItemId = item.stock_item.id;
     form.stockSheets = String(item.stock_item.on_hand);
     form.packSize = item.stock_item.pack_size ? String(item.stock_item.pack_size) : "";
+    if (item.type === "filler") {
+      // 58 left at 20 a sack shows as 2.9 sacks; the exact 58 is kept unless a box is changed
+      const per = item.stock_item.pack_size;
+      form.sacks = per ? String(Math.round((item.stock_item.on_hand / per) * 100) / 100) : "";
+      form.sacksOriginal = form.sacks;
+      form.packSizeOriginal = form.packSize;
+      form.onHandOriginal = Number(item.stock_item.on_hand) || 0;
+    }
   }
   if (item.color_hex) setColorFromHex(item.color_hex);
   if (item.type === "wrapper") {
@@ -1056,10 +1104,12 @@ function validate() {
     if (sheets !== "" && !(Number.isInteger(Number(sheets)) && Number(sheets) >= 0)) errors.stock_sheets = "Enter a whole number of sheets, or leave it blank.";
     if (String(form.packSize ?? "").trim() !== "" && !(Number(form.packSize) >= 2)) errors.pack_size = "A roll holds at least 2 sheets, or leave it blank.";
   }
-  if (activeTab.value === "filler") {
-    const left = String(form.stockSheets ?? "").trim();
-    if (left !== "" && !(Number.isInteger(Number(left)) && Number(left) >= 0)) errors.stock_sheets = "Enter a whole number of bouquets, or leave it blank.";
-    if (String(form.packSize ?? "").trim() !== "" && !(Number.isInteger(Number(form.packSize)) && Number(form.packSize) >= 2)) errors.pack_size = "Enter at least 2 bouquets, or leave it blank.";
+  if (activeTab.value === "filler" && !fillerUntouched()) {
+    const perSet = String(form.packSize ?? "").trim() !== "";
+    if (sacksEntered() && !(Number(form.sacks) >= 0)) errors.stock_sheets = "Enter how many sacks you have (like 3 or 0.5), or leave it blank.";
+    if ((sacksEntered() || perSet) && !(Number.isInteger(Number(form.packSize)) && Number(form.packSize) >= 2)) {
+      errors.pack_size = "Enter about how many bouquets one sack fills (2 or more).";
+    }
   }
   return !Object.keys(errors).length;
 }
@@ -1093,6 +1143,8 @@ async function submitForm() {
   // A wrapper's sheets / a filler's portions live on its own stock item (shared with ERP Stock and Inventory)
   // Blank: not tracked. A number: tracked on that stock item (made the first time)
   if (STOCKED_TYPES.includes(type)) {
+    // A filler's count is sacks × bouquets per sack (kept exactly as it was while both are unchanged)
+    if (type === "filler") form.stockSheets = fillerTotal.value === null ? "" : String(fillerTotal.value);
     const sheets = String(form.stockSheets ?? "").trim();
     payload.append("stock_item", sheets === "" ? "none" : form.stockItemId ? String(form.stockItemId) : "new");
     if (sheets !== "") {
@@ -1431,6 +1483,23 @@ const formatSize = (bytes) =>
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+}
+
+/* A filler's worked-out stock: "= 60 in stock (3 sacks × 20)" */
+.cz-stock-total {
+  margin: 10px 0 0;
+  color: var(--v-text-2);
+  font-size: 14px;
+}
+
+.cz-stock-total b {
+  color: var(--v-text);
+  font-weight: 600;
+}
+
+.cz-stock-total span {
+  margin-left: 4px;
+  color: var(--v-muted);
 }
 
 .cz-stock-rolls {
