@@ -375,18 +375,45 @@
             <span class="cz-label">Stock <small>(optional)</small></span>
             <!-- A filler asks the one guess first: how many bouquets a sack makes -->
             <div class="cz-stock-grid">
-              <template v-for="field in stockFieldOrder" :key="field">
-                <label v-if="field === 'onHand'" class="cz-field">
-                  <span class="cz-label">{{ stockWords.onHand }}</span>
-                  <input v-model="form.stockSheets" class="cz-input" :class="{ invalid: errors.stock_sheets }" type="number" min="0" step="1" inputmode="numeric" placeholder="Leave blank to skip" />
-                  <span v-if="errors.stock_sheets" class="cz-error">{{ errors.stock_sheets }}</span>
-                </label>
-                <label v-else class="cz-field">
-                  <span class="cz-label">{{ stockWords.perPack }}</span>
-                  <input v-model="form.packSize" class="cz-input" :class="{ invalid: errors.pack_size }" type="number" min="2" step="1" inputmode="numeric" :placeholder="stockWords.perPackPlaceholder" />
-                  <span v-if="errors.pack_size" class="cz-error">{{ errors.pack_size }}</span>
-                </label>
-              </template>
+              <div v-for="field in stockFieldOrder" :key="field" class="cz-field">
+                <!-- Label and its ? side by side (a button inside the label would focus the box instead) -->
+                <div class="cz-label-row">
+                  <label class="cz-label" :for="`cz-stock-${field}`">{{ field === "onHand" ? stockWords.onHand : stockWords.perPack }}</label>
+                  <span class="cz-tip">
+                    <button
+                      type="button"
+                      class="cz-tip-btn"
+                      :aria-describedby="`cz-stock-${field}-tip`"
+                      :aria-label="`What is “${field === 'onHand' ? stockWords.onHand : stockWords.perPack}”?`"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
+                    </button>
+                    <span :id="`cz-stock-${field}-tip`" role="tooltip" class="cz-tip-box">
+                      {{ field === "onHand" ? stockWords.onHandTip : stockWords.perPackTip }}
+                    </span>
+                  </span>
+                </div>
+                <input
+                  v-if="field === 'onHand'"
+                  id="cz-stock-onHand"
+                  v-model="form.stockSheets"
+                  class="cz-input"
+                  :class="{ invalid: errors.stock_sheets }"
+                  type="number" min="0" step="1" inputmode="numeric"
+                  :placeholder="stockWords.onHandPlaceholder"
+                />
+                <input
+                  v-else
+                  id="cz-stock-pack"
+                  v-model="form.packSize"
+                  class="cz-input"
+                  :class="{ invalid: errors.pack_size }"
+                  type="number" min="2" step="1" inputmode="numeric"
+                  :placeholder="stockWords.perPackPlaceholder"
+                />
+                <span v-if="field === 'onHand' && errors.stock_sheets" class="cz-error">{{ errors.stock_sheets }}</span>
+                <span v-if="field === 'pack' && errors.pack_size" class="cz-error">{{ errors.pack_size }}</span>
+              </div>
             </div>
             <div v-if="Number(form.packSize) >= 2" class="cz-stock-rolls">
               <input v-model="form.addRolls" class="cz-input" type="number" min="1" step="1" inputmode="numeric" :placeholder="stockWords.packsTitle" :aria-label="`${stockWords.packsTitle} to add`" />
@@ -668,7 +695,11 @@ const switchText = (item) =>
 const STOCK_WORDS = {
   wrapper: {
     onHand: "Sheets on hand",
+    onHandPlaceholder: "Blank = don't count",
+    onHandTip:
+      "How many sheets of this wrapper you have right now. Each bouquet a customer orders takes 1 sheet off, and at 0 the wrapper hides from customers. Leave it blank if you'd rather not count; then use the Shown / Hidden switch on the wrapper.",
     perPack: "Sheets per roll",
+    perPackTip: "How many sheets one roll gives you. Fill it in to add stock by the roll below; we work out the sheets for you.",
     perPackPlaceholder: "e.g. 50",
     packs: "rolls",
     packsTitle: "Rolls",
@@ -676,13 +707,18 @@ const STOCK_WORDS = {
     hint: "Each bouquet uses 1 sheet. This count is the same one in Inventory.",
   },
   filler: {
-    onHand: "Bouquets it can still fill",
-    perPack: "Bouquets one sack makes",
+    onHand: "Bouquets left (your stock)",
+    onHandPlaceholder: "Blank = don't count",
+    onHandTip:
+      "How many more bouquets you can still make with the filler you have now. Every bouquet a customer orders with this filler takes 1 off, no matter how much of it they place. At 0 it shows as Sold out. Leave it blank if you'd rather not count; then use the Available / Sold out switch on the filler.",
+    perPack: "How many bouquets can 1 sack fill?",
+    perPackTip:
+      "Your best guess is fine, no need to count pieces. If one sack usually covers about 20 bouquets, type 20. Then you can add stock by the sack below and we do the math.",
     perPackPlaceholder: "Your best guess, e.g. 20",
     packs: "sacks",
     packsTitle: "Sacks",
     addLabel: (n) => `Add ${n} bouquets' worth`,
-    hint: "No counting pieces: each bouquet with this filler takes 1 off, however much is placed. Leave it blank to skip counting, then switch it to Sold out when the sack runs out. Same count as in Inventory.",
+    hint: "Each bouquet with this filler takes 1 off. This is the same count as in Inventory.",
   },
 };
 const stockWords = computed(() => STOCK_WORDS[activeTab.value] || null);
@@ -1300,6 +1336,87 @@ const formatSize = (bytes) =>
 .cz-label small {
   color: var(--v-faint);
   font-weight: 400;
+}
+
+/* A field's label with a ? that explains it (hover, or tap / Tab to it) */
+.cz-label-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cz-tip {
+  position: static;
+  display: inline-flex;
+}
+
+.cz-tip-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--v-muted);
+  cursor: help;
+}
+
+.cz-tip-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.cz-tip-btn:hover,
+.cz-tip-btn:focus-visible {
+  color: var(--v-text);
+}
+
+.cz-tip-btn:focus-visible {
+  outline: 2px solid var(--bc-accent, var(--v-green-text));
+  outline-offset: 1px;
+}
+
+/* Opens above the whole label row, as wide as the field at most, so it never runs off the card */
+.cz-tip-box {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: max-content;
+  max-width: min(320px, 100%);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-ink, #1f2937);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  box-shadow: var(--v-shadow, 0 10px 30px rgba(0, 0, 0, 0.2));
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+  pointer-events: none;
+}
+
+.cz-tip:hover .cz-tip-box,
+.cz-tip:focus-within .cz-tip-box {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cz-tip-box {
+    transition: none;
+  }
 }
 
 /* Wrapper stock: sheets on hand, sheets per roll, add rolls */
