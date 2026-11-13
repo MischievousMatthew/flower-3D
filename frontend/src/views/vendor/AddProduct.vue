@@ -235,8 +235,19 @@
               <small>Low-stock alert</small>
             </label>
             <label data-change="max_stock_level" class="sp-field">
-              <span>Maximum <small>(optional)</small></span>
-              <input v-model.number="form.max_stock_level" type="number" :min="form.min_stock_level || 0" step="1" class="sp-input" />
+              <span>Maximum</span>
+              <input
+                v-model.number="form.max_stock_level"
+                type="number"
+                :min="Math.max(1, form.min_stock_level || 0)"
+                step="1"
+                required
+                class="sp-input"
+                :class="{ invalid: errors.max_stock_level }"
+                @input="clear('max_stock_level')"
+              />
+              <small v-if="errors.max_stock_level" class="sp-error">{{ errors.max_stock_level }}</small>
+              <small v-else>The most you keep. Restocking fills up to this.</small>
             </label>
             <label data-change="season" class="sp-field">
               <span>Season</span>
@@ -394,7 +405,7 @@ const CHECKLIST = [
   { key: "basics", label: "Name, description, colour & SKU", anchor: "ap-basics" },
   { key: "organize", label: "Category, flower type & an occasion", anchor: "ap-organize" },
   { key: "price", label: "Selling price above your cost", anchor: "ap-price" },
-  { key: "stock", label: "Stock count", anchor: "ap-stock" },
+  { key: "stock", label: "Stock count & maximum", anchor: "ap-stock" },
 ];
 
 const blank = () => ({
@@ -454,7 +465,11 @@ const steps = computed(() => ({
   basics: !!(form.product_name.trim() && form.description.trim() && form.sku.trim() && !colorProblem(form.colors.slice(0, 1)) && !form.colors.some((c) => c.value === "other" && !String(c.name || "").trim())),
   organize: !!(form.category && form.flower_type && (form.occasion_tags.length || !needsOccasion.value)),
   price: Number(form.selling_price) > 0 && Number(form.purchase_price) >= 0 && form.purchase_price !== null && profit.value > 0 && (!form.has_discount || salePercent.value > 0),
-  stock: Number.isInteger(Number(form.quantity_in_stock)) && Number(form.quantity_in_stock) >= 0,
+  stock:
+    Number.isInteger(Number(form.quantity_in_stock)) && Number(form.quantity_in_stock) >= 0 &&
+    // The maximum (what restocking fills up to) is needed too
+    form.max_stock_level !== null && form.max_stock_level !== "" && Number.isInteger(Number(form.max_stock_level)) &&
+    Number(form.max_stock_level) >= Math.max(1, Number(form.min_stock_level || 0)),
 }));
 const progress = computed(() => (Object.values(steps.value).filter(Boolean).length / CHECKLIST.length) * 100);
 
@@ -644,6 +659,10 @@ function validate(status) {
   else if (Number(form.selling_price) > 0 && profit.value <= 0) e.selling_price = "The selling price must be higher than your cost.";
   if (form.has_discount && !salePercent.value) e.discount_price = "The sale price must be above ₱0 and below the selling price.";
   if (!Number.isInteger(Number(form.quantity_in_stock)) || Number(form.quantity_in_stock) < 0) e.quantity_in_stock = "Enter how many you have.";
+  // The maximum is what restocking fills up to, so every product needs one
+  const max = form.max_stock_level;
+  if (max === null || max === "" || !Number.isInteger(Number(max)) || Number(max) < 1) e.max_stock_level = "Enter the most you keep in stock (1 or more).";
+  else if (Number(max) < Number(form.min_stock_level || 0)) e.max_stock_level = "The maximum can't be lower than “Warn me at”.";
   const flowersIssue = form.selling_type === "bouquet" ? compositionProblem(form.composition) : "";
   if (flowersIssue) e.composition = flowersIssue;
   if (status === "active" && needsOccasion.value && !form.occasion_tags.length) e.occasion_tags = "Pick at least one occasion so customers can find it.";
@@ -654,7 +673,7 @@ function validate(status) {
     const anchor = {
       images: "ap-photos", product_name: "ap-basics", description: "ap-basics", sku: "ap-basics", color: "ap-basics", color_stock: "ap-stock",
       category: "ap-organize", flower_type: "ap-organize", occasion_tags: "ap-organize",
-      selling_price: "ap-price", purchase_price: "ap-price", discount_price: "ap-price", quantity_in_stock: "ap-stock", composition: "ap-stock",
+      selling_price: "ap-price", purchase_price: "ap-price", discount_price: "ap-price", quantity_in_stock: "ap-stock", composition: "ap-stock", max_stock_level: "ap-stock",
     }[first];
     if (anchor) jump(anchor);
   }

@@ -319,15 +319,19 @@
                   >
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Maximum Stock Level</label>
+                  <label class="form-label">Maximum Stock Level *</label>
                   <input
                     v-model.number="formData.max_stock_level"
                     type="number"
-                    min="0"
-                    placeholder="0"
+                    :min="Math.max(1, formData.min_stock_level || 0)"
+                    placeholder="e.g. 100"
                     class="form-input"
+                    :class="{ 'is-invalid': errors.max_stock_level }"
+                    @input="clearError('max_stock_level')"
+                    required
                   />
-                  <span class="hint-text">Avoid overstocking</span>
+                  <span v-if="errors.max_stock_level" class="error-text">{{ errors.max_stock_level }}</span>
+                  <span class="hint-text">The most you keep. Restocking fills up to this.</span>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Season Availability</label>
@@ -933,6 +937,18 @@ const validateForm = () => {
         if (!firstError) firstError = f.field;
       }
     }
+  }
+
+  // The maximum is what restocking fills up to, so every product needs one
+  const max = formData.max_stock_level;
+  if (max === null || max === "" || !Number.isInteger(Number(max)) || Number(max) < 1) {
+    errors.max_stock_level = "Enter the most you keep in stock (1 or more).";
+  } else if (Number(max) < Number(formData.min_stock_level || 0)) {
+    errors.max_stock_level = "The maximum can't be lower than the minimum stock level.";
+  }
+  if (errors.max_stock_level) {
+    isValid = false;
+    if (!firstError) firstError = "max_stock_level";
   }
 
   const colorIssue = colorProblem(formData.colors);
