@@ -70,8 +70,9 @@ class ProductController extends Controller
             ->map(fn (Product $p) => [
                 'id'       => $p->id,
                 'name'     => $p->product_name,
-                // "wrapper": a wrapping material counted in sheets (a bouquet's wrapper), else a flower
-                'kind'     => $p->isMaterial() && $p->stock_kind === 'wrapping' ? 'wrapper' : 'flower',
+                // "wrapper": a wrapping material counted in sheets (a bouquet's wrapper);
+                // "filler": a filler's stock (greenery, counted in bouquets' worth); else a flower
+                'kind'     => self::materialKind($p) ?? 'flower',
                 'pack_size' => $p->packSize() > 1 ? $p->packSize() : null,
                 'sku'      => $p->sku,
                 'color'    => $p->color === 'other' ? $p->color_other : ($p->color ? ucfirst($p->color) : null),
@@ -85,6 +86,17 @@ class ProductController extends Controller
             ]);
 
         return response()->json(['success' => true, 'data' => $flowers]);
+    }
+
+    /** Bouquet rows that take from a material instead of a flower: the row kind and the stock kind it needs */
+    private const MATERIAL_ROWS = ['wrapper' => 'wrapping', 'filler' => 'greenery'];
+
+    /** "wrapper" or "filler" for a material a bouquet row can take from, else null (a flower) */
+    private static function materialKind(Product $p): ?string
+    {
+        $kind = array_search($p->stock_kind, self::MATERIAL_ROWS, true);
+
+        return $p->isMaterial() && $kind !== false ? $kind : null;
     }
 
     public function myProducts(Request $request)
@@ -451,18 +463,19 @@ class ProductController extends Controller
             // Optionally linked to one of the shop's single flowers: the bouquet's
             // stock then comes from it, and selling one takes these pieces from it
             $link = is_numeric($row['product_id'] ?? null) ? (int) $row['product_id'] : 0;
-            // A wrapper row: sheets of one of the shop's wrappers (always linked)
-            $isWrapper = ($row['kind'] ?? null) === 'wrapper';
-            if ($isWrapper && $link <= 0) {
-                return $fail('Pick which wrapper the bouquet uses.');
+            // A wrapper row (sheets of one of the shop's wrappers) or a filler row
+            // (bouquets' worth of one of its fillers): always linked
+            $material = isset(self::MATERIAL_ROWS[$row['kind'] ?? '']) ? $row['kind'] : null;
+            if ($material && $link <= 0) {
+                return $fail("Pick which {$material} the bouquet uses.");
             }
             $list[] = array_filter([
                 'flower'     => $flower,
-                'color'      => $isWrapper ? null : ($color !== '' ? $color : null),
+                'color'      => $material ? null : ($color !== '' ? $color : null),
                 'count'      => (int) $count,
                 'cost'       => $cost === null || $cost === '' ? null : round((float) $cost, 2),
                 'product_id' => $link > 0 ? $link : null,
-                'kind'       => $isWrapper ? 'wrapper' : null,
+                'kind'       => $material,
             ], fn ($v, $k) => $k !== 'kind' || $v !== null, ARRAY_FILTER_USE_BOTH);
         }
         if (count($list) > 30) {
@@ -470,7 +483,7 @@ class ProductController extends Controller
         }
 
         // Linked flowers must be this shop's own single flowers (not a bouquet, not
-        // itself); a wrapper row must be one of its wrappers (wrapping stock items)
+        // itself); a wrapper or filler row must be one of its wrappers / fillers
         $ids = array_values(array_unique(array_filter(array_column($list, 'product_id'))));
         if ($ids) {
             $flowers = Product::query()
@@ -488,9 +501,10 @@ class ProductController extends Controller
                 }
             }
             foreach ($list as $row) {
-                $item = ($row['kind'] ?? null) === 'wrapper' ? $flowers->get($row['product_id']) : null;
-                if ($item && ! ($item->moderation_status === Product::MODERATION_INTERNAL && $item->stock_kind === 'wrapping')) {
-                    return $fail('Pick one of your wrappers for the bouquet\'s wrapper.');
+                $kind = $row['kind'] ?? null;
+                $item = $kind ? $flowers->get($row['product_id']) : null;
+                if ($item && self::materialKind($item) !== $kind) {
+                    return $fail("Pick one of your {$kind}s for the bouquet's {$kind}.");
                 }
             }
         }

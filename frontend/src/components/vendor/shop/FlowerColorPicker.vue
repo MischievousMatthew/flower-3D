@@ -159,7 +159,7 @@ function setOtherName(name) {
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--v-ink, #1f2937);
-  color: #fff;
+  color: var(--v-ink-text, #fff);
   font-size: 12.5px;
   font-weight: 400;
   line-height: 1.5;

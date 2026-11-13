@@ -250,6 +250,53 @@ class ProductColorStockTest extends TestCase
         $this->assertSame(['Rose'], array_column($inside, 'flower'));
     }
 
+    public function test_a_bouquets_filler_comes_from_the_shared_filler_stock(): void
+    {
+        $rose = $this->flower('Red rose', 100);
+        $breath = Product::forceCreate([
+            'owner_id' => 1, 'product_name' => "Baby's breath", 'sku' => 'F-1', 'quantity_in_stock' => 6, 'min_stock_level' => 0,
+            'stock_kind' => 'greenery', 'stock_unit' => 'portion', 'moderation_status' => Product::MODERATION_INTERNAL, 'status' => 'active',
+        ]);
+        $b = $this->bouquet([
+            ['flower' => 'Rose', 'count' => 12, 'product_id' => $rose->id],
+            ['flower' => "Baby's breath", 'count' => 2, 'product_id' => $breath->id, 'kind' => 'filler'],
+        ]);
+
+        // 100 roses ÷ 12 = 8, 6 bouquets' worth ÷ 2 = 3: the filler limits it
+        $this->assertSame(3, (int) $b->fresh()->quantity_in_stock);
+
+        // Selling 1 takes 12 roses and 2 of the filler
+        $plan = Product::stockPlan([[$b->id, null, 1]]);
+        $this->assertSame([[$rose->id, null, 12, $b->id], [$breath->id, null, 2, $b->id]], $plan);
+        DB::transaction(function () use ($plan) {
+            foreach ($plan as [$id, $color, $qty]) {
+                $this->assertNotNull(Product::takeStock($id, $qty, $color));
+            }
+        });
+        $this->assertSame([88, 4], [(int) $rose->fresh()->quantity_in_stock, (int) $breath->fresh()->quantity_in_stock]);
+
+        // The form: a filler row must be one of the shop's fillers, not a flower or a wrapper
+        $kraft = Product::forceCreate([
+            'owner_id' => 1, 'product_name' => 'Kraft Paper', 'sku' => 'W-2', 'quantity_in_stock' => 9, 'min_stock_level' => 0,
+            'stock_kind' => 'wrapping', 'stock_unit' => 'sheet', 'moderation_status' => Product::MODERATION_INTERNAL, 'status' => 'active',
+        ]);
+        $method = new \ReflectionMethod(ProductController::class, 'compositionFromRequest');
+        $method->setAccessible(true);
+        $read = fn ($rows) => $method->invoke(app(ProductController::class), Request::create('/', 'POST', ['composition' => json_encode($rows)]), 'bouquet', 1, 999);
+        $ok = $read([['flower' => "Baby's breath", 'count' => 2, 'product_id' => $breath->id, 'kind' => 'filler', 'color' => 'ignored']]);
+        $this->assertSame(['flower' => "Baby's breath", 'color' => null, 'count' => 2, 'cost' => null, 'product_id' => $breath->id, 'kind' => 'filler'], $ok['attributes']['composition'][0]);
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Breath', 'count' => 1, 'kind' => 'filler']]), 'no filler picked');
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 1, 'product_id' => $rose->id, 'kind' => 'filler']]), 'a flower is not a filler');
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Kraft', 'count' => 1, 'product_id' => $kraft->id, 'kind' => 'filler']]), 'a wrapper is not a filler');
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Breath', 'count' => 1, 'product_id' => $breath->id, 'kind' => 'wrapper']]), 'a filler is not a wrapper');
+
+        // Customers don't see the filler in "What's inside"
+        $customer = new \ReflectionMethod(\App\Http\Controllers\Customer\CustomerProductController::class, 'composition');
+        $customer->setAccessible(true);
+        $inside = $customer->invoke(app(\App\Http\Controllers\Customer\CustomerProductController::class), $b->fresh()->composition);
+        $this->assertSame(['Rose'], array_column($inside, 'flower'));
+    }
+
     public function test_links_must_be_the_shops_own_single_flowers(): void
     {
         $rose = $this->flower('Red rose', 100);

@@ -150,6 +150,53 @@
         Add a wrapper
       </button>
       <small v-else class="bf-help">No wrappers in stock yet. Add one with its sheets in 3D Bouquet Management.</small>
+
+      <!-- Fillers: bouquets' worth of the shop's fillers (the same stock as 3D Bouquet Management and Inventory) -->
+      <div class="bf-head bf-head-wrap">
+        <span class="bf-label">Fillers</span>
+        <span v-if="fillerRows.length" class="bf-total">{{ fillerRows.length }} {{ fillerRows.length === 1 ? "filler" : "fillers" }}</span>
+      </div>
+      <ul v-if="fillerRows.length" class="bf-list">
+        <li v-for="{ row, i } in fillerRows" :key="i" class="bf-row bf-row-wrap linked">
+          <label class="bf-field">
+            <span>Filler</span>
+            <select
+              :value="row.product_id || ''"
+              class="fx-input"
+              :class="{ invalid: !!error && !row.product_id }"
+              aria-label="Which filler"
+              @change="setMaterial(i, fillers, $event.target.value)"
+            >
+              <option value="" disabled>Pick a filler</option>
+              <option v-for="f in fillers" :key="f.id" :value="f.id">{{ f.name }} · enough for {{ f.stock }} {{ f.stock === 1 ? "bouquet" : "bouquets" }}</option>
+            </select>
+          </label>
+          <label class="bf-field bf-count">
+            <span>Bouquets' worth</span>
+            <input
+              :value="row.count ?? ''"
+              type="number"
+              min="1"
+              max="1000"
+              step="1"
+              inputmode="numeric"
+              class="fx-input"
+              :class="{ invalid: !!error && !(Number(row.count) >= 1) }"
+              :aria-label="`How much of ${row.flower || 'this filler'} one bouquet uses, in bouquets' worth`"
+              @input="update(i, { count: $event.target.value === '' ? '' : Math.floor(Number($event.target.value)) })"
+            />
+          </label>
+          <button type="button" class="bf-remove" :aria-label="`Remove ${row.flower || 'this filler'}`" @click="remove(i)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </li>
+      </ul>
+      <small v-if="fillerRows.length" class="bf-help">1 = what a normal bouquet uses; type 2 for a big one. Selling this bouquet takes that much off the filler.</small>
+      <button v-if="fillers.length" type="button" class="bf-add" :disabled="modelValue.length >= 30" @click="addMaterial('filler', fillers)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        Add a filler
+      </button>
+      <small v-else class="bf-help">No counted fillers yet. In 3D Bouquet Management, fill in a filler's "Bouquets left" to count its stock.</small>
     </template>
 
     <p v-if="linkedMake !== null" class="bf-linked-note" role="status">
@@ -157,7 +204,7 @@
     </p>
 
     <div v-if="cost > 0" class="bf-sum">
-      <span>{{ wrapperRows.length ? "Flowers and wrappers cost" : "Flowers cost" }} <b>{{ peso(cost) }}</b> per bouquet<template v-if="unpriced"> · {{ unpriced }} {{ unpriced === 1 ? "flower has" : "flowers have" }} no cost yet</template></span>
+      <span>{{ wrapperRows.length || fillerRows.length ? "Flowers and materials cost" : "Flowers cost" }} <b>{{ peso(cost) }}</b> per bouquet<template v-if="unpriced"> · {{ unpriced }} {{ unpriced === 1 ? "flower has" : "flowers have" }} no cost yet</template></span>
       <button
         v-if="costValue !== undefined && Math.abs(Number(costValue || 0) - cost) >= 0.005"
         type="button"
@@ -182,7 +229,7 @@
 <script setup>
 import { computed } from "vue";
 import { FLOWER_COLORS } from "../../../utils/flowerColors.js";
-import { flowerStockFor, flowersCost, rowCost, stockFromLinks } from "../../../utils/bouquetComposition.js";
+import { MATERIAL_KINDS, flowerStockFor, flowersCost, rowCost, stockFromLinks } from "../../../utils/bouquetComposition.js";
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
@@ -205,12 +252,27 @@ const labelId = `bf-${Math.random().toString(36).slice(2, 8)}`;
 const FLOWER_NAMES = ["Rose", "Tulip", "Sunflower", "Lily", "Carnation", "Chrysanthemum", "Gerbera", "Orchid", "Hydrangea", "Peony", "Baby's breath", "Eucalyptus", "Statice", "Aster", "Daisy", "Lisianthus"];
 const COLOR_NAMES = FLOWER_COLORS.filter((c) => c.value !== "other").map((c) => c.label);
 
-// Flower rows and wrapper rows live in one list; each keeps its index in it
-const isWrapperRow = (r) => r.kind === "wrapper";
-const flowerRows = computed(() => props.modelValue.map((row, i) => ({ row, i })).filter(({ row }) => !isWrapperRow(row)));
-const wrapperRows = computed(() => props.modelValue.map((row, i) => ({ row, i })).filter(({ row }) => isWrapperRow(row)));
-const singleFlowers = computed(() => (props.flowers || []).filter((f) => f.kind !== "wrapper"));
+// Flower, wrapper and filler rows live in one list; each keeps its index in it
+const rowsOf = (test) => computed(() => props.modelValue.map((row, i) => ({ row, i })).filter(({ row }) => test(row)));
+const flowerRows = rowsOf((r) => !MATERIAL_KINDS.includes(r.kind));
+const wrapperRows = rowsOf((r) => r.kind === "wrapper");
+const fillerRows = rowsOf((r) => r.kind === "filler");
+const singleFlowers = computed(() => (props.flowers || []).filter((f) => !MATERIAL_KINDS.includes(f.kind)));
 const wrappers = computed(() => (props.flowers || []).filter((f) => f.kind === "wrapper"));
+const fillers = computed(() => (props.flowers || []).filter((f) => f.kind === "filler"));
+
+/** A filler row: which of the shop's fillers, and how many bouquets' worth one bouquet uses */
+function addMaterial(kind, list) {
+  const first = list[0];
+  emit("update:modelValue", [
+    ...props.modelValue,
+    { kind, flower: first?.name || "", color: "", count: 1, cost: first?.cost ?? "", product_id: first?.id ?? null },
+  ]);
+}
+function setMaterial(index, list, value) {
+  const m = list.find((x) => x.id === Number(value));
+  if (m) update(index, { product_id: m.id, flower: m.name, cost: m.cost ?? "" });
+}
 
 const stems = computed(() => flowerRows.value.reduce((sum, { row }) => sum + (Number(row.count) > 0 ? Number(row.count) : 0), 0));
 const sheets = computed(() => wrapperRows.value.reduce((sum, { row }) => sum + (Number(row.count) > 0 ? Number(row.count) : 0), 0));

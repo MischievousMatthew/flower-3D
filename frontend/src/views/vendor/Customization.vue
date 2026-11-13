@@ -710,7 +710,7 @@ const STOCK_WORDS = {
     onHand: "Bouquets left (your stock)",
     onHandPlaceholder: "Blank = don't count",
     onHandTip:
-      "How many more bouquets you can still make with the filler you have now. Every bouquet a customer orders with this filler takes 1 off, no matter how much of it they place. At 0 it shows as Sold out. Leave it blank if you'd rather not count; then use the Available / Sold out switch on the filler.",
+      "How many more bouquets you can still make with the filler you have now. A custom 3D bouquet with this filler takes 1 off, no matter how much of it the customer places. A bouquet in Products that lists this filler takes off the amount you typed there. At 0 it shows as Sold out. Leave it blank if you'd rather not count; then use the Available / Sold out switch on the filler.",
     perPack: "How many bouquets can 1 sack fill?",
     perPackTip:
       "Your best guess is fine, no need to count pieces. If one sack usually covers about 20 bouquets, type 20. Then you can add stock by the sack below and we do the math.",
@@ -718,7 +718,7 @@ const STOCK_WORDS = {
     packs: "sacks",
     packsTitle: "Sacks",
     addLabel: (n) => `Add ${n} bouquets' worth`,
-    hint: "Each bouquet with this filler takes 1 off. This is the same count as in Inventory.",
+    hint: "Custom 3D bouquets take 1 off; bouquets in Products take what you set under their Fillers. Same count as in Inventory.",
   },
 };
 const stockWords = computed(() => STOCK_WORDS[activeTab.value] || null);
@@ -1394,7 +1394,7 @@ const formatSize = (bytes) =>
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--v-ink, #1f2937);
-  color: #fff;
+  color: var(--v-ink-text, #fff);
   font-size: 12.5px;
   font-weight: 400;
   line-height: 1.5;

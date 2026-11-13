@@ -8,6 +8,9 @@ const hasCost = (r) => r?.cost !== "" && r?.cost !== null && r?.cost !== undefin
 const filled = (r) =>
   String(r?.flower || "").trim() || String(r?.color || "").trim() || hasCost(r) || (r?.count !== "" && r?.count != null && r?.count !== 1);
 
+/** Rows that take from the shop's materials instead of a flower: a wrapper's sheets, a filler's bouquets' worth */
+export const MATERIAL_KINDS = ["wrapper", "filler"];
+
 /** The rows of an existing product, for its edit form */
 export const compositionFromProduct = (p) =>
   (Array.isArray(p?.composition) ? p.composition : []).map((f) => ({
@@ -16,7 +19,7 @@ export const compositionFromProduct = (p) =>
     count: Number(f.count) || 1,
     cost: f.cost ?? "",
     product_id: f.product_id ?? null, // linked single flower (shares its stock)
-    ...(f.kind === "wrapper" ? { kind: "wrapper" } : {}), // sheets of one of the shop's wrappers
+    ...(MATERIAL_KINDS.includes(f.kind) ? { kind: f.kind } : {}), // sheets of a wrapper, or bouquets' worth of a filler
   }));
 
 /** How many of a linked flower a row can use: its colour's own stock when it counts colours */
@@ -61,7 +64,7 @@ export const compositionField = (rows) =>
         count: Math.floor(Number(r.count)),
         cost: hasCost(r) ? Math.round(Number(r.cost) * 100) / 100 : null,
         product_id: r.product_id ? Number(r.product_id) : null,
-        ...(r.kind === "wrapper" ? { kind: "wrapper" } : {}),
+        ...(MATERIAL_KINDS.includes(r.kind) ? { kind: r.kind } : {}),
       })),
   );
 
@@ -72,6 +75,12 @@ export function compositionProblem(rows) {
       if (!r.product_id) return "Pick which wrapper the bouquet uses, or remove that row.";
       const n = Number(r.count);
       if (!Number.isInteger(n) || n < 1 || n > 1000) return `Enter how many sheets of ${r.flower || "the wrapper"} one bouquet uses (1 or more).`;
+      continue;
+    }
+    if (r.kind === "filler") {
+      if (!r.product_id) return "Pick which filler the bouquet uses, or remove that row.";
+      const n = Number(r.count);
+      if (!Number.isInteger(n) || n < 1 || n > 1000) return `Enter how many bouquets' worth of ${r.flower || "the filler"} one bouquet uses (1 or more).`;
       continue;
     }
     if (!filled(r)) continue;

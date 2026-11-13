@@ -738,8 +738,8 @@ SQL;
     private function composition($raw): array
     {
         return collect(is_array($raw) ? $raw : [])
-            // The bouquet's wrapper sheets are for the shop's stock, not part of "What's inside"
-            ->filter(fn ($f) => is_array($f) && trim((string) ($f['flower'] ?? '')) !== '' && ($f['kind'] ?? null) !== 'wrapper')
+            // The bouquet's wrapper sheets and filler stock are for the shop's count, not part of "What's inside"
+            ->filter(fn ($f) => is_array($f) && trim((string) ($f['flower'] ?? '')) !== '' && ! in_array($f['kind'] ?? null, ['wrapper', 'filler'], true))
             ->map(fn ($f) => [
                 'flower' => trim((string) $f['flower']),
                 'color'  => isset($f['color']) && trim((string) $f['color']) !== '' ? trim((string) $f['color']) : null,
