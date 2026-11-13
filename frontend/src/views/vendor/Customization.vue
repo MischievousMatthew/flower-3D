@@ -370,6 +370,25 @@
             <span class="cz-counter">{{ form.description.length }}/500</span>
           </label>
 
+          <!-- A photo customers see first when choosing (the colour shows when they point at it) -->
+          <div v-if="isStocked({ type: activeTab })" class="cz-field">
+            <span class="cz-label">Photo <small>(optional · what customers see first)</small></span>
+            <label class="cz-upload cz-upload--image" :class="{ invalid: errors.image_file, filled: form.imagePreview }">
+              <input type="file" accept="image/jpeg,image/png,image/webp" class="bc-sr-only" @change="onImageSelected" />
+              <img v-if="form.imagePreview" :src="form.imagePreview" alt="" class="cz-upload-preview" />
+              <span v-else class="cz-upload-icon" aria-hidden="true">⬆</span>
+              <span class="cz-upload-text">
+                <strong>{{ form.imagePreview ? (form.imageFile ? form.imageFile.name : "Current photo kept") : `Upload a photo of the ${current.singular}` }}</strong>
+                <small>{{ form.imagePreview ? "Click to replace" : "JPG, PNG or WEBP · Max 5 MB" }}</small>
+              </span>
+            </label>
+            <button v-if="form.imagePreview" type="button" class="cz-link cz-photo-remove" @click="removePhoto">Remove photo</button>
+            <span v-if="errors.image_file" class="cz-error">{{ errors.image_file }}</span>
+            <span class="cz-hint">
+              {{ activeTab === "filler" ? "Customers see this photo on the filler's tile." : "Customers see this photo first; pointing at it shows the colour." }}
+            </span>
+          </div>
+
           <!-- Wrapper sheets / filler portions: the same count ERP Stock & replenishment and Inventory show -->
           <div v-if="stockWords" class="cz-field cz-stock">
             <span class="cz-label">Stock <small>(optional)</small></span>
@@ -485,7 +504,7 @@
               class="cz-row"
               :class="{ editing: editingId === item.id, off: isStocked(item) && !item.is_active }"
             >
-              <img v-if="item.type === 'card' && item.image_url" :src="item.image_url" alt="" class="cz-card-thumb" />
+              <img v-if="item.image_url && item.type !== 'wrap_model'" :src="item.image_url" alt="" class="cz-card-thumb" />
               <span
                 v-else-if="item.color_hex"
                 class="cz-dot"
@@ -667,6 +686,7 @@ const form = reactive({
   // Cards
   imageFile: null,
   imagePreview: null,
+  removeImage: false, // a wrapper's / filler's / ribbon's photo taken off
   limitType: "words",
   limit: "",
   sizes: [{ label: "Small", price: "" }],
@@ -1028,6 +1048,7 @@ function resetForm() {
   form.modelUrl = null;
   form.imageFile = null;
   form.imagePreview = null;
+  form.removeImage = false;
   form.limitType = "words";
   form.limit = "";
   form.sizes = [{ label: "Small", price: "" }];
@@ -1065,6 +1086,7 @@ function startEdit(item) {
     form.patternSize = cleanPatternSize(item.pattern_size);
     refreshPrintPreview();
   }
+  if (isStocked(item)) form.imagePreview = item.image_url || null;
   if (item.type === "card") {
     form.imagePreview = item.image_url || null;
     form.limitType = item.card_limit_type || "words";
@@ -1093,6 +1115,13 @@ function onModelSelected(event) {
   form.modelFile = file;
 }
 
+/** Takes a wrapper's, filler's or ribbon's photo off (saved with the form) */
+function removePhoto() {
+  form.imageFile = null;
+  form.imagePreview = null;
+  form.removeImage = true;
+}
+
 // ---- Cards ----
 function onImageSelected(event) {
   const file = event.target.files?.[0];
@@ -1108,6 +1137,7 @@ function onImageSelected(event) {
   }
   delete errors.image_file;
   form.imageFile = file;
+  form.removeImage = false;
   const reader = new FileReader();
   reader.onload = (e) => (form.imagePreview = e.target.result);
   reader.readAsDataURL(file);
@@ -1177,6 +1207,11 @@ async function submitForm() {
   if (!editingId.value) payload.append("type", type);
   payload.append("name", form.name);
   payload.append("description", form.description.trim());
+  // A wrapper's, filler's or ribbon's photo: a new one, or "remove" to take it off
+  if (STOCKED_TYPES.includes(type)) {
+    if (form.imageFile) payload.append("image_file", form.imageFile);
+    else if (form.removeImage) payload.append("remove_image", "1");
+  }
   if (current.value.isCard) {
     if (form.imageFile) payload.append("image_file", form.imageFile);
     payload.append("card_limit_type", form.limitType);
@@ -1900,6 +1935,13 @@ const formatSize = (bytes) =>
 .cz-link:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* "Remove photo" under the upload box */
+.cz-photo-remove {
+  align-self: flex-start;
+  min-height: 32px;
+  color: var(--v-red-text);
 }
 
 /* ---- List ---- */

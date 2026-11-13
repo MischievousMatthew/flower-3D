@@ -178,7 +178,8 @@ class VendorCustomizationOptionController extends Controller
             if (in_array($type, Option::MODEL_TYPES, true)) {
                 $this->storeModel($option, $request->file('model_file'));
             }
-            if ($type === Option::TYPE_CARD) {
+            // A card always has a photo; a wrapper, filler or ribbon may have one
+            if ($type === Option::TYPE_CARD || (isset(Option::STOCK[$type]) && $request->hasFile('image_file'))) {
                 $this->storeImage($option, $request->file('image_file'));
             }
 
@@ -220,8 +221,13 @@ class VendorCustomizationOptionController extends Controller
             if (in_array($option->type, Option::MODEL_TYPES, true) && $request->hasFile('model_file')) {
                 $this->storeModel($option, $request->file('model_file'));
             }
-            if ($option->type === Option::TYPE_CARD && $request->hasFile('image_file')) {
+            $hasPhoto = $option->type === Option::TYPE_CARD || isset(Option::STOCK[$option->type]);
+            if ($hasPhoto && $request->hasFile('image_file')) {
                 $this->storeImage($option, $request->file('image_file'));
+            } elseif (isset(Option::STOCK[$option->type]) && $request->boolean('remove_image')) {
+                // A wrapper's, filler's or ribbon's photo taken off (the file is deleted below)
+                $option->image_url = null;
+                $option->image_path = null;
             }
 
             $option->save();
@@ -318,6 +324,9 @@ class VendorCustomizationOptionController extends Controller
         }
 
         if (isset(Option::STOCK[$type])) {
+            // A photo customers see first (optional), or remove_image to take it off
+            $rules['image_file'] = 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120';
+            $rules['remove_image'] = 'nullable|boolean';
             // Switched off = hidden (how an uncounted filler or ribbon is marked sold out)
             $rules['is_active'] = 'nullable|boolean';
             // Sheets or portions on hand (blank = not counted) and how many a roll or sack gives
@@ -415,7 +424,7 @@ class VendorCustomizationOptionController extends Controller
     private function storeImage(Option $option, UploadedFile $file): void
     {
         $result = CloudinaryHelper::upload($file, [
-            'folder' => 'customization_cards',
+            'folder' => $option->type === Option::TYPE_CARD ? 'customization_cards' : 'customization_photos',
             'resource_type' => 'image',
         ]);
 

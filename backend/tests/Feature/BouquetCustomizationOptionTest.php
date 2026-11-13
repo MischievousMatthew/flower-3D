@@ -41,6 +41,7 @@ class BouquetCustomizationOptionTest extends TestCase
         });
 
         (include database_path('migrations/2026_10_10_000001_create_bouquet_customization_options_table.php'))->up();
+        (include database_path('migrations/2026_10_11_000000_add_card_fields_to_bouquet_customization_options_table.php'))->up();
         (include database_path('migrations/2026_11_04_130000_add_pattern_to_bouquet_customization_options.php'))->up();
         (include database_path('migrations/2026_11_04_150000_add_pattern_size_to_bouquet_customization_options.php'))->up();
         (include database_path('migrations/2026_11_13_130000_add_stock_item_to_customization_options.php'))->up();
@@ -287,6 +288,29 @@ class BouquetCustomizationOptionTest extends TestCase
         $this->assertSame(['Twine'], $available());
         $this->as($vendor)->patchJson("/api/vendor/customization-options/{$twine->id}/active", ['is_active' => false])->assertOk();
         $this->assertSame([], $available());
+    }
+
+    public function test_a_wrapper_fillers_or_ribbons_photo_reaches_the_customizer_and_can_be_taken_off(): void
+    {
+        $vendor = $this->vendor();
+        $satin = BouquetCustomizationOption::create([
+            'owner_id' => $vendor->id, 'type' => 'ribbon', 'name' => 'Red satin', 'color_hex' => '#cc0000',
+            'image_url' => 'https://example.com/satin.jpg', 'image_path' => 'customization_photos/satin',
+        ]);
+
+        // The storefront sends the photo with the colour
+        $ribbon = collect(BouquetCustomizationOption::query()->available()->where('type', 'ribbon')->get())->first();
+        $this->assertSame(['https://example.com/satin.jpg', '#cc0000'], [$ribbon->image_url, $ribbon->color_hex]);
+
+        // A photo must be an image
+        $this->as($vendor)->post("/api/vendor/customization-options/{$satin->id}", [
+            'image_file' => \Illuminate\Http\UploadedFile::fake()->create('notes.pdf', 10, 'application/pdf'),
+        ], ['Accept' => 'application/json'])->assertStatus(422)->assertJsonValidationErrors('image_file');
+
+        // "Remove photo"
+        $this->as($vendor)->postJson("/api/vendor/customization-options/{$satin->id}", ['remove_image' => '1'])
+            ->assertOk()->assertJsonPath('data.image_url', null);
+        $this->assertNull($satin->fresh()->image_path);
     }
 
     public function test_validation_requires_a_hex_colour_and_a_filler_model(): void

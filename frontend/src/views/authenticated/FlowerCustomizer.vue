@@ -180,7 +180,10 @@
                   :aria-checked="activeWrap.id === option.id"
                   @click="selectWrapper(activeWrapLayer, option)"
                 >
-                  <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
+                  <!-- The shop's photo first; pointing at it (or focusing it) shows the colour underneath -->
+                  <span class="fc-option-swatch" :class="{ 'has-photo': option.image_url }" :style="{ background: option.color_hex }">
+                    <img v-if="option.image_url" :src="option.image_url" alt="" loading="lazy" />
+                  </span>
                   <span class="fc-option-copy">
                     <strong>{{ option.name }}</strong>
                     <small v-if="printLabel(option)">{{ printLabel(option) }}</small>
@@ -205,7 +208,10 @@
                   :aria-checked="selectedRibbonId === option.id"
                   @click="selectRibbon(option)"
                 >
-                  <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
+                  <!-- The shop's photo first; pointing at it (or focusing it) shows the colour underneath -->
+                  <span class="fc-option-swatch" :class="{ 'has-photo': option.image_url }" :style="{ background: option.color_hex }">
+                    <img v-if="option.image_url" :src="option.image_url" alt="" loading="lazy" />
+                  </span>
                   <span class="fc-option-copy">
                     <strong>{{ option.name }}</strong>
                     <small v-if="option.description">{{ option.description }}</small>
@@ -1447,6 +1453,7 @@ async function fetchCustomizationOptions() {
       price: 0,
       model: filler.model_url,
       model_3d_url: filler.model_url,
+      image: filler.image_url || null, // the shop's photo of the filler, shown on its tile
     }));
     cards.value = (data.cards || [])
       .map((card) => ({
@@ -4694,6 +4701,52 @@ function showToast(message, type = "success") {
   flex-shrink: 0;
   border-radius: 50%;
   box-shadow: inset 0 0 0 1px rgba(54, 63, 78, 0.12);
+}
+
+/* With the shop's photo: a bigger tile showing the photo; pointing at the
+   option (or focusing it) fades the photo to show the colour underneath */
+.fc-option-swatch.has-photo {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: var(--radius-md, 10px);
+}
+
+.fc-option-swatch.has-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.25s ease;
+}
+
+.fc-option:hover .fc-option-swatch.has-photo img,
+.fc-option:focus-visible .fc-option-swatch.has-photo img {
+  opacity: 0;
+}
+
+/* Phones and tablets can't point: a small dot of the colour sits on the photo */
+@media (hover: none) {
+  .fc-option-swatch.has-photo::after {
+    content: "";
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: inherit;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fc-option-swatch.has-photo img {
+    transition: none;
+  }
 }
 
 .fc-option-copy {
