@@ -153,6 +153,14 @@
           </div>
           <small class="bp-uses-note" role="status">{{ usesNote(p) }}</small>
           <small v-if="errors[`${p.key}.size_uses`]" class="sp-error">{{ errors[`${p.key}.size_uses`] }}</small>
+
+          <!-- The ribbon is one amount for every size -->
+          <label v-if="p.ribbon" class="bp-ribbon-use">
+            <span>Ribbon per bouquet <small>(any size)</small></span>
+            <input v-model.number="p.uses.ribbon" class="sp-input" type="number" min="1" :max="MAX_USE" step="1" inputmode="numeric" />
+          </label>
+          <small v-if="errors[`${p.key}.uses`]" class="sp-error">{{ errors[`${p.key}.uses`] }}</small>
+
           <form v-if="p.sizes.length < limits.max_sizes" class="bp-add" @submit.prevent="addSize(p)">
             <input
               v-model.number="drafts[p.key]"
@@ -168,13 +176,6 @@
           </form>
           <small v-else class="sp-hint">Up to {{ limits.max_sizes }} sizes per occasion.</small>
           <small v-if="errors[`${p.key}.sizes`]" class="sp-error">{{ errors[`${p.key}.sizes`] }}</small>
-
-          <!-- The ribbon is one amount for every size -->
-          <label v-if="p.ribbon" class="bp-ribbon-use">
-            <span>Ribbon per bouquet <small>(any size)</small></span>
-            <input v-model.number="p.uses.ribbon" class="sp-input" type="number" min="1" :max="MAX_USE" step="1" inputmode="numeric" />
-          </label>
-          <small v-if="errors[`${p.key}.uses`]" class="sp-error">{{ errors[`${p.key}.uses`] }}</small>
         </div>
 
         <button v-if="p.custom" type="button" class="bp-remove" @click="removeOccasion(p)">Remove this occasion</button>
