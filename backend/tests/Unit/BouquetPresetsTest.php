@@ -94,6 +94,27 @@ class BouquetPresetsTest extends TestCase
         $result = BouquetPresets::check(BouquetPresets::merge($saved), $this->bouquet(['key' => 'romance', 'size' => 6], 3));
         $this->assertSame(['wrapper' => 2, 'filler' => 3, 'ribbon' => 2], $result['customizations']['preset']['uses']);
 
+        // Each size sets its own wrapper sheets and filler: the Grand bouquet takes more
+        $saved = BouquetPresets::normalize(['romance' => [
+            'sizes' => [6, 24],
+            'uses' => ['ribbon' => 1],
+            'size_uses' => ['6' => ['wrapper' => 1, 'filler' => 1], '24' => ['wrapper' => 2, 'filler' => 3]],
+        ]]);
+        $romance = collect(BouquetPresets::merge($saved))->firstWhere('key', 'romance');
+        $this->assertSame(['6' => ['wrapper' => 1, 'filler' => 1], '24' => ['wrapper' => 2, 'filler' => 3]], array_map(fn ($u) => $u, $romance['size_uses']));
+        $small = BouquetPresets::check(BouquetPresets::merge($saved), $this->bouquet(['key' => 'romance', 'size' => 6], 3));
+        $grand = BouquetPresets::check(BouquetPresets::merge($saved), $this->bouquet(['key' => 'romance', 'size' => 24], 20));
+        $this->assertSame(['wrapper' => 1, 'filler' => 1, 'ribbon' => 1], $small['customizations']['preset']['uses']);
+        $this->assertSame(['wrapper' => 2, 'filler' => 3, 'ribbon' => 1], $grand['customizations']['preset']['uses']);
+
+        // A size with a bad amount is refused
+        try {
+            BouquetPresets::normalize(['romance' => ['sizes' => [6], 'size_uses' => ['6' => ['wrapper' => 0]]]]);
+            $this->fail('0 sheets should be refused');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('romance.size_uses', $e->errors());
+        }
+
         // 0, fractions and too many are refused
         foreach ([0, 1.5, BouquetPresets::MAX_USE + 1] as $bad) {
             try {

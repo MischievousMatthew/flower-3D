@@ -34,6 +34,30 @@ class BouquetPresets
     public const USE_PARTS = ['wrapper', 'filler', 'ribbon'];
     public const MAX_USE = 50;
 
+    /** What's set per size: a bigger bouquet takes more wrapper paper and more of each filler */
+    public const SIZE_PARTS = ['wrapper', 'filler'];
+
+    /**
+     * Wrapper sheets per layer and filler per placement for each of an
+     * occasion's sizes: {"6": {"wrapper": 1, "filler": 1}, "24": {"wrapper": 2, "filler": 2}}.
+     * A size not set takes the occasion's own amount ($fallback, 1 by default).
+     */
+    public static function cleanSizeUses($raw, array $sizes, array $fallback = []): array
+    {
+        $out = [];
+        foreach ($sizes as $size) {
+            $row = is_array($raw) ? ($raw[$size] ?? $raw[(string) $size] ?? null) : null;
+            foreach (self::SIZE_PARTS as $part) {
+                $n = is_array($row) ? ($row[$part] ?? null) : null;
+                $out[(string) $size][$part] = is_numeric($n) && (int) $n == $n
+                    ? max(1, min(self::MAX_USE, (int) $n))
+                    : (int) ($fallback[$part] ?? 1);
+            }
+        }
+
+        return $out;
+    }
+
     /** An occasion's amounts, each a whole number from 1 to MAX_USE (1 when missing or wrong) */
     public static function cleanUses($uses): array
     {
@@ -130,6 +154,7 @@ class BouquetPresets
         $design = self::validDesign($own['design'] ?? null) ?? $default['design'];
         $can = self::parts($design);
         $sizes = self::cleanSizes($own['sizes'] ?? null);
+        $uses = self::cleanUses($own['uses'] ?? null);
 
         return [
             'key' => $key,
@@ -141,8 +166,10 @@ class BouquetPresets
             'enabled' => array_key_exists('enabled', $own) ? (bool) $own['enabled'] : true,
             'sizes' => $sizes ?: $default['sizes'],
             'base_price' => is_numeric($own['base_price'] ?? null) ? round(max(0, min(self::MAX_BASE_PRICE, (float) $own['base_price'])), 2) : 0.0,
-            // Stock one bouquet takes: sheets per wrapper layer, per filler placed, ribbon
-            'uses' => self::cleanUses($own['uses'] ?? null),
+            // Stock one bouquet takes: the ribbon here; wrapper sheets per layer and
+            // filler per placement for each size (size_uses)
+            'uses' => $uses,
+            'size_uses' => self::cleanSizeUses($own['size_uses'] ?? null, $sizes ?: $default['sizes'], $uses),
             'custom' => $custom,
             'icon' => $default['icon'],
             'description' => $default['description'],
@@ -302,6 +329,19 @@ class BouquetPresets
                     continue 2;
                 }
             }
+            // Wrapper sheets and filler for each size
+            $sizeUses = is_array($row['size_uses'] ?? null) ? $row['size_uses'] : [];
+            foreach ($sizes as $size) {
+                $one = $sizeUses[$size] ?? $sizeUses[(string) $size] ?? [];
+                foreach (self::SIZE_PARTS as $part) {
+                    $n = is_array($one) ? ($one[$part] ?? 1) : 1;
+                    if (! is_numeric($n) || (int) $n != $n || $n < 1 || $n > self::MAX_USE) {
+                        $what = $part === 'wrapper' ? 'wrapper sheets per layer' : 'of each filler';
+                        $errors["$key.size_uses"][] = "$label: a {$size}-flower bouquet uses 1 to " . self::MAX_USE . " {$what}.";
+                        continue 3;
+                    }
+                }
+            }
 
             $can = self::parts($design);
             $out[$key] = $stored + [
@@ -312,6 +352,7 @@ class BouquetPresets
                 'wrapper' => $can['wrapper'] && (bool) ($row['wrapper'] ?? ($isCustom ? true : self::DEFAULTS[$key]['wrapper'])),
                 'ribbon' => $can['ribbon'] && (bool) ($row['ribbon'] ?? ($isCustom ? true : self::DEFAULTS[$key]['ribbon'])),
                 'uses' => self::cleanUses($uses),
+                'size_uses' => self::cleanSizeUses($sizeUses, $sizes, self::cleanUses($uses)),
             ];
         }
 
@@ -393,7 +434,11 @@ class BouquetPresets
         // back) by what the shop had set when it was bought
         $customizations['preset'] = [
             'key' => $occasion['key'], 'size' => $size, 'label' => $occasion['label'], 'base_price' => $base,
-            'uses' => self::cleanUses($occasion['uses'] ?? null),
+            // Wrapper sheets and filler for this size, ribbon for the occasion
+            'uses' => array_merge(
+                self::cleanUses($occasion['uses'] ?? null),
+                self::cleanSizeUses($occasion['size_uses'] ?? null, [$size], self::cleanUses($occasion['uses'] ?? null))[(string) $size],
+            ),
         ];
         // The bouquet's design follows its occasion (the viewer rebuilds it from this)
         $customizations['design'] = $occasion['design'];
