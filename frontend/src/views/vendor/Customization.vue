@@ -764,8 +764,14 @@ async function loadFlowers() {
 
 function switchTab(key) {
   if (activeTab.value === key) return;
-  // Leaving Occasions & sizes with unsaved edits waits for save or discard
-  if (!guardUnsaved(() => switchTab(key))) return;
+  // Leaving Occasions & sizes with unsaved edits waits for save or discard.
+  // guardUnsaved runs the move right away when nothing is unsaved, so the move
+  // must not call switchTab again (that looped until the stack overflowed).
+  guardUnsaved(() => openTab(key));
+}
+
+function openTab(key) {
+  if (activeTab.value === key) return;
   activeTab.value = key;
   confirmingId.value = null;
   resetForm();
