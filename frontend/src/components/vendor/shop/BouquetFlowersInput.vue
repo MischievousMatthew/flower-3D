@@ -191,7 +191,8 @@
           </button>
         </li>
       </ul>
-      <small v-if="fillerRows.length" class="bf-help">How many of the filler one bouquet uses. With 60 left and 2 per bouquet, you can make 30.</small>
+      <!-- Worked out from each row: "With 40 left and 2 per bouquet, you can make 20." -->
+      <small v-for="line in fillerLines" :key="line.i" class="bf-help" role="status">{{ line.text }}</small>
       <button v-if="fillers.length" type="button" class="bf-add" :disabled="modelValue.length >= 30" @click="addMaterial('filler', fillers)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         Add a filler
@@ -269,6 +270,19 @@ function addMaterial(kind, list) {
     { kind, flower: first?.name || "", color: "", count: 1, cost: first?.cost ?? "", product_id: first?.id ?? null },
   ]);
 }
+/** Under the filler rows: what each one's stock and amount make, as the vendor types */
+const fillerLines = computed(() =>
+  fillerRows.value.map(({ row, i }) => {
+    const filler = fillers.value.find((f) => f.id === Number(row.product_id));
+    const per = Number(row.count);
+    if (!filler) return { i, text: "Pick a filler, then type how many of it one bouquet uses." };
+    if (!Number.isInteger(per) || per < 1) return { i, text: `Type how many ${filler.name} one bouquet uses.` };
+    const left = Number(filler.stock) || 0;
+    const make = Math.floor(left / per);
+    const name = fillerRows.value.length > 1 ? `${filler.name}: ` : "";
+    return { i, text: `${name}With ${left} left and ${per} per bouquet, you can make ${make} ${make === 1 ? "bouquet" : "bouquets"}.` };
+  }),
+);
 function setMaterial(index, list, value) {
   const m = list.find((x) => x.id === Number(value));
   if (m) update(index, { product_id: m.id, flower: m.name, cost: m.cost ?? "" });
