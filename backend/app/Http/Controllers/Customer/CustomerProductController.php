@@ -331,17 +331,16 @@ class CustomerProductController extends Controller
                 ->findOrFail($id);
 
             $statsMap = $this->loadProductStats([$product->id]);
-            $vendorName = null;
-            if ($product->owner?->email) {
-                $vendorName = VendorApplication::where('email', $product->owner->email)
-                    ->where('status', 'approved')
-                    ->value('store_name');
-            }
+            $shop = $product->owner?->email
+                ? VendorApplication::where('email', $product->owner->email)->where('status', 'approved')->first()
+                : null;
 
-            return response()->json([
-                'success' => true,
-                'data'    => $this->formatProduct($product, $statsMap[$product->id] ?? null, $vendorName),
-            ]);
+            $data = $this->formatProduct($product, $statsMap[$product->id] ?? null, $shop?->store_name);
+            // How long the customer waits: none when the product is ready the same
+            // day, otherwise the shop's own preparation time (its settings)
+            $data['preparation_days'] = $product->prepDaysFor($shop);
+
+            return response()->json(['success' => true, 'data' => $data]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Product not found'], 404);
         }
@@ -542,6 +541,8 @@ SQL;
             'care_instructions' => $product->care_instructions ?? '',
             // Made to order: days the shop needs to prepare it; how long it stays fresh
             'preparation_days'  => (int) ($product->preparation_days ?? 0),
+            // Ready the same day: can be delivered today whatever the shop's same-day switch says
+            'ready_same_day'    => (bool) $product->ready_same_day,
             'freshness_days'    => $product->freshness_days ? (int) $product->freshness_days : null,
             'selling_type'      => $product->selling_type,
             // Filled in by the shop; empty until then (the page hides them)

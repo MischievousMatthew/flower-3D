@@ -618,7 +618,8 @@ const availability = computed(() => {
     return { title: "", note: others ? `${chosenColor.value} is sold out. Pick another colour.` : "Check back soon, or ask the shop." };
   }
   const days = prepDays.value;
-  const ready = days > 0 ? `Made to order · ready in ${days} ${days === 1 ? "day" : "days"}` : "";
+  // Ready the same day, or made to order with the shop's preparation time
+  const ready = product.value?.ready_same_day ? "Ready the same day" : days > 0 ? `Made to order · ready in ${days} ${days === 1 ? "day" : "days"}` : "";
   if (stock <= LOW_STOCK) return { title: `Only ${stock} left`, note: ready };
   return { title: `${stock} available`, note: ready };
 });
@@ -632,7 +633,7 @@ const specs = computed(() => {
     ...(composition.value.length ? [{ label: "Stems", value: `${totalStems.value} in all` }] : []),
     { label: "Season", value: p.season === "all-year" ? "All year" : titleCase(p.season) || "—" },
     { label: "Occasions", value: (p.occasion_tags || []).join(", ") || "—" },
-    { label: "Preparation", value: prepDays.value ? `${prepDays.value} ${prepDays.value === 1 ? "day" : "days"}` : "Ready to send" },
+    { label: "Preparation", value: p.ready_same_day ? "Ready the same day" : prepDays.value ? `${prepDays.value} ${prepDays.value === 1 ? "day" : "days"}` : "Ready to send" },
     { label: "Stays fresh", value: p.freshness_days ? `About ${p.freshness_days} days` : "—" },
     { label: "Shop", value: p.vendor_name || "—" },
     { label: "Availability", value: soldOut.value ? "Sold out" : `${chosenStock.value} in stock${colorOptions.value.some((c) => c.stock != null) && chosenColor.value ? ` (${chosenColor.value})` : ""}` },
@@ -703,12 +704,13 @@ async function loadDates() {
   datesLoading.value = true;
   try {
     const { data } = await api.get("/customer/availability", {
-      params: { vendor_id: p.vendor_id, start_date: today, end_date: addDays(today, 30) },
+      // The product goes along: one that's "ready the same day" opens today,
+      // otherwise the shop's own same-day switch and preparation time decide
+      params: { vendor_id: p.vendor_id, start_date: today, end_date: addDays(today, 30), product_ids: [p.id] },
     });
     if (product.value?.id !== id) return;
-    const earliest = addDays(today, prepDays.value);
     const open = Object.entries(data?.data?.calendar || {})
-      .filter(([date, day]) => !day.is_disabled && date >= earliest)
+      .filter(([, day]) => !day.is_disabled)
       .map(([date]) => date)
       .sort()
       .slice(0, DATE_CHOICES);

@@ -411,6 +411,9 @@ class Product extends Model
         'supplier_contact',
         'supplier_sku',
         'preparation_days',
+        // Ready the same day: can be delivered today whatever the shop's same-day switch says.
+        // Off: the shop's own preparation time (its settings) applies.
+        'ready_same_day',
         'supplier_lead_time',
 
         // Product attributes
@@ -446,6 +449,7 @@ class Product extends Model
         'color_options'          => 'array',
         'composition'            => 'array',
         'preparation_days'       => 'integer',
+        'ready_same_day'         => 'boolean',
         'supplier_lead_time'     => 'integer',
     ];
 
@@ -562,6 +566,31 @@ class Product extends Model
     public function getWarehouseQtyAttribute(): int
     {
         return $this->activeBatches()->sum('qty_remaining');
+    }
+
+    /**
+     * True when every product is "ready the same day": only then can an order
+     * be delivered today whatever the shop's same-day switch says. One product
+     * that follows the shop's preparation time puts the whole order on the
+     * shop's rules.
+     */
+    public static function allReadySameDay(iterable $products): bool
+    {
+        $any = false;
+        foreach ($products as $product) {
+            if (! $product || ! $product->ready_same_day) {
+                return false;
+            }
+            $any = true;
+        }
+
+        return $any;
+    }
+
+    /** Days a customer waits for this product: none when it's ready the same day, else the shop's preparation time */
+    public function prepDaysFor(?VendorApplication $shop): int
+    {
+        return $this->ready_same_day ? 0 : max(0, (int) ($shop?->reservationLeadTimeDays() ?? 0));
     }
 
     public function getPreparationDaysAttribute($value): int

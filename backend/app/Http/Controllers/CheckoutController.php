@@ -557,7 +557,9 @@ class CheckoutController extends Controller
                 ], 422);
             }
 
-            $settings = VendorApplication::buildReservationSettings($vendorUser, $vendor);
+            // Every product "ready the same day": today is allowed whatever the shop's same-day switch says
+            $readySameDay = Product::allReadySameDay($cartItems->pluck('product'));
+            $settings = VendorApplication::buildReservationSettings($vendorUser, $vendor, null, $readySameDay);
             $nowInPh = Carbon::now($settings['timezone']);
             $todayInPh = $nowInPh->copy()->startOfDay();
             $maxDate = $todayInPh->copy()->addMonths(3);
@@ -1431,7 +1433,8 @@ class CheckoutController extends Controller
 
         $vendor = \App\Models\User::find($order->vendor_id);
         $vendorApplication = VendorApplication::findApprovedForVendorUser($vendor);
-        $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication, $today);
+        $readySameDay = Product::allReadySameDay($order->items()->with('product')->get()->pluck('product'));
+        $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication, $today, $readySameDay);
 
         if (!$this->validateReservationDateSelection($reservationDate, $settings, $today)['valid']) {
             return false;

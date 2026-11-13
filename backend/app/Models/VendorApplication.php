@@ -506,7 +506,12 @@ class VendorApplication extends Model
             ->first();
     }
 
-    public static function buildReservationSettings(?User $vendor, ?self $application = null, ?CarbonInterface $referenceNow = null): array
+    /**
+     * $readySameDay: every product in the order is "ready the same day", so it
+     * can be delivered today (until the shop closes) whatever the shop's
+     * same-day switch says. Otherwise the shop's own settings apply.
+     */
+    public static function buildReservationSettings(?User $vendor, ?self $application = null, ?CarbonInterface $referenceNow = null, bool $readySameDay = false): array
     {
         $application ??= static::findApprovedForVendorUser($vendor);
 
@@ -514,17 +519,21 @@ class VendorApplication extends Model
             ? Carbon::instance($referenceNow)->setTimezone(self::RESERVATION_TIMEZONE)
             : Carbon::now(self::RESERVATION_TIMEZONE);
 
-        $sameDayDelivery      = (bool) ($application?->same_day_delivery ?? false);
+        $shopSameDay          = (bool) ($application?->same_day_delivery ?? false);
+        $sameDayDelivery      = $shopSameDay || ($readySameDay && $application !== null);
+        $forced               = $sameDayDelivery && ! $shopSameDay;
         $leadTimeDays         = $application?->reservationLeadTimeDays() ?? 0;
         $maxOrdersPerDay      = max(1, (int) ($application?->max_orders_per_day ?? 10));
-        $cutoffTimeToday      = $application?->cutoffTimeForDate($now);
+        $cutoffTimeToday      = $application?->cutoffTimeForDate($now, $forced);
         $sameDayCutoffReached = $sameDayDelivery
-            ? $application?->isSameDayCutoffReached($now) ?? false
+            ? $application?->isSameDayCutoffReached($now, $forced) ?? false
             : true;
 
         return [
             'timezone'                  => self::RESERVATION_TIMEZONE,
             'same_day_delivery'         => $sameDayDelivery,
+            // Same-day only because the products are ready the same day (the shop's switch is off)
+            'same_day_from_products'    => $forced,
             'lead_time_days'            => max(0, $leadTimeDays),
             'max_orders_per_day'        => $maxOrdersPerDay,
             'cutoff_time_today'         => $cutoffTimeToday,
@@ -644,9 +653,10 @@ class VendorApplication extends Model
         return 0;
     }
 
-    public function cutoffTimeForDate(CarbonInterface $date): ?string
+    /** $force: for an order of "ready the same day" products, the shop's switch being off doesn't matter */
+    public function cutoffTimeForDate(CarbonInterface $date, bool $force = false): ?string
     {
-        if (!$this->same_day_delivery) {
+        if (!$this->same_day_delivery && !$force) {
             return null;
         }
 
@@ -673,9 +683,9 @@ class VendorApplication extends Model
         return null;
     }
 
-    public function isSameDayCutoffReached(?CarbonInterface $referenceNow = null): bool
+    public function isSameDayCutoffReached(?CarbonInterface $referenceNow = null, bool $force = false): bool
     {
-        if (!$this->same_day_delivery) {
+        if (!$this->same_day_delivery && !$force) {
             return true;
         }
 
@@ -683,7 +693,7 @@ class VendorApplication extends Model
             ? Carbon::instance($referenceNow)->setTimezone(self::RESERVATION_TIMEZONE)
             : Carbon::now(self::RESERVATION_TIMEZONE);
 
-        $cutoffTime = $this->cutoffTimeForDate($now);
+        $cutoffTime = $this->cutoffTimeForDate($now, $force);
         if (!$cutoffTime) {
             return true;
         }

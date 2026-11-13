@@ -255,13 +255,10 @@
                 <option v-for="s in SEASONS" :key="s.value" :value="s.value">{{ s.label }}</option>
               </select>
             </label>
-            <label data-change="preparation_days" class="sp-field">
-              <span>Preparation time</span>
-              <select v-model.number="form.preparation_days" class="sp-select">
-                <option :value="0">Ready the same day</option>
-                <option v-for="d in [1, 2, 3, 5, 7]" :key="d" :value="d">{{ d }} {{ d === 1 ? "day" : "days" }}</option>
-              </select>
-            </label>
+          </div>
+          <!-- Ready the same day, or the shop's own preparation time (set once in Shop settings) -->
+          <div data-change="ready_same_day" class="ap-gap">
+            <PrepTimeField v-model="form.ready_same_day" />
           </div>
         </section>
 
@@ -381,6 +378,7 @@ import FlowerColorPicker from "../../components/vendor/shop/FlowerColorPicker.vu
 import ColorStockInputs from "../../components/vendor/shop/ColorStockInputs.vue";
 import { colorFields, colorProblem, countsPerColor, totalOf } from "../../utils/flowerColors.js";
 import BouquetFlowersInput from "../../components/vendor/shop/BouquetFlowersInput.vue";
+import PrepTimeField from "../../components/vendor/shop/PrepTimeField.vue";
 import { compositionField, compositionProblem, stockFromLinks } from "../../utils/bouquetComposition.js";
 
 const route = useRoute();
@@ -428,6 +426,8 @@ const blank = () => ({
   selling_type: "bouquet",
   season: "all-year",
   preparation_days: 0,
+  // false: the shop's preparation time (Shop settings); true: ready the same day, whatever the shop's same-day switch says
+  ready_same_day: false,
   supplier_name: "",
   supplier_contact: "",
   supplier_sku: "",
@@ -478,7 +478,7 @@ const FIELD_LABELS = [
   ["ap-basics", { product_name: "Product name", description: "Description", colors: "Flower colours", sku: "SKU" }],
   ["ap-organize", { category: "Category", flower_type: "Flower type", occasion_tags: "Occasions" }],
   ["ap-price", { selling_price: "Selling price", purchase_price: "Your cost", has_discount: "On sale", discount_price: "Sale price" }],
-  ["ap-stock", { selling_type: "How it's sold", composition: "Bouquet flowers", quantity_in_stock: "In stock", min_stock_level: "Warn me at", max_stock_level: "Maximum stock", season: "Season", preparation_days: "Preparation time" }],
+  ["ap-stock", { selling_type: "How it's sold", composition: "Bouquet flowers", quantity_in_stock: "In stock", min_stock_level: "Warn me at", max_stock_level: "Maximum stock", season: "Season", ready_same_day: "Preparation time" }],
   ["ap-extra", { is_fragile: "Fragile", requires_refrigeration: "Keep refrigerated", care_instructions: "Care instructions", supplier_name: "Supplier", supplier_contact: "Supplier contact", supplier_sku: "Supplier's code", notes: "Private notes" }],
 ];
 const { markClean } = useUnsavedChanges({

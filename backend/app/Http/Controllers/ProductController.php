@@ -177,7 +177,7 @@ class ProductController extends Controller
             }
 
             $ownerId = $this->resolveOwnerId($request);
-            $request->merge($this->normalizeProductPayload($request));
+            $request->merge($this->normalizeProductPayload($request, true));
             $product = Product::where('id', $id)
                 ->where('owner_id', $ownerId)
                 ->with(['images', 'models'])
@@ -237,6 +237,8 @@ class ProductController extends Controller
                 'selling_type'           => 'required|in:per_piece,per_piece_customizable,bouquet',
                 'season'                 => 'nullable|in:all-year,spring,summer,autumn,winter',
                 'preparation_days'       => 'nullable|integer|min:0|max:60',
+                // Ready the same day (overrides the shop's same-day switch), or the shop's preparation time
+                'ready_same_day'         => 'nullable|boolean',
                 'supplier_name'          => 'nullable|string|max:255',
                 'supplier_contact'       => 'nullable|string|max:100',
                 'supplier_sku'           => 'nullable|string|max:255',
@@ -559,6 +561,7 @@ class ProductController extends Controller
                 'min_stock_level'        => 'nullable|integer|min:0',
                 'max_stock_level'        => 'nullable|integer|min:0',
                 'selling_type'           => 'nullable|in:per_piece,per_piece_customizable,bouquet',
+                'ready_same_day'         => 'nullable|boolean',
                 'season'                 => 'nullable|in:all-year,spring,summer,autumn,winter',
                 'supplier_name'          => 'nullable|string|max:255',
                 'supplier_contact'       => 'nullable|string|max:100',
@@ -1013,7 +1016,7 @@ class ProductController extends Controller
         $images->first()->update(['is_primary' => true]);
     }
 
-    private function normalizeProductPayload(Request $request): array
+    private function normalizeProductPayload(Request $request, bool $creating = false): array
     {
         $payload = $request->all();
 
@@ -1053,10 +1056,19 @@ class ProductController extends Controller
             }
         }
 
-        $rawPreparationDays = $payload['preparation_days'] ?? $payload['supplier_lead_time'] ?? 0;
-        $normalizedPreparationDays = max(0, (int) $rawPreparationDays);
-        $payload['preparation_days'] = $normalizedPreparationDays;
-        $payload['supplier_lead_time'] = $normalizedPreparationDays;
+        // An edit that doesn't send the days leaves them (and the supplier lead
+        // time they share) as they are; a new product starts at 0
+        if ($creating || array_key_exists('preparation_days', $payload) || array_key_exists('supplier_lead_time', $payload)) {
+            $rawPreparationDays = $payload['preparation_days'] ?? $payload['supplier_lead_time'] ?? 0;
+            $normalizedPreparationDays = max(0, (int) $rawPreparationDays);
+            $payload['preparation_days'] = $normalizedPreparationDays;
+            $payload['supplier_lead_time'] = $normalizedPreparationDays;
+        }
+
+        // "Ready the same day" arrives from a form as 1 / 0 / "true" / "false"
+        if (array_key_exists('ready_same_day', $payload)) {
+            $payload['ready_same_day'] = filter_var($payload['ready_same_day'], FILTER_VALIDATE_BOOLEAN);
+        }
 
         return $payload;
     }

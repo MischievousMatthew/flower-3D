@@ -1038,6 +1038,8 @@ async function loadCalendarData() {
         vendor_id: checkoutData.value.vendor?.id,
         start_date: startDate,
         end_date: endDate,
+        // What's being ordered: when every product is "ready the same day", today is open
+        product_ids: [...new Set((checkoutData.value.items || []).map((i) => i.product_id).filter(Boolean))],
       },
     });
 

@@ -64,7 +64,7 @@ class VendorFulfillmentController extends Controller
         $vendorId = $this->resolveOwnerId($request);
 
         $orders = $this->visibleOrders($vendorId)
-            ->with(['user:id,name,surname', 'delivery', 'orderRequests', 'items.product:id,preparation_days,supplier_lead_time'])
+            ->with(['user:id,name,surname', 'delivery', 'orderRequests', 'items.product:id,preparation_days,supplier_lead_time,ready_same_day'])
             ->when($data['from'] ?? null, fn ($q, $d) => $q->whereDate('reservation_date', '>=', $d))
             ->when($data['to'] ?? null, fn ($q, $d) => $q->whereDate('reservation_date', '<=', $d))
             ->get()
@@ -202,7 +202,7 @@ class VendorFulfillmentController extends Controller
                 'is_custom_bouquet' => ($custom['type'] ?? null) === 'custom_flower_bouquet',
                 'model_3d_url' => $modelUrl,
                 'model_type' => $model?->model_type ?? 'glb',
-                'preparation_days' => (int) ($item->product?->preparation_days ?? 0),
+                'preparation_days' => $this->prepDays($item->product, (int) $order->vendor_id),
             ];
         });
 
@@ -278,7 +278,7 @@ class VendorFulfillmentController extends Controller
         $until = $today->copy()->addDays(($data['days'] ?? 14) - 1);
 
         $orders = $this->visibleOrders($vendorId)
-            ->with(['user:id,name,surname', 'delivery', 'orderRequests', 'items.product:id,preparation_days,supplier_lead_time'])
+            ->with(['user:id,name,surname', 'delivery', 'orderRequests', 'items.product:id,preparation_days,supplier_lead_time,ready_same_day'])
             ->whereNotNull('reservation_date')
             ->whereDate('reservation_date', '<=', $until->toDateString())
             ->get()
@@ -438,7 +438,7 @@ class VendorFulfillmentController extends Controller
         $caseSummary = $case ? app(ReturnCaseService::class)->summary($case) : null;
         $caseOpen = $case && in_array($case->status, OrderRequest::OPEN_STATUSES, true);
         $deliveryDate = $order->reservation_date?->toDateString();
-        $prepDays = (int) $order->items->max(fn ($i) => (int) ($i->product?->preparation_days ?? 0));
+        $prepDays = (int) $order->items->max(fn ($i) => $this->prepDays($i->product, (int) $order->vendor_id));
         $prepareBy = $deliveryDate ? Carbon::parse($deliveryDate)->subDays($prepDays)->toDateString() : null;
         // (outside the delivery areas, paying comes after the shop approves: said below)
         $onlineUnpaid = $order->payment_method === 'ewallet' && $order->payment_status !== 'paid' && ! $order->outside_area;
@@ -514,6 +514,26 @@ class VendorFulfillmentController extends Controller
             'cancelled' => $o['status'] === 'cancelled',
             default => $o['status'] === $tab,
         };
+    }
+
+    /** The shop's preparation time per vendor, looked up once per request */
+    private array $shopLeadDays = [];
+
+    /**
+     * Days to prepare a product: none when it's "ready the same day",
+     * otherwise the shop's own preparation time (its settings).
+     */
+    private function prepDays(?\App\Models\Product $product, int $vendorId): int
+    {
+        if (! $product || $product->ready_same_day) {
+            return 0;
+        }
+        if (! array_key_exists($vendorId, $this->shopLeadDays)) {
+            $shop = VendorApplication::findApprovedForVendorUser(\App\Models\User::find($vendorId));
+            $this->shopLeadDays[$vendorId] = max(0, (int) ($shop?->reservationLeadTimeDays() ?? 0));
+        }
+
+        return $this->shopLeadDays[$vendorId];
     }
 
     private function handledBy(?VendorApplication $application): string

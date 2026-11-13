@@ -156,10 +156,10 @@
             <section class="sp-section">
               <h4>Care &amp; handling</h4>
               <div class="sp-grid-2">
-                <label class="sp-field">
-                  <span>Preparation time (days)</span>
-                  <input v-model.number="form.preparation_days" type="number" min="0" max="60" class="sp-input" />
-                </label>
+                <!-- Ready the same day, or the shop's own preparation time (set once in Shop settings) -->
+                <div class="sp-span-all">
+                  <PrepTimeField v-model="form.ready_same_day" />
+                </div>
                 <div class="pe-toggles">
                   <label class="pe-toggle">
                     <span class="sp-switch"><input v-model="form.is_fragile" type="checkbox" /><span></span></span>
@@ -236,6 +236,7 @@ import FlowerColorPicker from "./FlowerColorPicker.vue";
 import ColorStockInputs from "./ColorStockInputs.vue";
 import { colorFields, colorProblem, colorsFromProduct } from "../../../utils/flowerColors.js";
 import BouquetFlowersInput from "./BouquetFlowersInput.vue";
+import PrepTimeField from "./PrepTimeField.vue";
 import { compositionField, compositionFromProduct, compositionProblem, hasLinks } from "../../../utils/bouquetComposition.js";
 
 const props = defineProps({ productId: { type: Number, default: null } });
@@ -306,7 +307,8 @@ async function fetch() {
       selling_price: Number(p.selling_price ?? 0),
       purchase_price: p.purchase_price !== null && p.purchase_price !== undefined ? Number(p.purchase_price) : "",
       occasion_tags: Array.isArray(p.occasion_tags) ? [...p.occasion_tags] : [],
-      preparation_days: Number(p.preparation_days ?? 0),
+      // true: ready the same day; false: the shop's preparation time (Shop settings)
+      ready_same_day: !!p.ready_same_day,
       is_fragile: !!p.is_fragile,
       requires_refrigeration: !!p.requires_refrigeration,
       care_instructions: p.care_instructions ?? "",

@@ -23,6 +23,9 @@ class ReservationController extends Controller
                 'vendor_id' => 'required|exists:users,id',
                 'start_date' => 'nullable|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
+                // The products being ordered: when all are "ready the same day", today is open
+                'product_ids' => 'nullable|array|max:100',
+                'product_ids.*' => 'integer',
             ]);
 
             if ($validator->fails()) {
@@ -35,7 +38,7 @@ class ReservationController extends Controller
             $vendorId = $request->vendor_id;
             $vendor = User::find($vendorId);
             $vendorApplication = VendorApplication::findApprovedForVendorUser($vendor);
-            $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication);
+            $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication, null, $this->readySameDay($request, (int) $vendorId));
             
             if (!$vendor) {
                 return response()->json([
@@ -161,6 +164,8 @@ class ReservationController extends Controller
             $validator = Validator::make($request->all(), [
                 'vendor_id' => 'required|exists:users,id',
                 'reservation_date' => 'required|date_format:Y-m-d',
+                'product_ids' => 'nullable|array|max:100',
+                'product_ids.*' => 'integer',
             ]);
 
             if ($validator->fails()) {
@@ -175,7 +180,7 @@ class ReservationController extends Controller
 
             $vendor = User::find($vendorId);
             $vendorApplication = VendorApplication::findApprovedForVendorUser($vendor);
-            $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication);
+            $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication, null, $this->readySameDay($request, (int) $vendorId));
             if (!$vendor) {
                 return response()->json([
                     'success' => false,
@@ -407,6 +412,22 @@ class ReservationController extends Controller
             'almost_full' => 'yellow',
             default => 'white',
         };
+    }
+
+    /**
+     * True when the page says which products are being ordered (product_ids)
+     * and every one is this shop's and "ready the same day". Only shows the
+     * calendar; checkout checks the real order again.
+     */
+    private function readySameDay(Request $request, int $vendorId): bool
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array) $request->input('product_ids', [])))));
+        if (! $ids) {
+            return false;
+        }
+        $products = Product::query()->whereIn('id', $ids)->where('owner_id', $vendorId)->get(['id', 'ready_same_day']);
+
+        return $products->count() === count($ids) && Product::allReadySameDay($products);
     }
 
     private function minimumAllowedDate(Carbon $today, array $settings): Carbon
