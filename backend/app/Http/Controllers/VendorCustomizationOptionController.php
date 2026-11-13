@@ -118,7 +118,7 @@ class VendorCustomizationOptionController extends Controller
                 ->where('stock_kind', $how['kind'])
                 ->first();
             if (! $item) {
-                throw new \InvalidArgumentException($option->type === Option::TYPE_WRAPPER ? 'Pick one of your wrapping items.' : 'Pick one of your filler stock items.');
+                throw new \InvalidArgumentException($option->type === Option::TYPE_WRAPPER ? 'Pick one of your wrapping items.' : "Pick one of your {$option->type} stock items.");
             }
             $item->update(['pack_unit' => $packSize ? ($item->pack_unit ?: $how['pack']) : null, 'pack_size' => $packSize]);
             if ($onHand !== null && $onHand !== (int) $item->quantity_in_stock) {
@@ -296,6 +296,8 @@ class VendorCustomizationOptionController extends Controller
         }
 
         if (isset(Option::STOCK[$type])) {
+            // Switched off = hidden (how an uncounted filler or ribbon is marked sold out)
+            $rules['is_active'] = 'nullable|boolean';
             // Sheets or portions on hand (blank = not counted) and how many a roll or sack gives
             $rules['stock_on_hand'] = 'nullable|integer|min:0|max:1000000';
             $rules['stock_sheets'] = 'nullable|integer|min:0|max:1000000';

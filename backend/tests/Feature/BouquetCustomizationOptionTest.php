@@ -249,6 +249,32 @@ class BouquetCustomizationOptionTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('stock_item');
     }
 
+    public function test_a_ribbon_is_counted_by_the_roll_or_switched_to_sold_out(): void
+    {
+        $vendor = $this->vendor();
+        $make = fn ($name) => BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'ribbon', 'name' => $name, 'color_hex' => '#cc0000']);
+
+        // 4 rolls that tie about 25 bouquets each: the form sends 100
+        $satin = $this->as($vendor)->postJson('/api/vendor/customization-options/' . $make('Red satin')->id, [
+            'stock_item' => 'new', 'stock_on_hand' => 100, 'pack_size' => 25,
+        ])->assertOk()->json('data');
+        $item = \App\Models\Product::findOrFail($satin['stock_item']['id']);
+        $this->assertSame(['ribbons', 'portion', 'roll', 25, 100],
+            [$item->stock_kind, $item->stock_unit, $item->pack_unit, (int) $item->pack_size, (int) $item->quantity_in_stock]);
+
+        // A custom bouquet with that ribbon, ordered 3 times, takes 3
+        $lines = BouquetCustomizationOption::stockLinesFor([(object) ['quantity' => 3, 'customizations' => ['ribbon' => ['id' => $satin['id']]]]]);
+        $this->assertSame([[$item->id, null, 3]], $lines);
+
+        // Out of stock: hidden; an uncounted ribbon is hidden with its switch
+        $twine = $make('Twine');
+        $available = fn () => BouquetCustomizationOption::query()->available()->where('type', 'ribbon')->pluck('name')->sort()->values()->all();
+        $item->update(['quantity_in_stock' => 0]);
+        $this->assertSame(['Twine'], $available());
+        $this->as($vendor)->patchJson("/api/vendor/customization-options/{$twine->id}/active", ['is_active' => false])->assertOk();
+        $this->assertSame([], $available());
+    }
+
     public function test_validation_requires_a_hex_colour_and_a_filler_model(): void
     {
         $vendor = $this->vendor();

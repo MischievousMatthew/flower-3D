@@ -290,6 +290,16 @@ class ProductColorStockTest extends TestCase
         $this->assertArrayHasKey('errors', $read([['flower' => 'Kraft', 'count' => 1, 'product_id' => $kraft->id, 'kind' => 'filler']]), 'a wrapper is not a filler');
         $this->assertArrayHasKey('errors', $read([['flower' => 'Breath', 'count' => 1, 'product_id' => $breath->id, 'kind' => 'wrapper']]), 'a filler is not a wrapper');
 
+        // A ribbon row takes from one of the shop's ribbons, and only a ribbon
+        $satin = Product::forceCreate([
+            'owner_id' => 1, 'product_name' => 'Red satin', 'sku' => 'R-1', 'quantity_in_stock' => 100, 'min_stock_level' => 0,
+            'stock_kind' => 'ribbons', 'stock_unit' => 'portion', 'moderation_status' => Product::MODERATION_INTERNAL, 'status' => 'active',
+        ]);
+        $ribbon = $read([['flower' => 'Red satin', 'count' => 1, 'product_id' => $satin->id, 'kind' => 'ribbon']]);
+        $this->assertSame('ribbon', $ribbon['attributes']['composition'][0]['kind']);
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Breath', 'count' => 1, 'product_id' => $breath->id, 'kind' => 'ribbon']]), 'a filler is not a ribbon');
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Satin', 'count' => 1, 'product_id' => $satin->id, 'kind' => 'filler']]), 'a ribbon is not a filler');
+
         // Customers don't see the filler in "What's inside"
         $customer = new \ReflectionMethod(\App\Http\Controllers\Customer\CustomerProductController::class, 'composition');
         $customer->setAccessible(true);

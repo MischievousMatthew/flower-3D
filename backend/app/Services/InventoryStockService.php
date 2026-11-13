@@ -185,7 +185,7 @@ class InventoryStockService
                 'color'  => isset($f['color']) && trim((string) $f['color']) !== '' ? trim((string) $f['color']) : null,
                 'count'  => (int) $f['count'],
                 'cost'   => isset($f['cost']) && is_numeric($f['cost']) ? (float) $f['cost'] : null, // paid per piece
-                'kind'   => in_array($f['kind'] ?? null, ['wrapper', 'filler'], true) ? $f['kind'] : 'flower', // a wrapper's sheets, a filler's bouquets' worth
+                'kind'   => in_array($f['kind'] ?? null, ['wrapper', 'filler', 'ribbon'], true) ? $f['kind'] : 'flower', // a wrapper's sheets; a filler or ribbon: how many of it
             ])
             ->values()
             ->all();

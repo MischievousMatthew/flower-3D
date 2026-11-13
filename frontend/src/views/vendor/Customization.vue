@@ -395,7 +395,7 @@
                 </div>
                 <!-- A filler: sacks you have (part of a sack is fine); the count is sacks × bouquets per sack -->
                 <input
-                  v-if="field === 'onHand' && activeTab === 'filler'"
+                  v-if="field === 'onHand' && isPacked(activeTab)"
                   id="cz-stock-onHand"
                   v-model="form.sacks"
                   class="cz-input"
@@ -426,7 +426,7 @@
               </div>
             </div>
             <!-- 3 sacks × 20 = 60 in stock: worked out for the vendor -->
-            <p v-if="activeTab === 'filler' && fillerTotal !== null" class="cz-stock-total" role="status">
+            <p v-if="isPacked(activeTab) && fillerTotal !== null" class="cz-stock-total" role="status">
               = <b>{{ fillerTotal.toLocaleString("en-PH") }} in stock</b>
               <span v-if="fillerTotalNote">{{ fillerTotalNote }}</span>
             </p>
@@ -499,7 +499,7 @@
                   <template v-else>{{ stockText(item) }}</template>
                 </p>
                 <p v-else-if="isStocked(item)" class="cz-stockline muted">
-                  {{ item.type === "filler" ? "Not counted · switch to Sold out when it runs out" : "Stock not counted" }}
+                  {{ isPacked(item.type) ? "Not counted · switch to Sold out when it runs out" : "Stock not counted" }}
                 </p>
                 <div v-if="item.type === 'wrapper' && item.pattern" class="cz-meta">
                   <span class="cz-chip">{{ item.pattern === "newspaper" ? "Newspaper print" : `Print: “${item.pattern_text}”` }}</span>
@@ -701,10 +701,13 @@ function sheetsText(item) {
 
 // Wrappers and fillers can have their stock counted; with no count, the
 // switch is how the shop marks them out (a filler: Available / Sold out)
-const STOCKED_TYPES = ["wrapper", "filler"];
+const STOCKED_TYPES = ["wrapper", "filler", "ribbon"];
+// Counted by the pack: bouquets one sack (filler) or roll (ribbon) does × how many you have
+const PACKED_TYPES = ["filler", "ribbon"];
+const isPacked = (type) => PACKED_TYPES.includes(type);
 const isStocked = (item) => STOCKED_TYPES.includes(item.type);
 const switchText = (item) =>
-  item.type === "filler"
+  isPacked(item.type)
     ? item.is_active ? "Available" : "Sold out · hidden"
     : item.is_active ? "Shown in customizer" : "Hidden";
 
@@ -739,17 +742,35 @@ const STOCK_WORDS = {
     perPackTip: "Your best guess is fine, no need to count pieces. If one sack usually covers about 20 bouquets, type 20.",
     perPackPlaceholder: "Your best guess, e.g. 20",
     hint: "Bought more? Just change the number of sacks. Same stock as in Inventory.",
+    pack: "sack",
+  },
+  // A ribbon works the same way, by the roll: bouquets one roll ties × rolls on hand
+  ribbon: {
+    onHand: "How many rolls do you have?",
+    onHandPlaceholder: "e.g. 4 (blank = don't count)",
+    onHandTip:
+      "The rolls of this ribbon you have now (half a roll? type 0.5). We multiply: 4 rolls × 25 = 100 in stock. A bouquet in Products that uses 1 of this ribbon can then be made 100 times, and each custom 3D bouquet uses 1. Leave it blank if you'd rather not count; then use the Available / Sold out switch on the ribbon.",
+    perPack: "How many bouquets can 1 roll tie?",
+    perPackTip: "Your best guess is fine, no need to measure. If one roll usually ties about 25 bouquets, type 25.",
+    perPackPlaceholder: "Your best guess, e.g. 25",
+    hint: "Bought more? Just change the number of rolls. Same stock as in Inventory.",
+    pack: "roll",
   },
 };
+/** "sack" / "sacks", "roll" / "rolls" for a filler or ribbon */
+const packWord = (type, n) => {
+  const word = STOCK_WORDS[type]?.pack || "pack";
+  return n === 1 ? word : `${word}s`;
+};
 const stockWords = computed(() => STOCK_WORDS[activeTab.value] || null);
-const stockFieldOrder = computed(() => (activeTab.value === "filler" ? ["pack", "onHand"] : ["onHand", "pack"]));
+const stockFieldOrder = computed(() => (isPacked(activeTab.value) ? ["pack", "onHand"] : ["onHand", "pack"]));
 
 // A filler's stock, worked out from its two boxes
 const sacksEntered = () => String(form.sacks ?? "").trim() !== "";
 const fillerUntouched = () => form.stockItemId && form.sacks === form.sacksOriginal && form.packSize === form.packSizeOriginal;
 /** The count the filler will have: kept as it is while untouched, else sacks × bouquets per sack */
 const fillerTotal = computed(() => {
-  if (activeTab.value !== "filler") return null;
+  if (!isPacked(activeTab.value)) return null;
   if (fillerUntouched()) return form.onHandOriginal;
   const sacks = Number(form.sacks);
   const per = Number(form.packSize);
@@ -759,18 +780,18 @@ const fillerTotal = computed(() => {
 const fillerTotalNote = computed(() => {
   const per = Number(form.packSize);
   if (fillerUntouched() || !(per >= 1) || !sacksEntered()) return "";
-  return `(${Number(form.sacks).toLocaleString("en-PH")} ${Number(form.sacks) === 1 ? "sack" : "sacks"} × ${per})`;
+  return `(${Number(form.sacks).toLocaleString("en-PH")} ${packWord(activeTab.value, Number(form.sacks))} × ${per})`;
 });
 
 /** "60 left · 3 sacks" for a filler, sheets and rolls for a wrapper */
 function stockText(item) {
   const s = item.stock_item;
-  if (item.type !== "filler") return `${sheetsText(s)} in stock`;
+  if (!isPacked(item.type)) return `${sheetsText(s)} in stock`;
   const n = Number(s.on_hand) || 0;
   const text = `${n.toLocaleString("en-PH")} left`;
   if (!s.pack_size) return text;
   const sacks = Math.round((n / s.pack_size) * 10) / 10;
-  return `${text} · ${Number.isInteger(n / s.pack_size) ? "" : "≈ "}${sacks} ${sacks === 1 ? "sack" : "sacks"}`;
+  return `${text} · ${Number.isInteger(n / s.pack_size) ? "" : "≈ "}${sacks} ${packWord(item.type, sacks)}`;
 }
 const hsl = reactive({ h: 0, s: 0, l: 0 });
 
@@ -998,7 +1019,7 @@ function startEdit(item) {
     form.stockItemId = item.stock_item.id;
     form.stockSheets = String(item.stock_item.on_hand);
     form.packSize = item.stock_item.pack_size ? String(item.stock_item.pack_size) : "";
-    if (item.type === "filler") {
+    if (isPacked(item.type)) {
       // 58 left at 20 a sack shows as 2.9 sacks; the exact 58 is kept unless a box is changed
       const per = item.stock_item.pack_size;
       form.sacks = per ? String(Math.round((item.stock_item.on_hand / per) * 100) / 100) : "";
@@ -1104,11 +1125,11 @@ function validate() {
     if (sheets !== "" && !(Number.isInteger(Number(sheets)) && Number(sheets) >= 0)) errors.stock_sheets = "Enter a whole number of sheets, or leave it blank.";
     if (String(form.packSize ?? "").trim() !== "" && !(Number(form.packSize) >= 2)) errors.pack_size = "A roll holds at least 2 sheets, or leave it blank.";
   }
-  if (activeTab.value === "filler" && !fillerUntouched()) {
+  if (isPacked(activeTab.value) && !fillerUntouched()) {
     const perSet = String(form.packSize ?? "").trim() !== "";
-    if (sacksEntered() && !(Number(form.sacks) >= 0)) errors.stock_sheets = "Enter how many sacks you have (like 3 or 0.5), or leave it blank.";
+    if (sacksEntered() && !(Number(form.sacks) >= 0)) errors.stock_sheets = `Enter how many ${packWord(activeTab.value, 2)} you have (like 3 or 0.5), or leave it blank.`;
     if ((sacksEntered() || perSet) && !(Number.isInteger(Number(form.packSize)) && Number(form.packSize) >= 2)) {
-      errors.pack_size = "Enter about how many bouquets one sack fills (2 or more).";
+      errors.pack_size = `Enter about how many bouquets one ${packWord(activeTab.value, 1)} does (2 or more).`;
     }
   }
   return !Object.keys(errors).length;
@@ -1144,7 +1165,7 @@ async function submitForm() {
   // Blank: not tracked. A number: tracked on that stock item (made the first time)
   if (STOCKED_TYPES.includes(type)) {
     // A filler's count is sacks × bouquets per sack (kept exactly as it was while both are unchanged)
-    if (type === "filler") form.stockSheets = fillerTotal.value === null ? "" : String(fillerTotal.value);
+    if (isPacked(type)) form.stockSheets = fillerTotal.value === null ? "" : String(fillerTotal.value);
     const sheets = String(form.stockSheets ?? "").trim();
     payload.append("stock_item", sheets === "" ? "none" : form.stockItemId ? String(form.stockItemId) : "new");
     if (sheets !== "") {
@@ -1198,11 +1219,11 @@ async function toggleWrapper(item, isActive) {
   item.is_active = isActive;
   try {
     await api.patch(`/vendor/customization-options/${item.id}/active`, { is_active: isActive });
-    if (item.type === "filler") toast.success(isActive ? `${item.name} is available again.` : `${item.name} is marked sold out and hidden from customers.`);
+    if (isPacked(item.type)) toast.success(isActive ? `${item.name} is available again.` : `${item.name} is marked sold out and hidden from customers.`);
     else toast.success(isActive ? `${item.name} is shown in the customizer.` : `${item.name} is hidden from the customizer.`);
   } catch (error) {
     item.is_active = previous;
-    toast.error(`Could not update the ${item.type === "filler" ? "filler" : "wrapper"}.`);
+    toast.error(`Could not update the ${item.type}.`);
   } finally {
     togglingId.value = null;
   }

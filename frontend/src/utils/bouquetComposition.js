@@ -8,8 +8,8 @@ const hasCost = (r) => r?.cost !== "" && r?.cost !== null && r?.cost !== undefin
 const filled = (r) =>
   String(r?.flower || "").trim() || String(r?.color || "").trim() || hasCost(r) || (r?.count !== "" && r?.count != null && r?.count !== 1);
 
-/** Rows that take from the shop's materials instead of a flower: a wrapper's sheets, a filler's bouquets' worth */
-export const MATERIAL_KINDS = ["wrapper", "filler"];
+/** Rows that take from the shop's materials instead of a flower: a wrapper's sheets, how many of a filler or ribbon */
+export const MATERIAL_KINDS = ["wrapper", "filler", "ribbon"];
 
 /** The rows of an existing product, for its edit form */
 export const compositionFromProduct = (p) =>
@@ -77,10 +77,10 @@ export function compositionProblem(rows) {
       if (!Number.isInteger(n) || n < 1 || n > 1000) return `Enter how many sheets of ${r.flower || "the wrapper"} one bouquet uses (1 or more).`;
       continue;
     }
-    if (r.kind === "filler") {
-      if (!r.product_id) return "Pick which filler the bouquet uses, or remove that row.";
+    if (r.kind === "filler" || r.kind === "ribbon") {
+      if (!r.product_id) return `Pick which ${r.kind} the bouquet uses, or remove that row.`;
       const n = Number(r.count);
-      if (!Number.isInteger(n) || n < 1 || n > 1000) return `Enter how many ${r.flower || "of the filler"} one bouquet uses (1 or more).`;
+      if (!Number.isInteger(n) || n < 1 || n > 1000) return `Enter how many ${r.flower || `of the ${r.kind}`} one bouquet uses (1 or more).`;
       continue;
     }
     if (!filled(r)) continue;

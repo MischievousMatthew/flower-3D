@@ -83,9 +83,11 @@ class BouquetCustomizationOption extends Model
     public const STOCK = [
         self::TYPE_WRAPPER => ['kind' => 'wrapping', 'unit' => 'sheet', 'pack' => 'roll'],
         self::TYPE_FILLER  => ['kind' => 'greenery', 'unit' => 'portion', 'pack' => 'sack'],
+        // A ribbon by the roll: the shop guesses how many bouquets a roll ties
+        self::TYPE_RIBBON  => ['kind' => 'ribbons', 'unit' => 'portion', 'pack' => 'roll'],
     ];
 
-    /** A wrapper's or filler's stock item (wrapping in sheets, a filler in portions) */
+    /** A wrapper's, filler's or ribbon's stock item (wrapping in sheets, a filler or ribbon in portions) */
     public function stockItem(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Product::class, 'stock_product_id');
@@ -93,8 +95,8 @@ class BouquetCustomizationOption extends Model
 
     /**
      * What custom bouquets take from stock: for each order item, a sheet of its
-     * outer and inner wrapper and a portion of each different filler (those
-     * with a stock item), as [stock item id, null, amount × quantity].
+     * outer and inner wrapper, a portion of each different filler and a portion
+     * of its ribbon (those with a stock item), as [stock item id, null, amount × quantity].
      */
     public static function stockLinesFor(iterable $items): array
     {
@@ -108,7 +110,8 @@ class BouquetCustomizationOption extends Model
                 continue;
             }
             $qty = max(1, (int) ($item->quantity ?? 1));
-            foreach (['wrapper.id', 'inner_wrapper.id'] as $path) {
+            // A sheet per wrapper layer, and one portion of the ribbon
+            foreach (['wrapper.id', 'inner_wrapper.id', 'ribbon.id'] as $path) {
                 $id = (int) data_get($c, $path, 0);
                 if ($id > 0) {
                     $uses[$id] = ($uses[$id] ?? 0) + self::SHEETS_PER_LAYER * $qty;

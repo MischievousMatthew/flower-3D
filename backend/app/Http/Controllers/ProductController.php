@@ -89,7 +89,7 @@ class ProductController extends Controller
     }
 
     /** Bouquet rows that take from a material instead of a flower: the row kind and the stock kind it needs */
-    private const MATERIAL_ROWS = ['wrapper' => 'wrapping', 'filler' => 'greenery'];
+    private const MATERIAL_ROWS = ['wrapper' => 'wrapping', 'filler' => 'greenery', 'ribbon' => 'ribbons'];
 
     /** "wrapper" or "filler" for a material a bouquet row can take from, else null (a flower) */
     private static function materialKind(Product $p): ?string

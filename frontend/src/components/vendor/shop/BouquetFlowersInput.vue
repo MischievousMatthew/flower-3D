@@ -151,53 +151,56 @@
       </button>
       <small v-else class="bf-help">No wrappers in stock yet. Add one with its sheets in 3D Bouquet Management.</small>
 
-      <!-- Fillers: bouquets' worth of the shop's fillers (the same stock as 3D Bouquet Management and Inventory) -->
-      <div class="bf-head bf-head-wrap">
-        <span class="bf-label">Fillers</span>
-        <span v-if="fillerRows.length" class="bf-total">{{ fillerRows.length }} {{ fillerRows.length === 1 ? "filler" : "fillers" }}</span>
-      </div>
-      <ul v-if="fillerRows.length" class="bf-list">
-        <li v-for="{ row, i } in fillerRows" :key="i" class="bf-row bf-row-wrap linked">
-          <label class="bf-field">
-            <span>Filler</span>
-            <select
-              :value="row.product_id || ''"
-              class="fx-input"
-              :class="{ invalid: !!error && !row.product_id }"
-              aria-label="Which filler"
-              @change="setMaterial(i, fillers, $event.target.value)"
-            >
-              <option value="" disabled>Pick a filler</option>
-              <option v-for="f in fillers" :key="f.id" :value="f.id">{{ f.name }} · {{ f.stock }} left</option>
-            </select>
-          </label>
-          <label class="bf-field bf-count">
-            <span>Per bouquet</span>
-            <input
-              :value="row.count ?? ''"
-              type="number"
-              min="1"
-              max="1000"
-              step="1"
-              inputmode="numeric"
-              class="fx-input"
-              :class="{ invalid: !!error && !(Number(row.count) >= 1) }"
-              :aria-label="`How many ${row.flower || 'of this filler'} one bouquet uses`"
-              @input="update(i, { count: $event.target.value === '' ? '' : Math.floor(Number($event.target.value)) })"
-            />
-          </label>
-          <button type="button" class="bf-remove" :aria-label="`Remove ${row.flower || 'this filler'}`" @click="remove(i)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-          </button>
-        </li>
-      </ul>
-      <!-- Worked out from each row: "With 40 left and 2 per bouquet, you can make 20." -->
-      <small v-for="line in fillerLines" :key="line.i" class="bf-help" role="status">{{ line.text }}</small>
-      <button v-if="fillers.length" type="button" class="bf-add" :disabled="modelValue.length >= 30" @click="addMaterial('filler', fillers)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-        Add a filler
-      </button>
-      <small v-else class="bf-help">No counted fillers yet. In 3D Bouquet Management, fill in a filler's sacks to count its stock.</small>
+      <!-- Fillers and ribbons: how many of the shop's fillers / ribbons one bouquet uses
+           (the same stock as 3D Bouquet Management and Inventory) -->
+      <template v-for="m in materials" :key="m.kind">
+        <div class="bf-head bf-head-wrap">
+          <span class="bf-label">{{ m.title }}</span>
+          <span v-if="m.rows.length" class="bf-total">{{ m.rows.length }} {{ m.rows.length === 1 ? m.kind : `${m.kind}s` }}</span>
+        </div>
+        <ul v-if="m.rows.length" class="bf-list">
+          <li v-for="{ row, i } in m.rows" :key="i" class="bf-row bf-row-wrap linked">
+            <label class="bf-field">
+              <span>{{ m.label }}</span>
+              <select
+                :value="row.product_id || ''"
+                class="fx-input"
+                :class="{ invalid: !!error && !row.product_id }"
+                :aria-label="`Which ${m.kind}`"
+                @change="setMaterial(i, m.items, $event.target.value)"
+              >
+                <option value="" disabled>Pick a {{ m.kind }}</option>
+                <option v-for="f in m.items" :key="f.id" :value="f.id">{{ f.name }} · {{ f.stock }} left</option>
+              </select>
+            </label>
+            <label class="bf-field bf-count">
+              <span>Per bouquet</span>
+              <input
+                :value="row.count ?? ''"
+                type="number"
+                min="1"
+                max="1000"
+                step="1"
+                inputmode="numeric"
+                class="fx-input"
+                :class="{ invalid: !!error && !(Number(row.count) >= 1) }"
+                :aria-label="`How many ${row.flower || `of this ${m.kind}`} one bouquet uses`"
+                @input="update(i, { count: $event.target.value === '' ? '' : Math.floor(Number($event.target.value)) })"
+              />
+            </label>
+            <button type="button" class="bf-remove" :aria-label="`Remove ${row.flower || `this ${m.kind}`}`" @click="remove(i)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </button>
+          </li>
+        </ul>
+        <!-- Worked out from each row: "With 40 left and 2 per bouquet, you can make 20." -->
+        <small v-for="line in m.lines" :key="line.i" class="bf-help" role="status">{{ line.text }}</small>
+        <button v-if="m.items.length" type="button" class="bf-add" :disabled="modelValue.length >= 30" @click="addMaterial(m.kind, m.items)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Add a {{ m.kind }}
+        </button>
+        <small v-else class="bf-help">No counted {{ m.kind }}s yet. In 3D Bouquet Management, fill in a {{ m.kind }}'s {{ m.pack }}s to count its stock.</small>
+      </template>
     </template>
 
     <p v-if="linkedMake !== null" class="bf-linked-note" role="status">
@@ -205,7 +208,7 @@
     </p>
 
     <div v-if="cost > 0" class="bf-sum">
-      <span>{{ wrapperRows.length || fillerRows.length ? "Flowers and materials cost" : "Flowers cost" }} <b>{{ peso(cost) }}</b> per bouquet<template v-if="unpriced"> · {{ unpriced }} {{ unpriced === 1 ? "flower has" : "flowers have" }} no cost yet</template></span>
+      <span>{{ wrapperRows.length || fillerRows.length || ribbonRows.length ? "Flowers and materials cost" : "Flowers cost" }} <b>{{ peso(cost) }}</b> per bouquet<template v-if="unpriced"> · {{ unpriced }} {{ unpriced === 1 ? "flower has" : "flowers have" }} no cost yet</template></span>
       <button
         v-if="costValue !== undefined && Math.abs(Number(costValue || 0) - cost) >= 0.005"
         type="button"
@@ -253,16 +256,18 @@ const labelId = `bf-${Math.random().toString(36).slice(2, 8)}`;
 const FLOWER_NAMES = ["Rose", "Tulip", "Sunflower", "Lily", "Carnation", "Chrysanthemum", "Gerbera", "Orchid", "Hydrangea", "Peony", "Baby's breath", "Eucalyptus", "Statice", "Aster", "Daisy", "Lisianthus"];
 const COLOR_NAMES = FLOWER_COLORS.filter((c) => c.value !== "other").map((c) => c.label);
 
-// Flower, wrapper and filler rows live in one list; each keeps its index in it
+// Flower, wrapper, filler and ribbon rows live in one list; each keeps its index in it
 const rowsOf = (test) => computed(() => props.modelValue.map((row, i) => ({ row, i })).filter(({ row }) => test(row)));
 const flowerRows = rowsOf((r) => !MATERIAL_KINDS.includes(r.kind));
 const wrapperRows = rowsOf((r) => r.kind === "wrapper");
 const fillerRows = rowsOf((r) => r.kind === "filler");
+const ribbonRows = rowsOf((r) => r.kind === "ribbon");
 const singleFlowers = computed(() => (props.flowers || []).filter((f) => !MATERIAL_KINDS.includes(f.kind)));
 const wrappers = computed(() => (props.flowers || []).filter((f) => f.kind === "wrapper"));
 const fillers = computed(() => (props.flowers || []).filter((f) => f.kind === "filler"));
+const ribbons = computed(() => (props.flowers || []).filter((f) => f.kind === "ribbon"));
 
-/** A filler row: which of the shop's fillers, and how many of it one bouquet uses */
+/** A filler or ribbon row: which of the shop's fillers / ribbons, and how many of it one bouquet uses */
 function addMaterial(kind, list) {
   const first = list[0];
   emit("update:modelValue", [
@@ -270,19 +275,22 @@ function addMaterial(kind, list) {
     { kind, flower: first?.name || "", color: "", count: 1, cost: first?.cost ?? "", product_id: first?.id ?? null },
   ]);
 }
-/** Under the filler rows: what each one's stock and amount make, as the vendor types */
-const fillerLines = computed(() =>
-  fillerRows.value.map(({ row, i }) => {
-    const filler = fillers.value.find((f) => f.id === Number(row.product_id));
+/** Under the rows: what each one's stock and amount make, as the vendor types */
+const linesFor = (kind, rows, items) =>
+  rows.map(({ row, i }) => {
+    const item = items.find((f) => f.id === Number(row.product_id));
     const per = Number(row.count);
-    if (!filler) return { i, text: "Pick a filler, then type how many of it one bouquet uses." };
-    if (!Number.isInteger(per) || per < 1) return { i, text: `Type how many ${filler.name} one bouquet uses.` };
-    const left = Number(filler.stock) || 0;
+    if (!item) return { i, text: `Pick a ${kind}, then type how many of it one bouquet uses.` };
+    if (!Number.isInteger(per) || per < 1) return { i, text: `Type how many ${item.name} one bouquet uses.` };
+    const left = Number(item.stock) || 0;
     const make = Math.floor(left / per);
-    const name = fillerRows.value.length > 1 ? `${filler.name}: ` : "";
+    const name = rows.length > 1 ? `${item.name}: ` : "";
     return { i, text: `${name}With ${left} left and ${per} per bouquet, you can make ${make} ${make === 1 ? "bouquet" : "bouquets"}.` };
-  }),
-);
+  });
+const materials = computed(() => [
+  { kind: "filler", title: "Fillers", label: "Filler", pack: "sack", rows: fillerRows.value, items: fillers.value },
+  { kind: "ribbon", title: "Ribbons", label: "Ribbon", pack: "roll", rows: ribbonRows.value, items: ribbons.value },
+].map((m) => ({ ...m, lines: linesFor(m.kind, m.rows, m.items) })));
 function setMaterial(index, list, value) {
   const m = list.find((x) => x.id === Number(value));
   if (m) update(index, { product_id: m.id, flower: m.name, cost: m.cost ?? "" });

@@ -115,7 +115,7 @@
                 <span v-if="it.sku">{{ it.sku }}</span>
               </small>
               <small v-if="it.composition?.length" class="st-compo" :title="'Flowers in one bouquet'">
-                {{ it.composition.map((f) => `${f.count} ${f.kind === "wrapper" ? `${rowUnit(f.kind, f.count)} of ` : f.kind === "filler" ? "of " : ""}${f.color ? `${f.color.toLowerCase()} ` : ""}${f.flower.toLowerCase()}`).join(" · ") }} per bouquet<template v-if="it.composition.some((f) => f.cost != null)"> · flowers {{ money(it.composition.reduce((s, f) => s + (f.cost != null ? f.cost * f.count : 0), 0)) }}</template>
+                {{ it.composition.map((f) => `${f.count} ${f.kind === "wrapper" ? `${rowUnit(f.kind, f.count)} of ` : f.kind === "filler" || f.kind === "ribbon" ? "of " : ""}${f.color ? `${f.color.toLowerCase()} ` : ""}${f.flower.toLowerCase()}`).join(" · ") }} per bouquet<template v-if="it.composition.some((f) => f.cost != null)"> · flowers {{ money(it.composition.reduce((s, f) => s + (f.cost != null ? f.cost * f.count : 0), 0)) }}</template>
               </small>
             </span>
             <span class="st-onhand">
@@ -420,7 +420,7 @@ const cap = (s) => String(s || "").charAt(0).toUpperCase() + String(s || "").sli
 /** "roll" → "rolls" (words already ending in s, like "pcs", stay as they are) */
 const plural = (word, n) => (n === 1 || /s$/i.test(String(word || "")) ? word : `${word}s`);
 /** What a bouquet row counts: stems of a flower, sheets of a wrapper; a filler is just a number ("2 of red fillers") */
-const rowUnit = (kind, n) => (kind === "wrapper" ? plural("sheet", n) : kind === "filler" ? "" : plural("stem", n));
+const rowUnit = (kind, n) => (kind === "wrapper" ? plural("sheet", n) : kind === "filler" || kind === "ribbon" ? "" : plural("stem", n));
 /** 95 sheets of 50 per roll → "≈ 1 roll + 45 sheets" */
 function packText(it, n) {
   const packs = Math.floor(n / it.pack_size);
