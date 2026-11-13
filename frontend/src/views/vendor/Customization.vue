@@ -375,27 +375,32 @@
             <span class="cz-label">Stock <small>(optional)</small></span>
             <!-- A filler asks the one guess first: how many bouquets a sack makes -->
             <div class="cz-stock-grid">
-              <div v-for="field in stockFieldOrder" :key="field" class="cz-field">
+              <div v-for="{ key: field, label, tip } in stockFields" :key="field" class="cz-field">
                 <!-- Label and its ? side by side (a button inside the label would focus the box instead) -->
                 <div class="cz-label-row">
-                  <label class="cz-label" :for="`cz-stock-${field}`">{{ field === "onHand" ? stockWords.onHand : stockWords.perPack }}</label>
+                  <label class="cz-label" :for="`cz-stock-${field}`">{{ label }}</label>
                   <span class="cz-tip">
-                    <button
-                      type="button"
-                      class="cz-tip-btn"
-                      :aria-describedby="`cz-stock-${field}-tip`"
-                      :aria-label="`What is “${field === 'onHand' ? stockWords.onHand : stockWords.perPack}”?`"
-                    >
+                    <button type="button" class="cz-tip-btn" :aria-describedby="`cz-stock-${field}-tip`" :aria-label="`What is “${label}”?`">
                       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
                     </button>
-                    <span :id="`cz-stock-${field}-tip`" role="tooltip" class="cz-tip-box">
-                      {{ field === "onHand" ? stockWords.onHandTip : stockWords.perPackTip }}
-                    </span>
+                    <span :id="`cz-stock-${field}-tip`" role="tooltip" class="cz-tip-box">{{ tip }}</span>
                   </span>
+                </div>
+                <!-- What the shop pays its supplier: procurement prices purchase orders with it -->
+                <div v-if="field === 'cost'" class="cz-money">
+                  <span aria-hidden="true">₱</span>
+                  <input
+                    id="cz-stock-cost"
+                    v-model="form.packCost"
+                    class="cz-input"
+                    :class="{ invalid: errors.pack_cost }"
+                    type="number" min="0" step="0.01" inputmode="decimal"
+                    :placeholder="activeTab === 'filler' ? 'e.g. 250' : 'e.g. 180'"
+                  />
                 </div>
                 <!-- A filler: sacks you have (part of a sack is fine); the count is sacks × bouquets per sack -->
                 <input
-                  v-if="field === 'onHand' && isPacked(activeTab)"
+                  v-else-if="field === 'onHand' && isPacked(activeTab)"
                   id="cz-stock-onHand"
                   v-model="form.sacks"
                   class="cz-input"
@@ -413,7 +418,7 @@
                   :placeholder="stockWords.onHandPlaceholder"
                 />
                 <input
-                  v-else
+                  v-else-if="field === 'pack'"
                   id="cz-stock-pack"
                   v-model="form.packSize"
                   class="cz-input"
@@ -423,6 +428,7 @@
                 />
                 <span v-if="field === 'onHand' && errors.stock_sheets" class="cz-error">{{ errors.stock_sheets }}</span>
                 <span v-if="field === 'pack' && errors.pack_size" class="cz-error">{{ errors.pack_size }}</span>
+                <span v-if="field === 'cost' && errors.pack_cost" class="cz-error">{{ errors.pack_cost }}</span>
               </div>
             </div>
             <!-- 3 sacks × 20 = 60 in stock: worked out for the vendor -->
@@ -672,6 +678,8 @@ const form = reactive({
   addRolls: "",
   // Fillers: sacks on hand × bouquets one sack fills (packSize) = the stock.
   // While both boxes are as they were loaded, the exact count is kept.
+  // What the shop pays for one sack / roll (a wrapper with no roll size: one sheet)
+  packCost: "",
   sacks: "",
   sacksOriginal: "",
   packSizeOriginal: "",
@@ -763,7 +771,25 @@ const packWord = (type, n) => {
   return n === 1 ? word : `${word}s`;
 };
 const stockWords = computed(() => STOCK_WORDS[activeTab.value] || null);
-const stockFieldOrder = computed(() => (isPacked(activeTab.value) ? ["pack", "onHand"] : ["onHand", "pack"]));
+const stockFieldOrder = computed(() => (isPacked(activeTab.value) ? ["pack", "onHand", "cost"] : ["onHand", "pack", "cost"]));
+
+/** What "Your cost" is per: a sack or roll; a wrapper bought without a roll size, per sheet */
+const costPer = computed(() =>
+  activeTab.value === "wrapper" && !(Number(form.packSize) >= 2) ? "sheet" : STOCK_WORDS[activeTab.value]?.pack || "pack",
+);
+const stockFields = computed(() => {
+  const w = stockWords.value;
+  if (!w) return [];
+  const all = {
+    onHand: { label: w.onHand, tip: w.onHandTip },
+    pack: { label: w.perPack, tip: w.perPackTip },
+    cost: {
+      label: `Your cost per ${costPer.value}`,
+      tip: `What you pay your supplier for 1 ${costPer.value}. Procurement uses it to price your purchase orders, and bouquets that use this ${current.value.singular} add it to their cost. Customers never see it. It's saved with the stock, so fill in the stock above too.`,
+    },
+  };
+  return stockFieldOrder.value.map((key) => ({ key, ...all[key] }));
+});
 
 // A filler's stock, worked out from its two boxes
 const sacksEntered = () => String(form.sacks ?? "").trim() !== "";
@@ -786,12 +812,14 @@ const fillerTotalNote = computed(() => {
 /** "60 left · 3 sacks" for a filler, sheets and rolls for a wrapper */
 function stockText(item) {
   const s = item.stock_item;
-  if (!isPacked(item.type)) return `${sheetsText(s)} in stock`;
+  // "· ₱250 a sack": what the shop pays, when it's set
+  const cost = Number(s.pack_cost) > 0 ? ` · ${formatPrice(s.pack_cost)} a ${s.pack_size ? s.pack_unit : s.unit}` : "";
+  if (!isPacked(item.type)) return `${sheetsText(s)} in stock${cost}`;
   const n = Number(s.on_hand) || 0;
   const text = `${n.toLocaleString("en-PH")} left`;
-  if (!s.pack_size) return text;
+  if (!s.pack_size) return `${text}${cost}`;
   const sacks = Math.round((n / s.pack_size) * 10) / 10;
-  return `${text} · ${Number.isInteger(n / s.pack_size) ? "" : "≈ "}${sacks} ${packWord(item.type, sacks)}`;
+  return `${text} · ${Number.isInteger(n / s.pack_size) ? "" : "≈ "}${sacks} ${packWord(item.type, sacks)}${cost}`;
 }
 const hsl = reactive({ h: 0, s: 0, l: 0 });
 
@@ -984,6 +1012,7 @@ function resetForm() {
   form.stockSheets = "";
   form.packSize = "";
   form.addRolls = "";
+  form.packCost = "";
   form.sacks = "";
   form.sacksOriginal = "";
   form.packSizeOriginal = "";
@@ -1019,6 +1048,7 @@ function startEdit(item) {
     form.stockItemId = item.stock_item.id;
     form.stockSheets = String(item.stock_item.on_hand);
     form.packSize = item.stock_item.pack_size ? String(item.stock_item.pack_size) : "";
+    form.packCost = item.stock_item.pack_cost ? String(item.stock_item.pack_cost) : "";
     if (isPacked(item.type)) {
       // 58 left at 20 a sack shows as 2.9 sacks; the exact 58 is kept unless a box is changed
       const per = item.stock_item.pack_size;
@@ -1132,6 +1162,10 @@ function validate() {
       errors.pack_size = `Enter about how many bouquets one ${packWord(activeTab.value, 1)} does (2 or more).`;
     }
   }
+  if (STOCKED_TYPES.includes(activeTab.value) && String(form.packCost ?? "").trim() !== "") {
+    const cost = Number(form.packCost);
+    if (!(cost >= 0) || cost > 1000000) errors.pack_cost = `Enter what 1 ${costPer.value} costs you (₱0 or more), or leave it blank.`;
+  }
   return !Object.keys(errors).length;
 }
 
@@ -1171,6 +1205,8 @@ async function submitForm() {
     if (sheets !== "") {
       payload.append("stock_sheets", String(Math.floor(Number(sheets))));
       payload.append("pack_size", String(form.packSize ?? "").trim() === "" ? "" : String(Math.floor(Number(form.packSize))));
+      // Your cost per sack / roll (per sheet for a wrapper with no roll size); blank = not set
+      payload.append("pack_cost", String(form.packCost ?? "").trim() === "" ? "" : String(Math.round(Number(form.packCost) * 100) / 100));
     }
   }
 
@@ -1504,6 +1540,24 @@ const formatSize = (bytes) =>
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+}
+
+/* "Your cost": a ₱ in front of the box */
+.cz-money {
+  position: relative;
+}
+
+.cz-money > span {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--v-muted);
+  pointer-events: none;
+}
+
+.cz-money .cz-input {
+  padding-left: 30px;
 }
 
 /* A filler's worked-out stock: "= 60 in stock (3 sacks × 20)" */

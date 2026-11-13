@@ -256,11 +256,25 @@ class BouquetCustomizationOptionTest extends TestCase
 
         // 4 rolls that tie about 25 bouquets each: the form sends 100
         $satin = $this->as($vendor)->postJson('/api/vendor/customization-options/' . $make('Red satin')->id, [
-            'stock_item' => 'new', 'stock_on_hand' => 100, 'pack_size' => 25,
+            'stock_item' => 'new', 'stock_on_hand' => 100, 'pack_size' => 25, 'pack_cost' => 150,
         ])->assertOk()->json('data');
         $item = \App\Models\Product::findOrFail($satin['stock_item']['id']);
         $this->assertSame(['ribbons', 'portion', 'roll', 25, 100],
             [$item->stock_kind, $item->stock_unit, $item->pack_unit, (int) $item->pack_size, (int) $item->quantity_in_stock]);
+
+        // Your cost: ₱150 a roll of 25 is kept as ₱6 each for procurement, and shown back per roll
+        $this->assertSame(6.0, (float) $item->purchase_price);
+        $this->assertSame(150, (int) $satin['stock_item']['pack_cost']);
+
+        // Changed later; leaving it out of a save keeps it; blank clears it
+        $url = "/api/vendor/customization-options/{$satin['id']}";
+        $this->as($vendor)->postJson($url, ['stock_item' => (string) $item->id, 'stock_on_hand' => 100, 'pack_size' => 25, 'pack_cost' => 200])->assertOk();
+        $this->assertSame(8.0, (float) $item->fresh()->purchase_price);
+        $this->as($vendor)->postJson($url, ['stock_item' => (string) $item->id, 'stock_on_hand' => 100, 'pack_size' => 25])->assertOk();
+        $this->assertSame(8.0, (float) $item->fresh()->purchase_price);
+        $this->as($vendor)->postJson($url, ['stock_item' => (string) $item->id, 'stock_on_hand' => 100, 'pack_size' => 25, 'pack_cost' => ''])
+            ->assertOk()->assertJsonPath('data.stock_item.pack_cost', null);
+        $this->assertSame(0.0, (float) $item->fresh()->purchase_price);
 
         // A custom bouquet with that ribbon, ordered 3 times, takes 3
         $lines = BouquetCustomizationOption::stockLinesFor([(object) ['quantity' => 3, 'customizations' => ['ribbon' => ['id' => $satin['id']]]]]);

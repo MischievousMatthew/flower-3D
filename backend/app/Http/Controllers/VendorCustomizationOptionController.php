@@ -60,7 +60,24 @@ class VendorCustomizationOptionController extends Controller
             'unit'      => $p->stock_unit ?: 'sheet',
             'pack_unit' => $p->packSize() > 1 ? $p->pack_unit : null,
             'pack_size' => $p->packSize() > 1 ? $p->packSize() : null,
+            // What the shop pays for one roll / sack (one sheet with no roll size); null when not set
+            'pack_cost' => (float) $p->purchase_price > 0 ? round((float) $p->purchase_price * $p->packSize(), 2) : null,
         ];
+    }
+
+    /**
+     * The cost per unit procurement keeps (purchase_price), from the form's
+     * "Your cost" per roll or sack: ₱250 a sack of 20 = ₱12.50 each. Null when
+     * the form didn't send it (leave the cost as it is); blank clears it.
+     */
+    private static function unitCostFrom(Request $request, ?int $packSize): ?float
+    {
+        if (! $request->has('pack_cost')) {
+            return null;
+        }
+        $cost = $request->filled('pack_cost') ? max(0, (float) $request->input('pack_cost')) : 0.0;
+
+        return round($cost / max(1, $packSize ?? 1), 2);
     }
 
     /** The shop's wrapping materials */
@@ -99,6 +116,7 @@ class VendorCustomizationOptionController extends Controller
         $field = $request->filled('stock_on_hand') ? 'stock_on_hand' : 'stock_sheets';
         $onHand = $request->filled($field) ? max(0, (int) $request->input($field)) : null;
         $packSize = (int) $request->input('pack_size') >= 2 ? (int) $request->input('pack_size') : null;
+        $unitCost = self::unitCostFrom($request, $packSize);
         $stock = app(\App\Services\InventoryStockService::class);
 
         if ($choice === 'new') {
@@ -109,6 +127,7 @@ class VendorCustomizationOptionController extends Controller
                 'pack_unit'  => $packSize ? $how['pack'] : null,
                 'pack_size'  => $packSize,
                 'on_hand'    => $onHand ?? 0,
+                'unit_cost'  => $unitCost ?? 0,
             ], $request->user());
         } else {
             $item = Product::query()
@@ -120,7 +139,10 @@ class VendorCustomizationOptionController extends Controller
             if (! $item) {
                 throw new \InvalidArgumentException($option->type === Option::TYPE_WRAPPER ? 'Pick one of your wrapping items.' : "Pick one of your {$option->type} stock items.");
             }
-            $item->update(['pack_unit' => $packSize ? ($item->pack_unit ?: $how['pack']) : null, 'pack_size' => $packSize]);
+            $item->update(array_merge(
+                ['pack_unit' => $packSize ? ($item->pack_unit ?: $how['pack']) : null, 'pack_size' => $packSize],
+                $unitCost !== null ? ['purchase_price' => $unitCost] : [],
+            ));
             if ($onHand !== null && $onHand !== (int) $item->quantity_in_stock) {
                 $stock->adjust($item, 'set', $onHand, 'count', "Counted in 3D Bouquet Management ({$option->name})", $request->user());
             }
@@ -302,6 +324,8 @@ class VendorCustomizationOptionController extends Controller
             $rules['stock_on_hand'] = 'nullable|integer|min:0|max:1000000';
             $rules['stock_sheets'] = 'nullable|integer|min:0|max:1000000';
             $rules['pack_size'] = 'nullable|integer|min:2|max:100000';
+            // Your cost per roll / sack (per sheet for a wrapper with no roll size)
+            $rules['pack_cost'] = 'nullable|numeric|min:0|max:1000000';
         }
 
         if ($type === Option::TYPE_WRAP_MODEL) {
