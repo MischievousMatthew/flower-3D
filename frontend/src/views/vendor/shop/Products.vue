@@ -117,6 +117,9 @@
             <span v-if="p.has_model" class="sp-chip blue">3D</span>
           </div>
           <span class="sp-chip p-status" :class="statusOf(p).tone">{{ statusOf(p).label }}</span>
+          <button v-if="p.image" type="button" class="p-zoom" :aria-label="`View ${p.name} photo full screen`" title="View full screen" @click.stop="zoomed = p">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+          </button>
         </div>
         <div class="p-body">
           <div class="p-title">
@@ -195,6 +198,7 @@
     </div>
 
     <ProductEditor :product-id="editing" @close="editing = null" @saved="load" />
+    <PhotoViewer :images="zoomed ? [zoomed.image] : []" :open="!!zoomed" :alt="zoomed?.name || 'Product'" @close="zoomed = null" />
     <SalePriceModal :product="saleFor" @close="saleFor = null" @saved="replace" />
 
     <!-- Delete confirmation -->
@@ -227,6 +231,7 @@ import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import ProductEditor from "../../../components/vendor/shop/ProductEditor.vue";
+import PhotoViewer from "../../../components/common/PhotoViewer.vue";
 import SalePriceModal from "../../../components/vendor/shop/SalePriceModal.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage, money, useVendorCatalog } from "../../../components/vendor/shop/useVendorCatalog";
@@ -256,6 +261,7 @@ const sort = ref("updated");
 const view = ref(readView());
 const selected = ref([]);
 const editing = ref(null);
+const zoomed = ref(null); // product whose photo is open full screen
 const saleFor = ref(null);
 const deleting = ref(null);
 const menuFor = ref(null);
@@ -560,6 +566,30 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   left: 10px;
   bottom: 10px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.p-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--v-glass);
+  color: var(--v-text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.15s;
+}
+.p-zoom:hover {
+  transform: scale(1.06);
+}
+.p-zoom:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
 }
 .p-body {
   display: flex;

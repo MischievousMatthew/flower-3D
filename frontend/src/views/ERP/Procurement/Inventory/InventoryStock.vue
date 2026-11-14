@@ -107,9 +107,11 @@
               <input v-model="picked" type="checkbox" :value="it.id" :disabled="!it.suggestion.qty" :aria-label="`Select ${it.name} to reorder`" />
             </label>
             <span class="st-item">
-              <span class="st-photo" :class="{ empty: !it.photo }">
-                <img v-if="it.photo" :src="it.photo" :alt="it.name" loading="lazy" decoding="async" />
-                <span v-else v-html="it.kind === 'flowers' ? ICONS.flower : ICONS.image" aria-hidden="true"></span>
+              <button v-if="it.photo" type="button" class="st-photo st-photo-btn" :aria-label="`View ${it.name} photo full screen`" title="View full screen" @click="zoomed = it">
+                <img :src="it.photo" :alt="it.name" loading="lazy" decoding="async" />
+              </button>
+              <span v-else class="st-photo empty">
+                <span v-html="it.kind === 'flowers' ? ICONS.flower : ICONS.image" aria-hidden="true"></span>
               </span>
               <span class="st-item-text">
               <b>{{ it.name }}</b>
@@ -190,6 +192,9 @@
         </li>
       </ul>
     </section>
+
+    <!-- A row's photo, full screen -->
+    <PhotoViewer :images="zoomed ? [zoomed.photo] : []" :open="!!zoomed" :alt="zoomed?.name || 'Item'" @close="zoomed = null" />
 
     <!-- Adjust -->
     <Teleport to="body">
@@ -386,6 +391,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import HrPage from "../../../../components/hr/HrPage.vue";
 import ShowMore from "../../../../components/common/ShowMore.vue";
+import PhotoViewer from "../../../../components/common/PhotoViewer.vue";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../../components/vendor/finance/financeUi";
@@ -447,6 +453,7 @@ const search = ref("");
 const picked = ref([]);
 const history = ref(null);
 const histFilter = ref("");
+const zoomed = ref(null); // item whose photo is open full screen
 const adj = ref(null);
 const lv = ref(null);
 const mat = ref(null);
@@ -898,6 +905,18 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.st-photo-btn {
+  padding: 0;
+  cursor: zoom-in;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.st-photo-btn:hover {
+  border-color: var(--v-accent, var(--bc-accent));
+}
+.st-photo-btn:focus-visible {
+  outline: 2px solid var(--v-accent, var(--bc-accent));
+  outline-offset: 2px;
 }
 .st-photo :deep(svg) {
   width: 18px;

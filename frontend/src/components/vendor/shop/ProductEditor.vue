@@ -29,15 +29,19 @@
             <section class="sp-section">
               <h4>Photos <span class="pe-count">{{ photoCount }}/5</span></h4>
               <div class="pe-photos">
-                <figure v-for="img in keptImages" :key="`old-${img.id}`" class="pe-photo">
-                  <img :src="img.image_url" :alt="form.product_name" />
+                <figure v-for="(img, i) in keptImages" :key="`old-${img.id}`" class="pe-photo">
+                  <button type="button" class="pe-photo-view" :aria-label="`View photo ${i + 1} full screen`" @click="openViewer(i)">
+                    <img :src="img.image_url" :alt="form.product_name" />
+                  </button>
                   <span v-if="img === coverImage" class="pe-cover">Cover</span>
                   <button type="button" class="pe-photo-x" aria-label="Remove photo" @click="removedImageIds.push(img.id)">
                     <span v-html="ICONS.close"></span>
                   </button>
                 </figure>
                 <figure v-for="(img, i) in newImages" :key="img.url" class="pe-photo">
-                  <img :src="img.url" alt="New photo" />
+                  <button type="button" class="pe-photo-view" :aria-label="`View new photo ${i + 1} full screen`" @click="openViewer(keptImages.length + i)">
+                    <img :src="img.url" alt="New photo" />
+                  </button>
                   <span class="pe-cover new">New</span>
                   <span v-if="img.small" class="pe-lowres" :title="`${img.size}: under 800px, it may look blurry`">Low res</span>
                   <button type="button" class="pe-photo-x" aria-label="Remove photo" @click="dropNewImage(i)">
@@ -50,6 +54,13 @@
                   <span>Add</span>
                 </label>
               </div>
+              <PhotoViewer
+                v-model:index="viewer.index"
+                :images="viewerPhotos"
+                :open="viewer.open"
+                :alt="form.product_name || 'Product'"
+                @close="viewer.open = false"
+              />
               <p v-if="errors.images" class="sp-error">{{ errors.images }}</p>
               <p v-else-if="newImages.some((img) => img.small)" class="pe-lowres-note">
                 Photos marked “Low res” are under 800px and may look blurry. A bigger photo looks sharper.
@@ -237,6 +248,7 @@ import ColorStockInputs from "./ColorStockInputs.vue";
 import { colorFields, colorProblem, colorsFromProduct } from "../../../utils/flowerColors.js";
 import BouquetFlowersInput from "./BouquetFlowersInput.vue";
 import PrepTimeField from "./PrepTimeField.vue";
+import PhotoViewer from "../../common/PhotoViewer.vue";
 import { compositionField, compositionFromProduct, compositionProblem, hasLinks } from "../../../utils/bouquetComposition.js";
 
 const props = defineProps({ productId: { type: Number, default: null } });
@@ -268,6 +280,15 @@ const loadError = ref("");
 const errors = reactive({});
 
 const keptImages = computed(() => images.value.filter((img) => !removedImageIds.value.includes(img.id)));
+
+// Full-screen viewer over the current photos (saved first, then new ones)
+const viewer = reactive({ open: false, index: 0 });
+const viewerPhotos = computed(() => [...keptImages.value.map((img) => img.image_url), ...newImages.value.map((img) => img.url)]);
+const openViewer = (i) => {
+  viewer.index = i;
+  viewer.open = true;
+};
+watch(() => props.productId, () => (viewer.open = false));
 const coverImage = computed(() => keptImages.value.find((i) => i.is_primary) ?? keptImages.value[0]);
 const photoCount = computed(() => keptImages.value.length + newImages.value.length);
 const margin = computed(() => {
@@ -475,6 +496,20 @@ function close() {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.pe-photo-view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.pe-photo-view:focus-visible {
+  outline: 2px solid var(--v-accent, var(--bc-accent));
+  outline-offset: -2px;
+  border-radius: 14px;
 }
 .pe-cover {
   position: absolute;
