@@ -54,6 +54,15 @@ class InventoryStockService
                 'quantity_in_stock', 'min_stock_level', 'max_stock_level', 'supplier_lead_time', 'purchase_price', 'selling_type', 'composition', 'pack_unit', 'pack_size']);
         $ids = $products->pluck('id');
 
+        // One photo per product: the main one, else the first in order
+        $photos = DB::table('product_images')
+            ->whereIn('product_id', $ids)
+            ->whereNotNull('image_url')
+            ->orderByDesc('is_primary')->orderBy('display_order')->orderBy('id')
+            ->get(['product_id', 'image_url'])
+            ->unique('product_id')
+            ->pluck('image_url', 'product_id');
+
         // Still to come on approved purchase orders
         $onOrder = DB::table('purchase_order_items as i')
             ->join('purchase_orders as o', 'o.id', '=', 'i.purchase_order_id')
@@ -107,7 +116,7 @@ class InventoryStockService
 
         $damaged = $this->damagedSince($ownerId, $since);
 
-        $items = $products->map(function ($p) use ($onOrder, $sold, $used, $lastBuy, $batchTracked, $damaged) {
+        $items = $products->map(function ($p) use ($onOrder, $sold, $used, $lastBuy, $batchTracked, $damaged, $photos) {
             $onHand = (int) $p->quantity_in_stock;
             $min = (int) $p->min_stock_level;
             $target = $p->max_stock_level !== null ? (int) $p->max_stock_level : null;
@@ -128,6 +137,7 @@ class InventoryStockService
                 'id'            => $p->id,
                 'name'          => $p->product_name,
                 'sku'           => $p->sku,
+                'photo'         => $photos[$p->id] ?? null,
                 'kind'          => self::kindOf($p),
                 'kind_set'      => (bool) $p->stock_kind,
                 'unit'          => $p->stock_unit,

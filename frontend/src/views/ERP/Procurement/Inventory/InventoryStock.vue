@@ -108,6 +108,11 @@
               <input v-model="picked" type="checkbox" :value="it.id" :disabled="!it.suggestion.qty" :aria-label="`Select ${it.name} to reorder`" />
             </label>
             <span class="st-item">
+              <span class="st-photo" :class="{ empty: !it.photo }">
+                <img v-if="it.photo" :src="it.photo" :alt="it.name" loading="lazy" decoding="async" />
+                <span v-else v-html="it.kind === 'flowers' ? ICONS.flower : ICONS.image" aria-hidden="true"></span>
+              </span>
+              <span class="st-item-text">
               <b>{{ it.name }}</b>
               <small>
                 <span class="sp-chip" :class="kindOf(it.kind).tone">{{ kindOf(it.kind).label }}</span>
@@ -117,6 +122,7 @@
               <small v-if="it.composition?.length" class="st-compo" :title="'Flowers in one bouquet'">
                 {{ it.composition.map((f) => `${f.count} ${f.kind === "wrapper" ? `${rowUnit(f.kind, f.count)} of ` : f.kind === "filler" || f.kind === "ribbon" ? "of " : ""}${f.color ? `${f.color.toLowerCase()} ` : ""}${f.flower.toLowerCase()}`).join(" · ") }} per bouquet<template v-if="it.composition.some((f) => f.cost != null)"> · flowers {{ money(it.composition.reduce((s, f) => s + (f.cost != null ? f.cost * f.count : 0), 0)) }}</template>
               </small>
+              </span>
             </span>
             <span class="st-onhand">
               <b>{{ it.on_hand.toLocaleString("en-PH") }} <small>{{ unitOf(it) }}</small></b>
@@ -857,6 +863,40 @@ onMounted(() => {
 .st-sel input:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+/* The product's photo beside its name */
+.st-row > .st-item {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+.st-item-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.st-photo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border: 1px solid var(--v-border);
+  border-radius: 10px;
+  background: var(--v-surface-2, var(--v-surface));
+  color: var(--v-faint);
+}
+.st-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.st-photo :deep(svg) {
+  width: 18px;
+  height: 18px;
 }
 .st-item small {
   display: flex;
