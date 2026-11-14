@@ -2,8 +2,9 @@
 // browser so the work never touches our server.
 //
 // Spaces break or move without notice: to swap one, edit PROVIDERS only.
+// TripoSR runs first; Hunyuan3D-2 is only a backup for when it isn't answering.
 // Two kinds ("pool"):
-//   zerogpu: Hugging Face's shared free GPUs. Best quality, but the free quota
+//   zerogpu: Hugging Face's shared free GPUs. Detailed, but the free quota
 //            belongs to the visitor's connection and is shared by every ZeroGPU
 //            Space (about one conversion a day), so once it runs out we skip
 //            them all until it resets.
@@ -54,46 +55,20 @@ async function fetchFile(file) {
 
 export const PROVIDERS = [
   {
-    id: "trellis",
-    label: "TRELLIS",
-    pool: "zerogpu",
-    async run(photo, onStage) {
-      const { Client, handle_file } = await loadClient();
-      onStage?.("connect");
-      const client = await Client.connect("trellis-community/TRELLIS");
-      await client.predict("/start_session", {});
-      onStage?.("background");
-      const pre = await client.predict("/preprocess_image", { image: handle_file(photo) });
-      onStage?.("shape");
-      const out = await client.predict("/generate_and_extract_glb", {
-        image: pre.data[0],
-        multiimages: [],
-        // A new seed each run, so "Make another version" gives a different model
-        seed: Math.floor(Math.random() * 2147483647),
-        ss_guidance_strength: 7.5,
-        ss_sampling_steps: 12,
-        slat_guidance_strength: 3,
-        slat_sampling_steps: 12,
-        multiimage_algo: "stochastic",
-        mesh_simplify: 0.95,
-        texture_size: 1024,
-      });
-      // Returns [preview video, 3D model, download]; the download is the GLB
-      onStage?.("download");
-      return fetchFile(out.data[2] || out.data[1]);
-    },
-  },
-  {
-    // TripoSR on a free CPU Space: unlimited, about 1–2 minutes, vertex colors
+    // The main model: TripoSR on a free CPU Space. Unlimited, about 1–2 minutes, vertex colors
     id: "triposr",
     label: "TripoSR",
     pool: "cpu",
-    async run(photo, onStage) {
+    async run(photo, onStage, { attempt = 1 } = {}) {
       const { Client, handle_file } = await loadClient();
       onStage?.("connect");
       const client = await Client.connect("WeReCooking2/Dust3R-TripoSR");
       onStage?.("background");
-      const pre = await client.predict("/preprocess", { input_image: handle_file(photo), do_remove_background: true, foreground_ratio: 0.85 });
+      // TripoSR has no seed, so the same photo always gives the same shape. The first
+      // try uses the best framing; "Make another version" frames the flower a little
+      // tighter or looser, which gives a different shape.
+      const foreground_ratio = attempt <= 1 ? 0.85 : Math.round((0.7 + Math.random() * 0.25) * 100) / 100;
+      const pre = await client.predict("/preprocess", { input_image: handle_file(photo), do_remove_background: true, foreground_ratio });
       onStage?.("shape");
       const out = await client.predict("/generate", { image: pre.data[0], mc_resolution: 256 });
       onStage?.("download");
@@ -101,6 +76,7 @@ export const PROVIDERS = [
     },
   },
   {
+    // Backup only when TripoSR isn't answering (uses the shared free GPU quota)
     id: "hunyuan",
     label: "Hunyuan3D-2",
     pool: "zerogpu",
@@ -166,7 +142,7 @@ function rememberQuota(storage, until) {
  * still tries the CPU ones, and is remembered so later runs skip the GPU until
  * it resets. `onSkip(provider, untilMs)` reports a skipped GPU provider.
  */
-export async function convertWithAI(photo, { providers = PROVIDERS, onStage, onProvider, onSkip, storage = localStore(), now = Date.now } = {}) {
+export async function convertWithAI(photo, { providers = PROVIDERS, onStage, onProvider, onSkip, storage = localStore(), now = Date.now, attempt = 1 } = {}) {
   let last = null;
   let quota = null;
   for (const provider of providers) {
@@ -180,7 +156,7 @@ export async function convertWithAI(photo, { providers = PROVIDERS, onStage, onP
     }
     onProvider?.(provider);
     try {
-      const blob = await withTimeout(provider.run(photo, onStage), RUN_TIMEOUT);
+      const blob = await withTimeout(provider.run(photo, onStage, { attempt }), RUN_TIMEOUT);
       return { blob, provider };
     } catch (err) {
       const message = err?.message || String(err);

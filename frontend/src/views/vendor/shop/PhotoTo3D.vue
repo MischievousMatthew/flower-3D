@@ -37,7 +37,7 @@
         </div>
 
         <ul class="p3-notes">
-          <li><b>Free AI</b> rebuilds the real shape from your photo. The most detailed model (TRELLIS) allows about one conversion a day per internet connection; after that an unlimited free model (TripoSR) takes over, with smoother, less detailed results in about 1–2 minutes.</li>
+          <li><b>Free AI</b> (TripoSR) rebuilds the real shape from your photo in about 1–2 minutes. It's unlimited, so you can make as many versions as you like.</li>
           <li><b>Matching 3D</b> builds BloomCraft's own rose, tulip, peony or daisy in your photo's colors. Instant, works any time.</li>
           <li>Photos sent to the free AI go to Hugging Face's public demo servers.</li>
         </ul>
@@ -192,6 +192,7 @@ const startedAt = ref(0);
 const now = ref(Date.now());
 let ticker = null;
 let alive = true;
+let aiAttempt = 0; // AI tries with this photo; the 2nd and later frame it differently
 
 const mode = ref(null); // "ai" | "matched"
 const result = ref(null); // { blob, url, source, provider }
@@ -227,12 +228,7 @@ const resultHint = computed(() => {
   return "It will show up here.";
 });
 
-// TripoSR gives the same shape for the same photo; TRELLIS and Hunyuan vary each try
-const redoHint = computed(() =>
-  result.value?.provider === "TripoSR"
-    ? "Try again: if the detailed model is free by then, you'll get a sharper result. A clearer photo (one flower, plain background, good light) helps most."
-    : "Each try comes out a little different. A clearer photo (one flower, plain background, good light) also helps.",
-);
+const redoHint = "Each new version frames your flower a little differently, so the shape changes. A clearer photo (one flower, plain background, good light) helps most.";
 
 const fileSize = (bytes) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
@@ -281,6 +277,7 @@ async function setPhoto(file) {
     const palette = extractPalette(sctx.getImageData(0, 0, small.width, small.height));
 
     reset();
+    aiAttempt = 0;
     photo.value = blob;
     if (photoUrl.value) URL.revokeObjectURL(photoUrl.value);
     photoUrl.value = URL.createObjectURL(blob);
@@ -294,7 +291,7 @@ async function setPhoto(file) {
 
 // ── Results ────────────────────────────────────────────────────────────
 const RESULT_NOTES = {
-  TripoSR: "Made by the unlimited free model: smoother and less detailed than TRELLIS. Try TRELLIS again after its daily limit resets for more detail.",
+  "Hunyuan3D-2": "Made by the backup free AI because TripoSR wasn't answering.",
 };
 
 function showResult(blob, source, provider = "") {
@@ -333,7 +330,7 @@ const retryText = (seconds) => {
 function explain(err) {
   switch (err?.code) {
     case "quota":
-      return { title: "The free AI can't take more photos right now", body: `Today's detailed-model limit is used up (it resets ${retryText(err.retryInSeconds)}) and the unlimited free model isn't answering. Try again in a few minutes, or build a matching 3D now.` };
+      return { title: "The free AI can't take more photos right now", body: `TripoSR isn't answering and the backup AI's daily limit is used up (it resets ${retryText(err.retryInSeconds)}). Try again in a few minutes, or build a matching 3D now.` };
     case "busy":
       return { title: "The free AI is busy", body: "Lots of people are using it right now. Try again in a few minutes, or build a matching 3D now." };
     case "bad-photo":
@@ -362,10 +359,10 @@ async function makeWithAI() {
       onProvider: (p) => {
         if (!alive) return;
         providerLabel.value = p.label;
-        // The CPU model only runs after the GPU ones were skipped or failed
-        if (p.pool === "cpu" && !switchNote.value) switchNote.value = "The detailed model isn't available right now, so the unlimited free model is making it.";
+        // The backup only runs after TripoSR failed
+        if (p.id !== "triposr" && !switchNote.value) switchNote.value = `TripoSR isn't answering right now, so the backup free AI (${p.label}) is making it.`;
       },
-      onSkip: () => alive && (switchNote.value = "Today's detailed-model limit is used up, so the unlimited free model is making it."),
+      attempt: ++aiAttempt,
     });
     if (!alive) return;
     showResult(blob, "ai", provider.label);
