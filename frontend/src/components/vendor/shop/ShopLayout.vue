@@ -102,6 +102,7 @@ const CRM_TABS = [
 ];
 // Open on every plan, even an expired one, so the vendor can always renew
 const ACCOUNT_TABS = [
+  { name: "VendorProfile", label: "Profile", icon: "user" },
   { name: "VendorSubscription", label: "Subscription Plan", icon: "sparkle" },
   { name: "VendorBilling", label: "Billing History", icon: "receipt" },
   { name: "VendorUsage", label: "Usage & Limits", icon: "activity" },

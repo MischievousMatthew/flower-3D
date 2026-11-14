@@ -1,786 +1,359 @@
 <template>
-  <vendorHeader title="Vendor Profile" />
-  <div class="vendor-profile-layout">
-    <!-- Sidebar -->
-    <VendorSidebar />
-
-    <!-- Main Content -->
-    <main class="profile-main">
-      <!-- Profile Completion Progress -->
-      <div class="completion-card">
-        <div class="completion-header">
-          <div class="completion-title-section">
-            <h3 class="completion-title">Profile Completion</h3>
-            <p class="completion-subtitle">
-              Complete your profile to unlock all features
-            </p>
-          </div>
-          <div class="completion-percentage">
-            {{ profileData.profile_completion_percentage || 0 }}%
-          </div>
+  <ShopLayout section="account" title="Profile" subtitle="How your shop looks to customers, and how you get paid.">
+    <!-- ══════════ Storefront header ══════════ -->
+    <section class="vp-hero sp-card" aria-label="Your storefront">
+      <div class="vp-cover" :class="{ empty: !profileData.store_cover_url }">
+        <div v-if="isLoading" class="bc-skeleton vp-cover-sk"></div>
+        <img v-else-if="profileData.store_cover_url" :src="profileData.store_cover_url" alt="Store cover photo" />
+        <div v-else class="vp-cover-empty">
+          <span v-html="ICONS.image"></span>
+          <p>Add a cover photo. Customers see it across the top of your shop.</p>
         </div>
-
-        <div class="completion-bar-container">
-          <div
-            class="completion-bar-fill"
-            :style="{
-              width: (profileData.profile_completion_percentage || 0) + '%',
-            }"
-          ></div>
-        </div>
-
-        <div class="completion-items">
-          <div
-            class="completion-item"
-            :class="{ completed: profileData.payment_details_completed }"
-          >
-            <span class="completion-icon">{{
-              profileData.payment_details_completed ? "✓" : "○"
-            }}</span>
-            <span class="completion-text">Payment Details</span>
-            <button
-              v-if="!profileData.payment_details_completed"
-              class="completion-action"
-              @click="activeTab = 'payment'"
-            >
-              Complete →
-            </button>
-          </div>
-          <div
-            class="completion-item"
-            :class="{ completed: profileData.product_details_completed }"
-          >
-            <span class="completion-icon">{{
-              profileData.product_details_completed ? "✓" : "○"
-            }}</span>
-            <span class="completion-text">Product Details</span>
-            <button
-              v-if="!profileData.product_details_completed"
-              class="completion-action"
-              @click="activeTab = 'product'"
-            >
-              Complete →
-            </button>
-          </div>
-          <div
-            class="completion-item"
-            :class="{ completed: profileData.delivery_details_completed }"
-          >
-            <span class="completion-icon">{{
-              profileData.delivery_details_completed ? "✓" : "○"
-            }}</span>
-            <span class="completion-text">Delivery Details</span>
-            <button
-              v-if="!profileData.delivery_details_completed"
-              class="completion-action"
-              @click="router.push({ name: 'VendorShopSettings' })"
-            >
-              Complete →
-            </button>
-          </div>
+        <div class="vp-cover-actions">
+          <button type="button" class="vp-glass-btn" @click="openUploadModal('cover')">
+            <span v-html="ICONS.image"></span>{{ profileData.store_cover_url ? "Change cover" : "Add cover" }}
+          </button>
+          <button v-if="profileData.store_cover_url" type="button" class="vp-glass-btn" :disabled="isRemovingCover" aria-label="Remove cover photo" @click="removeStoreCover">
+            <span v-html="ICONS.trash"></span>{{ isRemovingCover ? "Removing…" : "" }}
+          </button>
         </div>
       </div>
 
-      <section v-if="profileData.subscription?.plan_name" class="subscription-card" aria-label="Current subscription">
-        <div>
-          <p class="subscription-card__eyebrow">Current subscription</p>
-          <h2>{{ profileData.subscription.plan_name }} Plan</h2>
-          <p v-if="profileData.subscription.status === 'trialing'">
-            Free Trial · Ends {{ formatSubscriptionDate(profileData.subscription.trial_ends_at) }}
-          </p>
-          <p v-else>
-            <template v-if="profileData.subscription.monthly_price !== null">
-              {{ formatSubscriptionPrice(profileData.subscription.monthly_price, profileData.subscription.currency) }}/month ·
-            </template>
-            Status: {{ formatSubscriptionStatus(profileData.subscription.status) }}
-          </p>
+      <div class="vp-id">
+        <button type="button" class="vp-logo" :aria-label="profileData.store_logo_url ? 'Change store logo' : 'Add store logo'" @click="openUploadModal('logo')">
+          <span v-if="isLoading" class="bc-skeleton vp-logo-sk"></span>
+          <img v-else-if="profileData.store_logo_url" :src="profileData.store_logo_url" alt="" />
+          <span v-else class="vp-logo-fallback">{{ initials }}</span>
+          <span class="vp-logo-edit" aria-hidden="true" v-html="ICONS.edit"></span>
+        </button>
+
+        <div class="vp-id-text">
+          <template v-if="isLoading">
+            <span class="bc-skeleton sp-sk-line w50"></span>
+            <span class="bc-skeleton sp-sk-line w30"></span>
+          </template>
+          <template v-else>
+            <h2>{{ profileData.store_name || "Your shop" }}</h2>
+            <p>
+              <span v-if="profileData.owner_name">{{ profileData.owner_name }}<template v-if="profileData.position"> · {{ profileData.position }}</template></span>
+              <router-link v-if="profileData.subscription?.plan_name" :to="{ name: 'VendorSubscription' }" class="vp-plan" :class="`status-${profileData.subscription.status}`">
+                <span v-html="ICONS.sparkle"></span>{{ profileData.subscription.plan_name }}{{ profileData.subscription.status === "trialing" ? " · Trial" : "" }}
+              </router-link>
+            </p>
+          </template>
         </div>
-        <span class="subscription-card__status" :class="`status-${profileData.subscription.status}`">
-          {{ profileData.subscription.status === 'trialing' ? 'Trial' : formatSubscriptionStatus(profileData.subscription.status) }}
-        </span>
-        <router-link :to="{ name: 'VendorSubscription' }" class="subscription-card__manage">Manage plan →</router-link>
-      </section>
 
-      <!-- Tabs -->
-      <div class="profile-tabs">
-        <button
-          class="tab-button"
-          :class="{ active: activeTab === 'general' }"
-          @click="activeTab = 'general'"
-        >
-          <span class="tab-icon" aria-hidden="true" v-html="ICONS.store"></span><span>General Info</span>
-        </button>
-        <button
-          class="tab-button"
-          :class="{ active: activeTab === 'payment' }"
-          @click="activeTab = 'payment'"
-        >
-          <span class="tab-icon" aria-hidden="true" v-html="ICONS.card"></span><span>Payment Details</span>
-          <span v-if="!profileData.payment_details_completed" class="tab-badge"
-            >!</span
-          >
-        </button>
-        <button
-          class="tab-button"
-          :class="{ active: activeTab === 'product' }"
-          @click="activeTab = 'product'"
-        >
-          <span class="tab-icon" aria-hidden="true" v-html="ICONS.flower"></span><span>Product Details</span>
-          <span v-if="!profileData.product_details_completed" class="tab-badge"
-            >!</span
-          >
-        </button>
-        <!-- Delivery and password moved to Subscription & account -->
-        <button
-          class="tab-button"
-          @click="router.push({ name: 'VendorShopSettings' })"
-        >
-          <span class="tab-icon" aria-hidden="true" v-html="ICONS.truck"></span><span>Delivery Details</span>
-          <span v-if="!profileData.delivery_details_completed" class="tab-badge"
-            >!</span
-          >
-        </button>
-        <button
-          class="tab-button"
-          @click="router.push({ name: 'VendorSecurity' })"
-        >
-          <span class="tab-icon" aria-hidden="true" v-html="ICONS.lock"></span><span>Password &amp; Security</span>
-        </button>
-      </div>
-
-      <!-- Loading skeleton, shaped like a tab panel with a form -->
-      <div v-if="isLoading" class="tab-content profile-skeleton" aria-busy="true">
-        <span class="sr-only">Loading profile…</span>
-        <div class="bc-skeleton sk-heading"></div>
-        <div class="bc-skeleton sk-subheading"></div>
-        <div class="bc-skeleton sk-media"></div>
-        <div class="sk-fields">
-          <div v-for="n in 6" :key="n" class="sk-field">
-            <div class="bc-skeleton sk-label"></div>
-            <div class="bc-skeleton sk-input"></div>
-          </div>
+        <!-- Completion ring -->
+        <div class="vp-ring" role="img" :aria-label="`Profile ${completion}% complete`" :style="{ '--p': completion }">
+          <b>{{ completion }}%</b>
+          <small>complete</small>
         </div>
       </div>
 
-      <!-- Tab Content -->
-      <div v-if="!isLoading" class="tab-content">
-        <!-- ══════════ General Info ══════════ -->
-        <div v-if="activeTab === 'general'" class="tab-panel">
-          <div class="panel-header">
-            <h2 class="panel-title">General Information</h2>
-            <p class="panel-description">
-              Update your store details and contact information
-            </p>
+      <!-- What's left to fill in -->
+      <ul v-if="!isLoading && completion < 100" class="vp-steps" aria-label="Finish your profile">
+        <li v-for="s in steps" :key="s.key" :class="{ done: s.done }">
+          <button type="button" :disabled="s.done" @click="s.go()">
+            <span class="vp-step-dot" v-html="s.done ? ICONS.check : ICONS[s.icon]"></span>
+            <span>{{ s.label }}</span>
+            <small>{{ s.done ? "Done" : "Add" }}</small>
+          </button>
+        </li>
+      </ul>
+    </section>
+
+    <div class="vp-layout">
+      <!-- ══════════ Settings menu ══════════ -->
+      <nav class="vp-nav" aria-label="Profile settings">
+        <button v-for="t in TABS" :key="t.key" type="button" class="vp-nav-item" :class="{ on: activeTab === t.key }" :aria-current="activeTab === t.key ? 'page' : undefined" @click="t.to ? router.push(t.to) : (activeTab = t.key)">
+          <span class="vp-nav-icon" v-html="ICONS[t.icon]"></span>
+          <span class="vp-nav-text"><b>{{ t.label }}</b><small>{{ t.hint }}</small></span>
+          <span v-if="t.todo && !profileData[t.todo]" class="vp-nav-dot" aria-label="Needs details"></span>
+          <span v-else-if="t.to" class="vp-nav-go" aria-hidden="true" v-html="ICONS.chevronRight"></span>
+        </button>
+      </nav>
+
+      <!-- ══════════ Panels ══════════ -->
+      <div class="vp-panel">
+        <!-- Loading -->
+        <section v-if="isLoading" class="sp-card vp-card" aria-busy="true">
+          <span class="sr-only">Loading profile…</span>
+          <div class="bc-skeleton sp-sk-line w30"></div>
+          <div class="bc-skeleton sp-sk-line w50"></div>
+          <div class="vp-sk-grid"><div v-for="n in 6" :key="n" class="bc-skeleton vp-sk-input"></div></div>
+        </section>
+
+        <!-- ── Store profile ── -->
+        <form v-else-if="activeTab === 'general'" class="sp-card vp-card" novalidate @submit.prevent="updateGeneralInfo">
+          <header class="vp-card-head">
+            <h2>Store profile</h2>
+            <p>What customers see on your shop page.</p>
+          </header>
+
+          <div v-if="generalForm.successMsg" class="sp-banner success vp-banner" role="status">
+            <span v-html="ICONS.check"></span>{{ generalForm.successMsg }}
+            <button type="button" aria-label="Dismiss" @click="generalForm.successMsg = ''" v-html="ICONS.close"></button>
+          </div>
+          <div v-if="generalForm.errorMsg" class="sp-banner error vp-banner" role="alert">
+            <span v-html="ICONS.alert"></span>{{ generalForm.errorMsg }}
+            <button type="button" aria-label="Dismiss" @click="generalForm.errorMsg = ''" v-html="ICONS.close"></button>
           </div>
 
-          <!-- ── Alert banners ── -->
-          <div class="store-media">
-            <!-- Cover photo, shown across the top of the storefront -->
-            <div class="store-media__cover">
-              <img
-                v-if="profileData.store_cover_url"
-                :src="profileData.store_cover_url"
-                alt="Store cover photo"
-              />
-              <p v-else class="store-media__cover-empty">
-                No cover photo yet. Customers will see a plain banner.
-              </p>
-              <div class="store-media__cover-actions">
-                <button
-                  type="button"
-                  class="store-media__btn"
-                  @click="openUploadModal('cover')"
-                >
-                  {{ profileData.store_cover_url ? "Change Cover" : "Add Cover Photo" }}
-                </button>
-                <button
-                  v-if="profileData.store_cover_url"
-                  type="button"
-                  class="store-media__btn"
-                  :disabled="isRemovingCover"
-                  @click="removeStoreCover"
-                >
-                  {{ isRemovingCover ? "Removing…" : "Remove" }}
-                </button>
-              </div>
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.store"></span>Your shop</legend>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span>Store name</span>
+                <input v-model="formData.general.store_name" class="sp-input" :class="{ invalid: generalForm.errors.store_name }" placeholder="Your store name" required @input="generalForm.clearError('store_name')" />
+                <small v-if="generalForm.errors.store_name" class="sp-error">{{ generalForm.errors.store_name }}</small>
+              </label>
+              <label class="sp-field">
+                <span>Operating hours</span>
+                <input v-model="formData.general.operating_hours" class="sp-input" placeholder="Mon–Fri, 9 AM – 6 PM" />
+              </label>
+              <label class="sp-field sp-span-all">
+                <span>About your shop <em class="vp-count">{{ (formData.general.store_description || "").length }}</em></span>
+                <textarea v-model="formData.general.store_description" class="sp-textarea" rows="4" placeholder="What you make, what makes it special, who you make it for…"></textarea>
+              </label>
             </div>
+          </fieldset>
 
-            <div class="logo-card">
-              <div class="logo-card__preview">
-                <img
-                  v-if="profileData.store_logo_url"
-                  :src="profileData.store_logo_url"
-                  alt="Store logo"
-                />
-                <div v-else class="logo-card__fallback">BC</div>
-              </div>
-              <div class="logo-card__content">
-                <h3 class="logo-card__title">Store Logo &amp; Cover</h3>
-                <p class="logo-card__text">
-                  Your logo sits on your cover photo at the top of your storefront.
-                  Covers look best at 1500 × 500.
-                </p>
-              </div>
-              <button
-                type="button"
-                class="btn-secondary logo-card__action"
-                @click="openUploadModal('logo')"
-              >
-                Change Logo
-              </button>
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.pin"></span>Location &amp; contact</legend>
+            <div class="sp-grid-2">
+              <label class="sp-field sp-span-all">
+                <span>Store address</span>
+                <input v-model="formData.general.store_address" class="sp-input" :class="{ invalid: generalForm.errors.store_address }" placeholder="Street, barangay, city" required @input="generalForm.clearError('store_address')" />
+                <small v-if="generalForm.errors.store_address" class="sp-error">{{ generalForm.errors.store_address }}</small>
+              </label>
+              <label class="sp-field">
+                <span>Contact number</span>
+                <div class="vp-affix"><i v-html="ICONS.phone"></i><input v-model="formData.general.contact_number" v-phone type="tel" class="sp-input" :class="{ invalid: generalForm.errors.contact_number }" required @input="generalForm.clearError('contact_number')" /></div>
+                <small v-if="generalForm.errors.contact_number" class="sp-error">{{ generalForm.errors.contact_number }}</small>
+              </label>
+              <label class="sp-field">
+                <span>Areas you deliver to</span>
+                <input v-model="formData.general.service_areas" class="sp-input" placeholder="e.g. Manila, Quezon City" />
+              </label>
             </div>
+          </fieldset>
+
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.user"></span>Owner</legend>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span>Owner name</span>
+                <input v-model="formData.general.owner_name" class="sp-input" :class="{ invalid: generalForm.errors.owner_name }" placeholder="Your full name" required @input="generalForm.clearError('owner_name')" />
+                <small v-if="generalForm.errors.owner_name" class="sp-error">{{ generalForm.errors.owner_name }}</small>
+              </label>
+              <label class="sp-field">
+                <span>Your role</span>
+                <input v-model="formData.general.position" class="sp-input" placeholder="Owner, manager…" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.globe"></span>Social pages <em>optional</em></legend>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span>Facebook</span>
+                <div class="vp-affix"><i class="vp-affix-text">fb</i><input v-model="formData.general.facebook_page" type="url" class="sp-input" placeholder="https://facebook.com/yourpage" /></div>
+              </label>
+              <label class="sp-field">
+                <span>Instagram</span>
+                <div class="vp-affix"><i class="vp-affix-text">ig</i><input v-model="formData.general.instagram_page" type="url" class="sp-input" placeholder="https://instagram.com/yourpage" /></div>
+              </label>
+            </div>
+          </fieldset>
+
+          <footer class="vp-save">
+            <p>Changes show on your shop page once saved.</p>
+            <button type="submit" class="sp-btn sp-btn-primary" :disabled="generalForm.isSubmitting">{{ generalForm.isSubmitting ? "Saving…" : "Save changes" }}</button>
+          </footer>
+        </form>
+
+        <!-- ── Payouts ── -->
+        <form v-else-if="activeTab === 'payment'" class="sp-card vp-card" novalidate @submit.prevent="updatePaymentDetails">
+          <header class="vp-card-head">
+            <h2>Payouts</h2>
+            <p>Where we send the money from your sales.</p>
+          </header>
+
+          <div v-if="paymentForm.successMsg" class="sp-banner success vp-banner" role="status">
+            <span v-html="ICONS.check"></span>{{ paymentForm.successMsg }}
+            <button type="button" aria-label="Dismiss" @click="paymentForm.successMsg = ''" v-html="ICONS.close"></button>
+          </div>
+          <div v-if="paymentForm.errorMsg" class="sp-banner error vp-banner" role="alert">
+            <span v-html="ICONS.alert"></span>{{ paymentForm.errorMsg }}
+            <button type="button" aria-label="Dismiss" @click="paymentForm.errorMsg = ''" v-html="ICONS.close"></button>
           </div>
 
-          <transition name="alert-slide">
-            <div v-if="generalForm.successMsg" class="alert-banner success">
-              <span class="alert-icon" aria-hidden="true" v-html="ICONS.check"></span>
-              <span>{{ generalForm.successMsg }}</span>
-              <button
-                class="alert-dismiss"
-                @click="generalForm.successMsg = ''"
-              >
-                ✕
-              </button>
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.wallet"></span>Payout method</legend>
+            <div class="vp-choices" role="radiogroup" aria-label="Payout method">
+              <label v-for="m in PAYOUT_METHODS" :key="m.value" class="vp-choice" :class="{ on: formData.payment.payout_method === m.value }">
+                <input v-model="formData.payment.payout_method" type="radio" name="payout" :value="m.value" />
+                <span class="vp-choice-icon" v-html="ICONS[m.icon]"></span>
+                <span class="vp-choice-text"><b>{{ m.label }}</b><small>{{ m.hint }}</small></span>
+                <span class="vp-choice-tick" aria-hidden="true" v-html="ICONS.check"></span>
+              </label>
             </div>
-          </transition>
-          <transition name="alert-slide">
-            <div v-if="generalForm.errorMsg" class="alert-banner error">
-              <span class="alert-icon" aria-hidden="true" v-html="ICONS.alert"></span>
-              <span>{{ generalForm.errorMsg }}</span>
-              <button class="alert-dismiss" @click="generalForm.errorMsg = ''">
-                ✕
-              </button>
-            </div>
-          </transition>
+            <small v-if="paymentForm.errors.payout_method" class="sp-error">{{ paymentForm.errors.payout_method }}</small>
+          </fieldset>
 
-          <form @submit.prevent="updateGeneralInfo" class="profile-form">
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Store Name *</label>
-                <input
-                  type="text"
-                  v-model="formData.general.store_name"
-                  class="form-input"
-                  :class="{ 'is-invalid': generalForm.errors.store_name }"
-                  placeholder="Your store name"
-                  required
-                  @input="generalForm.clearError('store_name')"
-                />
-                <span
-                  v-if="generalForm.errors.store_name"
-                  class="field-error"
-                  >{{ generalForm.errors.store_name }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Owner Name *</label>
-                <input
-                  type="text"
-                  v-model="formData.general.owner_name"
-                  class="form-input"
-                  :class="{ 'is-invalid': generalForm.errors.owner_name }"
-                  placeholder="Your full name"
-                  required
-                  @input="generalForm.clearError('owner_name')"
-                />
-                <span
-                  v-if="generalForm.errors.owner_name"
-                  class="field-error"
-                  >{{ generalForm.errors.owner_name }}</span
-                >
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Store Description</label>
-                <textarea
-                  v-model="formData.general.store_description"
-                  class="form-input"
-                  rows="4"
-                  placeholder="Describe your store..."
-                ></textarea>
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Store Address *</label>
-                <input
-                  type="text"
-                  v-model="formData.general.store_address"
-                  class="form-input"
-                  :class="{ 'is-invalid': generalForm.errors.store_address }"
-                  placeholder="Complete store address"
-                  required
-                  @input="generalForm.clearError('store_address')"
-                />
-                <span
-                  v-if="generalForm.errors.store_address"
-                  class="field-error"
-                  >{{ generalForm.errors.store_address }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Contact Number *</label>
-                <input
-                  type="tel"
-                  v-model="formData.general.contact_number"
-                  v-phone
-                  class="form-input"
-                  :class="{ 'is-invalid': generalForm.errors.contact_number }"
-                  required
-                  @input="generalForm.clearError('contact_number')"
-                />
-                <span
-                  v-if="generalForm.errors.contact_number"
-                  class="field-error"
-                  >{{ generalForm.errors.contact_number }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Service Areas</label>
-                <input
-                  type="text"
-                  v-model="formData.general.service_areas"
-                  class="form-input"
-                  placeholder="e.g., Manila, Quezon City"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Operating Hours</label>
-                <input
-                  type="text"
-                  v-model="formData.general.operating_hours"
-                  class="form-input"
-                  placeholder="Mon-Fri: 9AM-6PM"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Position/Role</label>
-                <input
-                  type="text"
-                  v-model="formData.general.position"
-                  class="form-input"
-                  placeholder="Owner, Manager, etc."
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Facebook Page</label>
-                <input
-                  type="url"
-                  v-model="formData.general.facebook_page"
-                  class="form-input"
-                  placeholder="https://facebook.com/yourpage"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Instagram Page</label>
-                <input
-                  type="url"
-                  v-model="formData.general.instagram_page"
-                  class="form-input"
-                  placeholder="https://instagram.com/yourpage"
-                />
-              </div>
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.card"></span>Account</legend>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span>Account holder name</span>
+                <input v-model="formData.payment.account_holder_name" class="sp-input" :class="{ invalid: paymentForm.errors.account_holder_name }" placeholder="Full name on the account" required @input="paymentForm.clearError('account_holder_name')" />
+                <small v-if="paymentForm.errors.account_holder_name" class="sp-error">{{ paymentForm.errors.account_holder_name }}</small>
+              </label>
+              <label class="sp-field">
+                <span>{{ formData.payment.payout_method === "bank" ? "Bank" : "Provider" }}</span>
+                <input v-model="formData.payment.bank_name" class="sp-input" :class="{ invalid: paymentForm.errors.bank_name }" :placeholder="formData.payment.payout_method === 'bank' ? 'e.g. BDO, BPI, Metrobank' : 'e.g. GCash, Maya'" required @input="paymentForm.clearError('bank_name')" />
+                <small v-if="paymentForm.errors.bank_name" class="sp-error">{{ paymentForm.errors.bank_name }}</small>
+              </label>
+              <label class="sp-field sp-span-all">
+                <span>{{ formData.payment.payout_method === "bank" ? "Account number" : "Account or mobile number" }}</span>
+                <input v-model="formData.payment.account_number" class="sp-input" :class="{ invalid: paymentForm.errors.account_number }" inputmode="numeric" autocomplete="off" required @input="paymentForm.clearError('account_number')" />
+                <small v-if="paymentForm.errors.account_number" class="sp-error">{{ paymentForm.errors.account_number }}</small>
+              </label>
+              <label class="sp-field sp-span-all">
+                <span>Billing address</span>
+                <textarea v-model="formData.payment.billing_address" class="sp-textarea" rows="3" placeholder="Complete billing address" required></textarea>
+                <small v-if="paymentForm.errors.billing_address" class="sp-error">{{ paymentForm.errors.billing_address }}</small>
+              </label>
             </div>
-            <div class="form-actions">
-              <button
-                type="submit"
-                class="btn-primary"
-                :disabled="generalForm.isSubmitting"
-              >
-                <span v-if="generalForm.isSubmitting" class="btn-spinner-wrap"
-                  ><span class="btn-spinner"></span> Saving...</span
-                >
-                <span v-else>Save Changes</span>
-              </button>
-            </div>
-          </form>
-        </div>
+          </fieldset>
 
-        <!-- ══════════ Payment Details ══════════ -->
-        <div v-if="activeTab === 'payment'" class="tab-panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Payment Details</h2>
-            <p class="panel-description">
-              Configure your payout and billing information
-            </p>
+          <p class="vp-note"><span v-html="ICONS.lock"></span>Stored securely. Only used to send your payouts and to let customers pay you.</p>
+
+          <footer class="vp-save">
+            <p>We'll use these details for your next payout.</p>
+            <button type="submit" class="sp-btn sp-btn-primary" :disabled="paymentForm.isSubmitting">{{ paymentForm.isSubmitting ? "Saving…" : "Save payout details" }}</button>
+          </footer>
+        </form>
+
+        <!-- ── Products & pricing ── -->
+        <form v-else-if="activeTab === 'product'" class="sp-card vp-card" novalidate @submit.prevent="updateProductDetails">
+          <header class="vp-card-head">
+            <h2>Products &amp; pricing</h2>
+            <p>What you sell and your usual price range.</p>
+          </header>
+
+          <div v-if="productForm.successMsg" class="sp-banner success vp-banner" role="status">
+            <span v-html="ICONS.check"></span>{{ productForm.successMsg }}
+            <button type="button" aria-label="Dismiss" @click="productForm.successMsg = ''" v-html="ICONS.close"></button>
+          </div>
+          <div v-if="productForm.errorMsg" class="sp-banner error vp-banner" role="alert">
+            <span v-html="ICONS.alert"></span>{{ productForm.errorMsg }}
+            <button type="button" aria-label="Dismiss" @click="productForm.errorMsg = ''" v-html="ICONS.close"></button>
           </div>
 
-          <transition name="alert-slide">
-            <div v-if="paymentForm.successMsg" class="alert-banner success">
-              <span class="alert-icon" aria-hidden="true" v-html="ICONS.check"></span>
-              <span>{{ paymentForm.successMsg }}</span>
-              <button
-                class="alert-dismiss"
-                @click="paymentForm.successMsg = ''"
-              >
-                ✕
-              </button>
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.flower"></span>What you sell <em>{{ formData.product.product_types.length }} picked</em></legend>
+            <div class="vp-chips">
+              <label v-for="type in productTypeOptions" :key="type.value" class="vp-chip" :class="{ on: formData.product.product_types.includes(type.value) }">
+                <input v-model="formData.product.product_types" type="checkbox" :value="type.value" />
+                <span v-if="formData.product.product_types.includes(type.value)" class="vp-chip-tick" v-html="ICONS.check"></span>{{ type.label }}
+              </label>
             </div>
-          </transition>
-          <transition name="alert-slide">
-            <div v-if="paymentForm.errorMsg" class="alert-banner error">
-              <span class="alert-icon" aria-hidden="true" v-html="ICONS.alert"></span>
-              <span>{{ paymentForm.errorMsg }}</span>
-              <button class="alert-dismiss" @click="paymentForm.errorMsg = ''">
-                ✕
-              </button>
-            </div>
-          </transition>
+            <small v-if="productForm.errors.product_types" class="sp-error">{{ productForm.errors.product_types }}</small>
+          </fieldset>
 
-          <form @submit.prevent="updatePaymentDetails" class="profile-form">
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Payout Method *</label>
-                <select
-                  v-model="formData.payment.payout_method"
-                  class="form-input"
-                  required
-                >
-                  <option value="">Select payout method</option>
-                  <option value="bank">Bank Transfer</option>
-                  <option value="gcash">GCash</option>
-                  <option value="maya">Maya</option>
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.tag"></span>Price range</legend>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span>From</span>
+                <div class="vp-affix"><i class="vp-affix-text">₱</i><input v-model.number="formData.product.price_min" type="number" step="0.01" min="0" class="sp-input" :class="{ invalid: productForm.errors.price_min }" placeholder="500.00" required @input="productForm.clearError('price_min')" /></div>
+                <small v-if="productForm.errors.price_min" class="sp-error">{{ productForm.errors.price_min }}</small>
+              </label>
+              <label class="sp-field">
+                <span>Up to</span>
+                <div class="vp-affix"><i class="vp-affix-text">₱</i><input v-model.number="formData.product.price_max" type="number" step="0.01" :min="formData.product.price_min || 0" class="sp-input" :class="{ invalid: productForm.errors.price_max }" placeholder="5,000.00" required @input="productForm.clearError('price_max')" /></div>
+                <small v-if="productForm.errors.price_max" class="sp-error">{{ productForm.errors.price_max }}</small>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.truck"></span>Same-day delivery</legend>
+            <div class="vp-choices two" role="radiogroup" aria-label="Same-day delivery">
+              <label class="vp-choice" :class="{ on: formData.product.same_day_delivery === true }">
+                <input v-model="formData.product.same_day_delivery" type="radio" name="sameday" :value="true" />
+                <span class="vp-choice-icon" v-html="ICONS.sparkle"></span>
+                <span class="vp-choice-text"><b>Yes, same day</b><small>Orders can arrive today</small></span>
+                <span class="vp-choice-tick" aria-hidden="true" v-html="ICONS.check"></span>
+              </label>
+              <label class="vp-choice" :class="{ on: formData.product.same_day_delivery === false }">
+                <input v-model="formData.product.same_day_delivery" type="radio" name="sameday" :value="false" />
+                <span class="vp-choice-icon" v-html="ICONS.calendar"></span>
+                <span class="vp-choice-text"><b>Standard only</b><small>Delivered on a later day</small></span>
+                <span class="vp-choice-tick" aria-hidden="true" v-html="ICONS.check"></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="vp-group">
+            <legend><span v-html="ICONS.clock"></span>Order cutoff times <em>optional</em></legend>
+            <p class="vp-group-hint">The latest time customers can order on each day.</p>
+            <ul v-if="formData.product.cutoff_times.length" class="vp-cutoffs">
+              <li v-for="(cutoff, index) in formData.product.cutoff_times" :key="index">
+                <select v-model="cutoff.day" class="sp-select" aria-label="Day" required>
+                  <option value="">Pick a day</option>
+                  <option v-for="d in WEEKDAYS" :key="d" :value="d">{{ d }}</option>
                 </select>
-                <span
-                  v-if="paymentForm.errors.payout_method"
-                  class="field-error"
-                  >{{ paymentForm.errors.payout_method }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Account Holder Name *</label>
-                <input
-                  type="text"
-                  v-model="formData.payment.account_holder_name"
-                  class="form-input"
-                  :class="{
-                    'is-invalid': paymentForm.errors.account_holder_name,
-                  }"
-                  placeholder="Full name on account"
-                  required
-                  @input="paymentForm.clearError('account_holder_name')"
-                />
-                <span
-                  v-if="paymentForm.errors.account_holder_name"
-                  class="field-error"
-                  >{{ paymentForm.errors.account_holder_name }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Account Number *</label>
-                <input
-                  type="text"
-                  v-model="formData.payment.account_number"
-                  class="form-input"
-                  :class="{ 'is-invalid': paymentForm.errors.account_number }"
-                  placeholder="Account/mobile number"
-                  required
-                  @input="paymentForm.clearError('account_number')"
-                />
-                <span
-                  v-if="paymentForm.errors.account_number"
-                  class="field-error"
-                  >{{ paymentForm.errors.account_number }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Bank/Provider Name *</label>
-                <input
-                  type="text"
-                  v-model="formData.payment.bank_name"
-                  class="form-input"
-                  :class="{ 'is-invalid': paymentForm.errors.bank_name }"
-                  :placeholder="
-                    formData.payment.payout_method === 'bank'
-                      ? 'e.g., BDO, BPI, Metrobank'
-                      : 'e.g., GCash, Maya'
-                  "
-                  required
-                  @input="paymentForm.clearError('bank_name')"
-                />
-                <span v-if="paymentForm.errors.bank_name" class="field-error">{{
-                  paymentForm.errors.bank_name
-                }}</span>
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Billing Address *</label>
-                <textarea
-                  v-model="formData.payment.billing_address"
-                  class="form-input"
-                  rows="3"
-                  placeholder="Complete billing address"
-                  required
-                ></textarea>
-                <span
-                  v-if="paymentForm.errors.billing_address"
-                  class="field-error"
-                  >{{ paymentForm.errors.billing_address }}</span
-                >
-              </div>
-            </div>
-            <div class="info-box">
-              <span class="info-icon" aria-hidden="true" v-html="ICONS.help"></span>
-              <p>
-                Your payment information is stored securely and used to process
-                vendor payouts and enable payment options for customers.
-              </p>
-            </div>
-            <div class="form-actions">
-              <button
-                type="submit"
-                class="btn-primary"
-                :disabled="paymentForm.isSubmitting"
-              >
-                <span v-if="paymentForm.isSubmitting" class="btn-spinner-wrap"
-                  ><span class="btn-spinner"></span> Saving...</span
-                >
-                <span v-else>Save Payment Details</span>
-              </button>
-            </div>
-          </form>
-        </div>
+                <input v-model="cutoff.time" type="time" class="sp-input" aria-label="Cutoff time" required />
+                <button type="button" class="sp-icon-btn" :aria-label="`Remove ${cutoff.day || 'this'} cutoff`" @click="removeCutoffTime(index)" v-html="ICONS.trash"></button>
+              </li>
+            </ul>
+            <button type="button" class="vp-add" @click="addCutoffTime"><span v-html="ICONS.plus"></span>Add a cutoff day</button>
+          </fieldset>
 
-        <!-- ══════════ Product Details ══════════ -->
-        <div v-if="activeTab === 'product'" class="tab-panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Product Details</h2>
-            <p class="panel-description">
-              Specify the types of products you offer
-            </p>
-          </div>
-
-          <transition name="alert-slide">
-            <div v-if="productForm.successMsg" class="alert-banner success">
-              <span class="alert-icon" aria-hidden="true" v-html="ICONS.check"></span>
-              <span>{{ productForm.successMsg }}</span>
-              <button
-                class="alert-dismiss"
-                @click="productForm.successMsg = ''"
-              >
-                ✕
-              </button>
-            </div>
-          </transition>
-          <transition name="alert-slide">
-            <div v-if="productForm.errorMsg" class="alert-banner error">
-              <span class="alert-icon" aria-hidden="true" v-html="ICONS.alert"></span>
-              <span>{{ productForm.errorMsg }}</span>
-              <button class="alert-dismiss" @click="productForm.errorMsg = ''">
-                ✕
-              </button>
-            </div>
-          </transition>
-
-          <form @submit.prevent="updateProductDetails" class="profile-form">
-            <div class="form-grid">
-              <div class="form-group full-width">
-                <label class="form-label">Product Types *</label>
-                <div class="checkbox-group">
-                  <label
-                    v-for="type in productTypeOptions"
-                    :key="type.value"
-                    class="checkbox-label"
-                  >
-                    <input
-                      type="checkbox"
-                      :value="type.value"
-                      v-model="formData.product.product_types"
-                      class="checkbox-input"
-                    />
-                    <span>{{ type.label }}</span>
-                  </label>
-                </div>
-                <span
-                  v-if="productForm.errors.product_types"
-                  class="field-error"
-                  >{{ productForm.errors.product_types }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Minimum Price (₱) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  v-model.number="formData.product.price_min"
-                  class="form-input"
-                  :class="{ 'is-invalid': productForm.errors.price_min }"
-                  placeholder="e.g., 500.00"
-                  required
-                  @input="productForm.clearError('price_min')"
-                />
-                <span v-if="productForm.errors.price_min" class="field-error">{{
-                  productForm.errors.price_min
-                }}</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Maximum Price (₱) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  :min="formData.product.price_min || 0"
-                  v-model.number="formData.product.price_max"
-                  class="form-input"
-                  :class="{ 'is-invalid': productForm.errors.price_max }"
-                  placeholder="e.g., 5000.00"
-                  required
-                  @input="productForm.clearError('price_max')"
-                />
-                <span v-if="productForm.errors.price_max" class="field-error">{{
-                  productForm.errors.price_max
-                }}</span>
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Same-Day Delivery *</label>
-                <div class="radio-group">
-                  <label class="radio-label">
-                    <input
-                      type="radio"
-                      :value="true"
-                      v-model="formData.product.same_day_delivery"
-                      class="radio-input"
-                    />
-                    <span>Yes, I offer same-day delivery</span>
-                  </label>
-                  <label class="radio-label">
-                    <input
-                      type="radio"
-                      :value="false"
-                      v-model="formData.product.same_day_delivery"
-                      class="radio-input"
-                    />
-                    <span>No, standard delivery only</span>
-                  </label>
-                </div>
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">
-                  Order Cutoff Times
-                  <span class="label-hint"
-                    >(Define cutoff times for different days)</span
-                  >
-                </label>
-                <div class="cutoff-times-list">
-                  <div
-                    v-for="(cutoff, index) in formData.product.cutoff_times"
-                    :key="index"
-                    class="cutoff-time-item"
-                  >
-                    <select
-                      v-model="cutoff.day"
-                      class="form-input cutoff-day"
-                      required
-                    >
-                      <option value="">Select Day</option>
-                      <option value="Monday">Monday</option>
-                      <option value="Tuesday">Tuesday</option>
-                      <option value="Wednesday">Wednesday</option>
-                      <option value="Thursday">Thursday</option>
-                      <option value="Friday">Friday</option>
-                      <option value="Saturday">Saturday</option>
-                      <option value="Sunday">Sunday</option>
-                    </select>
-                    <input
-                      type="time"
-                      v-model="cutoff.time"
-                      class="form-input cutoff-time"
-                      required
-                    />
-                    <button
-                      type="button"
-                      @click="removeCutoffTime(index)"
-                      class="btn-remove"
-                      title="Remove"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click="addCutoffTime"
-                  class="btn-add-cutoff"
-                >
-                  <span class="add-icon">+</span> Add Cutoff Day
-                </button>
-              </div>
-            </div>
-            <div class="form-actions">
-              <button
-                type="submit"
-                class="btn-primary"
-                :disabled="productForm.isSubmitting"
-              >
-                <span v-if="productForm.isSubmitting" class="btn-spinner-wrap"
-                  ><span class="btn-spinner"></span> Saving...</span
-                >
-                <span v-else>Save Product Details</span>
-              </button>
-            </div>
-          </form>
-        </div>
-
+          <footer class="vp-save">
+            <p>Shown to customers when they browse and order.</p>
+            <button type="submit" class="sp-btn sp-btn-primary" :disabled="productForm.isSubmitting">{{ productForm.isSubmitting ? "Saving…" : "Save product details" }}</button>
+          </footer>
+        </form>
       </div>
-      <!-- end tab-content -->
-    </main>
+    </div>
 
-    <!-- Store Logo / Cover Upload Modal -->
-    <transition name="modal-fade">
-      <div
-        v-if="showUploadModal"
-        class="modal-overlay"
-        @click="closeUploadModal"
-      >
-        <div class="modal-container" @click.stop>
-          <div class="modal-header">
-            <h3 class="modal-title">{{ uploadConfig.title }}</h3>
-            <button class="modal-close" @click="closeUploadModal">✕</button>
+    <!-- ══════════ Logo / cover upload ══════════ -->
+    <Transition name="sp-fade"><div v-if="showUploadModal" class="sp-backdrop" @click="closeUploadModal"></div></Transition>
+    <Transition name="sp-pop">
+      <div v-if="showUploadModal" class="sp-modal-wrap">
+        <div class="sp-modal vp-upload" role="dialog" aria-modal="true" aria-labelledby="vp-up-title">
+          <div class="sp-modal-head">
+            <div><h3 id="vp-up-title">{{ uploadConfig.title }}</h3><p>{{ uploadConfig.hint }}</p></div>
+            <button type="button" class="sp-icon-btn" aria-label="Close" @click="closeUploadModal" v-html="ICONS.close"></button>
           </div>
-          <div class="modal-body">
-            <div
-              class="photo-upload-area"
-              :class="{ 'photo-upload-area--cover': uploadKind === 'cover' }"
-              @click="$refs.imageInput.click()"
-            >
-              <div v-if="imagePreview" class="photo-preview">
-                <img :src="imagePreview" alt="Preview" />
-              </div>
-              <div v-else class="photo-placeholder">
-                <span class="upload-icon" aria-hidden="true" v-html="uploadKind === 'cover' ? ICONS.image : ICONS.store"></span>
-                <p class="upload-text">{{ uploadConfig.prompt }}</p>
-                <p class="upload-hint">{{ uploadConfig.hint }}</p>
-              </div>
-            </div>
-            <input
-              type="file"
-              ref="imageInput"
-              @change="handleImageSelect"
-              :accept="uploadConfig.accept"
-              class="hidden-input"
-            />
-          </div>
-          <div class="modal-footer">
-            <button class="btn-secondary" @click="closeUploadModal">
-              Cancel
-            </button>
-            <button
-              class="btn-primary"
-              @click="uploadStoreImage"
-              :disabled="!selectedImage || isUploading"
-            >
-              <span v-if="isUploading">Uploading...</span>
-              <span v-else>{{ uploadConfig.button }}</span>
-            </button>
+          <button type="button" class="vp-drop" :class="{ cover: uploadKind === 'cover', has: imagePreview }" @click="$refs.imageInput.click()">
+            <img v-if="imagePreview" :src="imagePreview" alt="Preview" />
+            <span v-else class="vp-drop-empty">
+              <span class="vp-drop-icon" v-html="uploadKind === 'cover' ? ICONS.image : ICONS.store"></span>
+              <b>{{ uploadConfig.prompt }}</b>
+            </span>
+          </button>
+          <input ref="imageInput" type="file" :accept="uploadConfig.accept" class="sr-only" @change="handleImageSelect" />
+          <div class="sp-modal-foot">
+            <button type="button" class="sp-btn sp-btn-ghost" @click="closeUploadModal">Cancel</button>
+            <button type="button" class="sp-btn sp-btn-primary" :disabled="!selectedImage || isUploading" @click="uploadStoreImage">{{ isUploading ? "Uploading…" : uploadConfig.button }}</button>
           </div>
         </div>
       </div>
-    </transition>
-  </div>
+    </Transition>
+  </ShopLayout>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from "vue";
 import { passwordOk } from "../../utils/passwordRules";
-import vendorHeader from "../../layouts/vendorHeader.vue";
 import { useRoute, useRouter } from "vue-router";
-import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
+import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
+import "../../components/vendor/shop/shop.css";
 import "../../styles/bloomcraft.css";
 import api from "../../plugins/axios";
 import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
@@ -801,6 +374,22 @@ const paymentForm = useFormSubmit();
 const productForm = useFormSubmit();
 const deliveryForm = useFormSubmit();
 const passwordForm = useFormSubmit();
+
+// ── Page layout ───────────────────────────────────────────────────────────
+// The settings menu. "to" items live on their own pages; "todo" shows a dot until that part is filled in.
+const TABS = [
+  { key: "general", label: "Store profile", hint: "Name, about, contact", icon: "store" },
+  { key: "payment", label: "Payouts", hint: "Where your money goes", icon: "wallet", todo: "payment_details_completed" },
+  { key: "product", label: "Products & pricing", hint: "What you sell, price range", icon: "flower", todo: "product_details_completed" },
+  { key: "delivery", label: "Delivery", hint: "In Shop settings", icon: "truck", to: { name: "VendorShopSettings" }, todo: "delivery_details_completed" },
+  { key: "security", label: "Password & security", hint: "In Security", icon: "lock", to: { name: "VendorSecurity" } },
+];
+const PAYOUT_METHODS = [
+  { value: "bank", label: "Bank transfer", hint: "Any local bank", icon: "store" },
+  { value: "gcash", label: "GCash", hint: "To your GCash number", icon: "phone" },
+  { value: "maya", label: "Maya", hint: "To your Maya number", icon: "phone" },
+];
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 // ── Page state ────────────────────────────────────────────────────────────
 const activeTab = ref("general");
@@ -1204,6 +793,19 @@ const UPLOAD_KINDS = {
 };
 const uploadConfig = computed(() => UPLOAD_KINDS[uploadKind.value]);
 
+// ── Header bits ───────────────────────────────────────────────────────────
+// "Bloom & Co" → "BC", for a shop without a logo yet
+const initials = computed(() => {
+  const words = String(profileData.store_name || "").trim().split(/\s+/).filter((w) => /[a-z0-9]/i.test(w));
+  return (words.length ? words.slice(0, 2).map((w) => w[0]).join("") : "BC").toUpperCase();
+});
+const completion = computed(() => Math.max(0, Math.min(100, Math.round(Number(profileData.profile_completion_percentage) || 0))));
+const steps = computed(() => [
+  { key: "payment", label: "Payouts", icon: "wallet", done: !!profileData.payment_details_completed, go: () => (activeTab.value = "payment") },
+  { key: "product", label: "Products & pricing", icon: "flower", done: !!profileData.product_details_completed, go: () => (activeTab.value = "product") },
+  { key: "delivery", label: "Delivery", icon: "truck", done: !!profileData.delivery_details_completed, go: () => router.push({ name: "VendorShopSettings" }) },
+]);
+
 const applyProfileResponse = (data) => {
   Object.assign(profileData, data);
   updateLocalProfile(data);
@@ -1293,43 +895,795 @@ onMounted(() => {
 onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 </script>
 
+
 <style scoped>
-* {
-  font-family: "Poppins", sans-serif;
-  box-sizing: border-box;
+/* ── Storefront header ─────────────────────────────────────────── */
+.vp-hero {
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 18px;
 }
-
-.vendor-profile-layout {
+.vp-cover {
+  position: relative;
+  aspect-ratio: 4 / 1;
+  min-height: 140px;
+  max-height: 240px;
+  width: 100%;
+  background: linear-gradient(120deg, var(--bc-accent-soft), var(--v-subtle-2));
+}
+.vp-cover img,
+.vp-cover-sk {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+}
+.vp-cover-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 16px 16px 40px;
+  text-align: center;
+  color: var(--v-muted);
+}
+.vp-cover-empty :deep(svg) {
+  width: 26px;
+  height: 26px;
+  color: var(--bc-accent-deep);
+}
+.vp-cover-empty p {
+  margin: 0;
+  font-size: 12.5px;
+}
+.vp-cover-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   display: flex;
-  min-height: 100vh;
-  background: linear-gradient(135deg, var(--v-bg) 0%, var(--v-subtle-2) 100%);
+  gap: 8px;
 }
-.profile-main {
-  margin-left: 260px;
+/* Frosted buttons that read on any photo */
+.vp-glass-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.vp-glass-btn:hover:not(:disabled) {
+  background: rgba(17, 24, 39, 0.72);
+}
+.vp-glass-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.vp-glass-btn :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+
+.vp-id {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 0 22px 18px;
+}
+.vp-logo {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  margin-top: -52px;
+  padding: 0;
+  overflow: hidden;
+  border: 4px solid var(--v-surface);
+  border-radius: 24px;
+  background: var(--v-subtle);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+  cursor: pointer;
+}
+.vp-logo img,
+.vp-logo-sk {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.vp-logo-fallback {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--bc-accent-deep);
+}
+.vp-logo-edit {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 24, 39, 0.5);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.vp-logo-edit :deep(svg) {
+  width: 22px;
+  height: 22px;
+}
+.vp-logo:hover .vp-logo-edit,
+.vp-logo:focus-visible .vp-logo-edit {
+  opacity: 1;
+}
+.vp-logo:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.vp-id-text {
   flex: 1;
-  padding: 28px;
-  max-width: 1400px;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding-top: 12px;
 }
-.subscription-card { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0 0 22px; padding: 21px 24px; background: var(--v-surface); border: 1px solid var(--v-border-strong); border-radius: 14px; box-shadow: 0 3px 12px rgba(15, 23, 42, .05); }
-.subscription-card__eyebrow { margin: 0 0 5px; color: var(--v-muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.subscription-card h2 { margin: 0 0 4px; color: var(--v-text); font-size: 20px; }
-.subscription-card p:not(.subscription-card__eyebrow) { margin: 0; color: var(--v-muted); font-size: 14px; }
-.subscription-card__status { margin-left: auto; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-.subscription-card__manage { color: var(--bc-accent-deep); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
-.subscription-card__manage:hover { text-decoration: underline; }
-.status-trialing { color: var(--v-blue-text); background: var(--v-blue-soft); }.status-active { color: var(--v-green-text); background: var(--v-green-soft); }.status-pending, .status-past_due { color: var(--v-amber-text); background: var(--v-amber-soft); }
+.vp-id-text h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--v-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vp-id-text p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--v-muted);
+}
+.vp-plan {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.vp-plan:hover {
+  text-decoration: underline;
+}
+.vp-plan :deep(svg) {
+  width: 13px;
+  height: 13px;
+}
+.vp-plan.status-expired,
+.vp-plan.status-past_due,
+.vp-plan.status-cancelled {
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
+}
 
-/* Completion card */
-.completion-card {
+/* Completion ring */
+.vp-ring {
+  --p: 0;
+  flex: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: conic-gradient(var(--bc-accent) calc(var(--p) * 1%), var(--v-subtle-2) 0);
+}
+.vp-ring::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
   background: var(--v-surface);
-  border-radius: 16px;
-  padding: 28px;
-  margin-bottom: 28px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--v-border-strong);
+}
+.vp-ring b,
+.vp-ring small {
+  position: relative;
+  line-height: 1.1;
+}
+.vp-ring b {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--v-text);
+}
+.vp-ring small {
+  font-size: 10px;
+  color: var(--v-muted);
 }
 
-/* ── Profile loading skeleton ─────────────────────────────────────────── */
+/* What's left */
+.vp-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--v-border);
+  list-style: none;
+}
+.vp-steps button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px dashed var(--v-border-strong);
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.vp-steps button:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+}
+.vp-steps button:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.vp-steps small {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--bc-accent-deep);
+}
+.vp-steps .done button {
+  border-style: solid;
+  border-color: var(--v-border);
+  color: var(--v-muted);
+  cursor: default;
+}
+.vp-steps .done small {
+  color: var(--v-green-text);
+}
+.vp-step-dot {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
+}
+.done .vp-step-dot {
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
+}
+.vp-step-dot :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── Menu + panel ──────────────────────────────────────────────── */
+.vp-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.vp-nav {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--v-border);
+  border-radius: 16px;
+  background: var(--v-surface);
+}
+.vp-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.vp-nav-item:hover:not(.on) {
+  background: var(--v-subtle);
+}
+.vp-nav-item.on {
+  background: var(--bc-accent-soft);
+}
+.vp-nav-item:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 1px;
+}
+.vp-nav-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
+}
+.on .vp-nav-icon {
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink, #fff);
+}
+.vp-nav-icon :deep(svg) {
+  width: 17px;
+  height: 17px;
+}
+.vp-nav-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.vp-nav-text b {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.vp-nav-text small {
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--v-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vp-nav-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--v-amber-text);
+}
+.vp-nav-go {
+  flex: none;
+  color: var(--v-faint);
+}
+.vp-nav-go :deep(svg) {
+  width: 16px;
+  height: 16px;
+}
+
+.vp-panel {
+  min-width: 0;
+}
+.vp-card {
+  padding: 22px 22px 0;
+}
+.vp-card-head {
+  margin-bottom: 18px;
+}
+.vp-card-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--v-text);
+}
+.vp-card-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--v-muted);
+}
+.vp-banner button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  text-decoration: none;
+}
+.sp-banner.success {
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
+}
+
+/* Field groups */
+.vp-group {
+  min-width: 0;
+  margin: 0 0 22px;
+  padding: 18px 0 0;
+  border: 0;
+  border-top: 1px solid var(--v-border);
+}
+.vp-group:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+.vp-group legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--v-text);
+}
+.vp-group legend :deep(svg) {
+  width: 16px;
+  height: 16px;
+  color: var(--bc-accent-deep);
+}
+.vp-group legend em,
+.vp-count {
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--v-faint);
+}
+.vp-count {
+  margin-left: auto;
+  float: right;
+}
+.vp-group-hint {
+  margin: -6px 0 12px;
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+
+/* Inputs with a small prefix (icon, ₱, fb) */
+.vp-affix {
+  position: relative;
+}
+.vp-affix i {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  transform: translateY(-50%);
+  font-style: normal;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v-faint);
+  pointer-events: none;
+}
+.vp-affix i :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.vp-affix .sp-input {
+  padding-left: 38px;
+}
+
+/* Choice cards (payout method, same-day) */
+.vp-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.vp-choices.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.vp-choice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--v-border);
+  border-radius: 14px;
+  background: var(--v-surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.vp-choice:hover:not(.on) {
+  border-color: var(--v-border-strong);
+}
+.vp-choice.on {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 14%, transparent);
+}
+.vp-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.vp-choice:has(input:focus-visible) {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.vp-choice-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
+}
+.on .vp-choice-icon {
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink, #fff);
+}
+.vp-choice-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.vp-choice-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.vp-choice-text b {
+  font-size: 13.5px;
+  color: var(--v-text);
+}
+.vp-choice-text small {
+  font-size: 11.5px;
+  color: var(--v-muted);
+}
+.vp-choice-tick {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink, #fff);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.on .vp-choice-tick {
+  opacity: 1;
+  transform: scale(1);
+}
+.vp-choice-tick :deep(svg) {
+  width: 12px;
+  height: 12px;
+}
+
+/* Product type chips */
+.vp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.vp-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 7px 14px;
+  border: 1.5px solid var(--v-border);
+  border-radius: 999px;
+  background: var(--v-surface);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--v-text-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.vp-chip:hover:not(.on) {
+  border-color: var(--v-border-strong);
+}
+.vp-chip.on {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+  font-weight: 600;
+}
+.vp-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.vp-chip:has(input:focus-visible) {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.vp-chip-tick :deep(svg) {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+/* Cutoff rows */
+.vp-cutoffs {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.vp-cutoffs li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px auto;
+  gap: 8px;
+  align-items: center;
+}
+.vp-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1.5px dashed var(--v-border-strong);
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bc-accent-deep);
+  cursor: pointer;
+}
+.vp-add:hover {
+  border-style: solid;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+}
+.vp-add:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.vp-add :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+
+.vp-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--v-subtle);
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+.vp-note :deep(svg) {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--bc-accent-deep);
+}
+
+/* Save bar, stuck to the bottom of the card while scrolling */
+.vp-save {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 -22px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--v-border);
+  border-radius: 0 0 16px 16px;
+  background: color-mix(in srgb, var(--v-surface) 92%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.vp-save p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+
+/* Upload modal */
+.vp-upload {
+  max-width: 520px;
+}
+.vp-drop {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 300px;
+  margin: 4px 0 16px;
+  padding: 0;
+  overflow: hidden;
+  border: 1.5px dashed var(--v-border-strong);
+  border-radius: 16px;
+  background: var(--v-subtle);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.vp-drop.cover {
+  aspect-ratio: 3 / 1;
+}
+.vp-drop:hover {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+}
+.vp-drop:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.vp-drop.has {
+  border-style: solid;
+}
+.vp-drop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.vp-drop-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--v-text);
+  font-size: 13.5px;
+}
+.vp-drop-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+}
+.vp-drop-icon :deep(svg) {
+  width: 22px;
+  height: 22px;
+}
+
+/* Skeletons */
+.vp-sk-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0 22px;
+}
+.vp-sk-input {
+  height: 42px;
+  border-radius: 10px;
+}
+.vp-logo-sk {
+  display: block;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1338,948 +1692,78 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
-.sk-heading {
-  height: 28px;
-  width: 260px;
-  max-width: 70%;
-  margin-bottom: 10px;
-}
-.sk-subheading {
-  height: 14px;
-  width: 360px;
-  max-width: 90%;
-  margin-bottom: 28px;
-}
-.sk-media {
-  height: 220px;
-  border-radius: 16px;
-  margin-bottom: 28px;
-}
-.sk-fields {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-.sk-label {
-  height: 12px;
-  width: 40%;
-  margin-bottom: 10px;
-}
-.sk-input {
-  height: 46px;
-}
-@media (max-width: 640px) {
-  .sk-fields {
-    grid-template-columns: 1fr;
+
+/* ── Smaller screens ───────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .vp-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
-
-.store-media {
-  margin-bottom: 22px;
-  border: 1px solid var(--v-border-strong);
-  border-radius: 16px;
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--v-green-soft) 0%, var(--v-blue-soft) 100%);
-}
-
-.store-media__cover {
-  position: relative;
-  aspect-ratio: 3 / 1;
-  max-height: 260px;
-  width: 100%;
-  background: linear-gradient(135deg, var(--v-green-soft) 0%, var(--v-blue-soft) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.store-media__cover img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.store-media__cover-empty {
-  margin: 0;
-  padding: 0 16px;
-  color: var(--v-muted);
-  font-size: 14px;
-  text-align: center;
-}
-
-.store-media__cover-actions {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  display: flex;
-  gap: 8px;
-}
-
-.store-media__btn {
-  padding: 8px 14px;
-  border: none;
-  border-radius: 8px;
-  background: var(--v-glass);
-  color: var(--v-text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-
-.store-media__btn:hover {
-  background: var(--v-surface);
-}
-
-.store-media__btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.logo-card {
-  display: grid;
-  grid-template-columns: 88px 1fr auto;
-  gap: 18px;
-  align-items: center;
-  padding: 0 20px 20px;
-}
-
-/* The logo overlaps the bottom of the cover, as on the storefront */
-.logo-card__preview {
-  margin-top: -36px;
-  position: relative;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-}
-
-.photo-upload-area--cover {
-  aspect-ratio: 3 / 1;
-}
-
-@media (max-width: 640px) {
-  .logo-card {
-    grid-template-columns: 72px 1fr;
-  }
-  .store-media .logo-card__preview {
-    width: 72px;
-    height: 72px;
-  }
-  .logo-card__action {
-    grid-column: 1 / -1;
-  }
-}
-
-.logo-card__preview {
-  width: 88px;
-  height: 88px;
-  border-radius: 20px;
-  overflow: hidden;
-  background: var(--v-surface);
-  border: 1px solid var(--v-border-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logo-card__preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.logo-card__fallback {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--bc-accent-deep);
-}
-
-.logo-card__title {
-  margin: 0 0 6px;
-  font-size: 18px;
-  color: var(--v-text);
-}
-
-.logo-card__text {
-  margin: 0;
-  color: var(--v-muted);
-  line-height: 1.5;
-}
-
-.logo-card__action {
-  white-space: nowrap;
-}
-.completion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.completion-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--v-text);
-  margin: 0 0 4px 0;
-}
-.completion-subtitle {
-  font-size: 14px;
-  color: var(--v-muted);
-  margin: 0;
-}
-.completion-percentage {
-  font-size: 36px;
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--bc-accent) 0%, var(--bc-accent-hover) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.completion-bar-container {
-  height: 10px;
-  background: var(--v-subtle-2);
-  border-radius: 10px;
-  overflow: hidden;
-  margin-bottom: 20px;
-}
-.completion-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--bc-accent) 0%, var(--bc-accent-hover) 100%);
-  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 10px;
-  box-shadow: 0 0 10px color-mix(in srgb, var(--bc-accent) 50%, transparent);
-}
-.completion-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 14px;
-}
-.completion-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  background: var(--v-subtle);
-  border-radius: 12px;
-  border: 2px solid transparent;
-  transition: all 0.3s;
-}
-.completion-item.completed {
-  background: var(--v-green-soft);
-  border-color: var(--bc-accent);
-}
-.completion-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  background: var(--v-subtle-2);
-  color: var(--v-faint);
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.completion-item.completed .completion-icon {
-  background: var(--bc-accent);
-  color: var(--bc-accent-ink);
-}
-.completion-text {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--v-text-2);
-}
-.completion-action {
-  padding: 6px 14px;
-  background: var(--bc-accent);
-  color: var(--bc-accent-ink);
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.completion-action:hover {
-  background: var(--bc-accent-hover);
-  transform: translateX(2px);
-}
-
-/* Tabs */
-.profile-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 28px;
-  padding: 6px;
-  background: var(--v-surface);
-  border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  overflow-x: auto;
-}
-.tab-button {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: transparent;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--v-muted);
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-  font-family: inherit;
-}
-.tab-button:hover {
-  color: var(--v-text-2);
-  background: var(--v-subtle);
-}
-.tab-button.active {
-  background: linear-gradient(135deg, var(--bc-accent) 0%, var(--bc-accent-hover) 100%);
-  color: var(--bc-accent-ink);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--bc-accent) 25%, transparent);
-}
-.tab-icon,
-.alert-icon,
-.info-icon {
-  display: inline-grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-.tab-icon :deep(svg),
-.alert-icon :deep(svg),
-.info-icon :deep(svg) {
-  width: 18px;
-  height: 18px;
-}
-.tab-badge {
-  width: 18px;
-  height: 18px;
-  background: #ef4444;
-  color: white;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tab-button.active .tab-badge {
-  background: var(--v-surface);
-  color: var(--bc-accent);
-}
-.tab-content {
-  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Tab panel */
-.tab-panel {
-  background: var(--v-surface);
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--v-border-strong);
-}
-.panel-header {
-  margin-bottom: 32px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid var(--v-border-strong);
-}
-.panel-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--v-text);
-  margin: 0 0 8px 0;
-}
-.panel-description {
-  font-size: 15px;
-  color: var(--v-muted);
-  margin: 0;
-}
-
-/* Alert banners */
-.alert-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  font-size: 14px;
-  font-weight: 500;
-  border: 1px solid transparent;
-}
-.alert-banner.success {
-  background: var(--v-green-soft);
-  color: var(--v-green-text);
-  border-color: #a7f3d0;
-}
-.alert-banner.error {
-  background: var(--v-red-soft);
-  color: var(--v-red-text);
-  border-color: #fca5a5;
-}
-.alert-banner span:nth-child(2) {
-  flex: 1;
-}
-.alert-dismiss {
-  margin-left: auto;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  color: inherit;
-  opacity: 0.6;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition:
-    opacity 0.2s,
-    background 0.2s;
-}
-.alert-dismiss:hover {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.06);
-}
-.alert-slide-enter-active {
-  transition: all 0.25s ease;
-}
-.alert-slide-leave-active {
-  transition: all 0.2s ease;
-}
-.alert-slide-enter-from,
-.alert-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-  max-height: 0;
-}
-.alert-slide-enter-to,
-.alert-slide-leave-from {
-  opacity: 1;
-  transform: translateY(0);
-  max-height: 80px;
-}
-
-/* Form */
-.profile-form {
-  max-width: 100%;
-}
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-  margin-bottom: 28px;
-}
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-.form-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--v-text-2);
-}
-.form-input {
-  padding: 12px 16px;
-  border: 2px solid var(--v-border-strong);
-  border-radius: 10px;
-  font-size: 15px;
-  color: var(--v-text);
-  background: var(--v-input);
-  transition: all 0.3s;
-  font-family: inherit;
-  width: 100%;
-}
-.form-input:focus {
-  outline: none;
-  border-color: var(--bc-accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--bc-accent) 10%, transparent);
-}
-.form-input::placeholder {
-  color: var(--v-faint);
-}
-.form-input.is-invalid {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
-.form-input.is-match {
-  border-color: #48bb78;
-}
-textarea.form-input {
-  resize: vertical;
-  min-height: 100px;
-}
-select.form-input {
-  cursor: pointer;
-}
-.field-error {
-  font-size: 12px;
-  color: #ef4444;
-  font-weight: 500;
-}
-
-/* Checkbox / radio */
-.checkbox-group,
-.radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.checkbox-label,
-.radio-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: var(--v-subtle);
-  border: 2px solid var(--v-border-strong);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.3s;
-  font-size: 14px;
-  color: var(--v-text-2);
-}
-.checkbox-label:hover,
-.radio-label:hover {
-  border-color: var(--bc-accent);
-  background: var(--v-green-soft);
-}
-.checkbox-input,
-.radio-input {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--bc-accent);
-}
-
-/* Info box */
-.info-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  background: var(--v-blue-soft);
-  border: 1px solid var(--v-blue-soft);
-  border-radius: 10px;
-  margin-bottom: 24px;
-}
-.info-box p {
-  margin: 0;
-  font-size: 14px;
-  color: var(--v-blue-text);
-  line-height: 1.6;
-}
-
-/* Form actions */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 24px;
-  border-top: 1px solid var(--v-border-strong);
-}
-.btn-primary,
-.btn-secondary {
-  padding: 13px 32px;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: none;
-  font-family: inherit;
-}
-.btn-primary {
-  background: linear-gradient(135deg, var(--bc-accent) 0%, var(--bc-accent-hover) 100%);
-  color: var(--bc-accent-ink);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--bc-accent) 25%, transparent);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--bc-accent) 35%, transparent);
-}
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-.btn-secondary {
-  background: var(--v-surface);
-  color: var(--v-text-2);
-  border: 2px solid var(--v-border-strong);
-}
-.btn-secondary:hover {
-  border-color: var(--bc-accent);
-  color: var(--bc-accent);
-}
-.btn-spinner-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.btn-spinner {
-  display: inline-block;
-  width: 15px;
-  height: 15px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Cutoff times */
-.label-hint {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--v-faint);
-  margin-left: 8px;
-}
-.cutoff-times-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.cutoff-time-item {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-.btn-remove {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 2px solid var(--v-red-soft);
-  background: var(--v-red-soft);
-  color: #ef4444;
-  font-size: 18px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.btn-remove:hover {
-  background: var(--v-red-soft);
-  border-color: #fca5a5;
-}
-.btn-add-cutoff {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: var(--v-green-soft);
-  border: 2px dashed var(--bc-accent);
-  border-radius: 10px;
-  color: var(--bc-accent);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  width: fit-content;
-  font-family: inherit;
-}
-.btn-add-cutoff:hover {
-  background: var(--bc-accent-soft);
-  border-color: var(--bc-accent-hover);
-}
-.add-icon {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-/* Password tab */
-.password-security-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 16px 18px;
-  margin-bottom: 28px;
-  background: var(--v-green-soft);
-  border: 1px solid #a7f3d0;
-  border-radius: 12px;
-  border-left: 4px solid var(--bc-accent);
-}
-.security-icon {
-  font-size: 24px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-.password-security-note strong {
-  display: block;
-  font-size: 15px;
-  color: var(--v-green-text);
-  margin-bottom: 3px;
-}
-.password-security-note p {
-  font-size: 13px;
-  color: var(--v-green-text);
-  margin: 0;
-}
-.password-grid {
-  grid-template-columns: 1fr;
-  max-width: 500px;
-}
-.input-password-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.input-password-wrap .form-input {
-  padding-right: 48px;
-}
-.eye-btn {
-  position: absolute;
-  right: 12px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  padding: 4px;
-  line-height: 1;
-}
-.strength-bar-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 6px;
-}
-.strength-bar {
-  flex: 1;
-  height: 5px;
-  background: var(--v-subtle-2);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.strength-fill {
-  height: 100%;
-  border-radius: 10px;
-  transition:
-    width 0.4s,
-    background 0.4s;
-}
-.strength-fill.weak {
-  background: #ef4444;
-}
-.strength-fill.fair {
-  background: #f59e0b;
-}
-.strength-fill.good {
-  background: #3b82f6;
-}
-.strength-fill.strong {
-  background: #48bb78;
-}
-.strength-label {
-  font-size: 12px;
-  font-weight: 700;
-  min-width: 46px;
-  text-align: right;
-}
-.strength-label.weak {
-  color: #ef4444;
-}
-.strength-label.fair {
-  color: var(--v-amber-text);
-}
-.strength-label.good {
-  color: #3b82f6;
-}
-.strength-label.strong {
-  color: var(--v-green-text);
-}
-.match-hint {
-  font-size: 12px;
-  color: var(--v-green-text);
-  font-weight: 600;
-}
-.mismatch-hint {
-  font-size: 12px;
-  color: #ef4444;
-  font-weight: 600;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 20px;
-  backdrop-filter: blur(4px);
-}
-.modal-container {
-  background: var(--v-raised);
-  border-radius: 20px;
-  max-width: 480px;
-  width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-}
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 28px;
-  border-bottom: 1px solid var(--v-border-strong);
-}
-.modal-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--v-text);
-  margin: 0;
-}
-.modal-close {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  background: var(--v-subtle);
-  color: var(--v-muted);
-  font-size: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.modal-close:hover {
-  background: var(--v-subtle-2);
-  color: var(--v-text);
-}
-.modal-body {
-  padding: 28px;
-}
-.photo-upload-area {
-  width: 100%;
-  aspect-ratio: 1;
-  border: 3px dashed var(--v-border-strong);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s;
-  overflow: hidden;
-}
-.photo-upload-area:hover {
-  border-color: var(--bc-accent);
-  background: var(--v-green-soft);
-}
-.photo-preview {
-  width: 100%;
-  height: 100%;
-}
-.photo-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.photo-placeholder {
-  text-align: center;
-  padding: 20px;
-}
-.upload-icon {
-  display: grid;
-  place-items: center;
-  margin: 0 auto 16px;
-  color: var(--v-muted, #94a3b8);
-}
-.upload-icon :deep(svg) {
-  width: 48px;
-  height: 48px;
-}
-.upload-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--v-text-2);
-  margin: 0 0 6px 0;
-}
-.upload-hint {
-  font-size: 13px;
-  color: var(--v-faint);
-  margin: 0;
-}
-.hidden-input {
-  display: none;
-}
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 28px;
-  border-top: 1px solid var(--v-border-strong);
-}
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-@media (max-width: 1024px) {
-  .profile-main {
-    margin-left: 0;
-    padding: 20px;
-  }
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .completion-items {
-    grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 768px) {
-  .profile-tabs {
+  /* The menu becomes a row you can swipe */
+  .vp-nav {
+    position: static;
+    display: flex;
     overflow-x: auto;
+    scrollbar-width: none;
   }
-  .tab-panel {
-    padding: 20px;
+  .vp-nav::-webkit-scrollbar {
+    display: none;
   }
-  .panel-title {
-    font-size: 20px;
+  .vp-nav-item {
+    flex: none;
+    width: auto;
   }
-  .cutoff-time-item {
-    grid-template-columns: 1fr;
+  .vp-nav-text small {
+    display: none;
   }
-  .password-grid {
-    max-width: 100%;
+}
+@media (max-width: 640px) {
+  .vp-id {
+    flex-wrap: wrap;
+    padding: 0 16px 16px;
+  }
+  .vp-logo {
+    width: 84px;
+    height: 84px;
+    margin-top: -42px;
+  }
+  .vp-ring {
+    display: none;
+  }
+  .vp-steps,
+  .vp-choices,
+  .vp-choices.two,
+  .vp-sk-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vp-steps {
+    padding: 12px 16px 16px;
+  }
+  .vp-card {
+    padding: 18px 16px 0;
+  }
+  .vp-save {
+    margin: 0 -16px;
+    padding: 12px 16px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .vp-save .sp-btn {
+    width: 100%;
+  }
+  .vp-cutoffs li {
+    grid-template-columns: minmax(0, 1fr) 120px auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vp-glass-btn,
+  .vp-logo-edit,
+  .vp-steps button,
+  .vp-nav-item,
+  .vp-choice,
+  .vp-choice-tick,
+  .vp-chip,
+  .vp-drop {
+    transition: none;
   }
 }
 </style>
