@@ -1008,10 +1008,13 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 }
 
 .vp-id {
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 18px;
-  padding: 0 22px 18px;
+  min-height: 96px;
+  /* Right padding leaves room for the completion ring */
+  padding: 0 116px 18px 22px;
 }
 .vp-logo {
   position: relative;
@@ -1116,14 +1119,17 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 }
 
 /* Completion ring */
+/* Out of the row's flow: the logo overlapping the cover makes the row's own
+   middle sit too high, so the ring centres on the strip below the cover itself */
 .vp-ring {
   --p: 0;
-  flex: none;
-  position: relative;
+  position: absolute;
+  top: 50%;
+  right: 22px;
   display: block;
-  align-self: center;
-  width: 78px;
-  height: 78px;
+  width: 72px;
+  height: 72px;
+  transform: translateY(-50%);
   border-radius: 50%;
   background: conic-gradient(var(--bc-accent) calc(var(--p) * 1%), var(--v-subtle-2) 0);
 }
@@ -1153,7 +1159,7 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 }
 .vp-ring b {
   font-variant-numeric: tabular-nums;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--v-text);
 }
