@@ -18,7 +18,7 @@
           </div>
         </div>
         <div class="header-right">
-          <button type="button" class="ghost-btn" :disabled="loading" @click="load">
+          <button type="button" class="ghost-btn" :disabled="loading" @click="guardUnsaved(load)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></svg>
             Refresh
           </button>
@@ -40,18 +40,18 @@
             </section>
           </template>
 
-          <form v-for="p in plans" v-else :key="p.key" class="plan-card" :class="{ featured: p.form.featured }" novalidate @submit.prevent="save(p)">
+          <form v-for="p in plans" v-else :key="p.key" class="plan-card" :class="{ featured: p.form.featured }" novalidate @submit.prevent="saveUnsaved">
             <div class="plan-top">
               <span class="plan-tier">{{ TIER[p.key] }}</span>
             </div>
 
-            <label class="field">
+            <label class="field" :data-change="`${p.key}.name`">
               <span class="label">Plan name</span>
               <input v-model.trim="p.form.name" class="input name-input" maxlength="40" :disabled="!canManage" :aria-invalid="!!p.errors.name" />
               <small v-if="p.errors.name" class="err">{{ p.errors.name }}</small>
             </label>
 
-            <label class="field">
+            <label class="field" :data-change="`${p.key}.monthly_price`">
               <span class="label">Monthly price</span>
               <span class="price-wrap">
                 <span class="peso">₱</span>
@@ -62,17 +62,17 @@
               <small v-else-if="Number(p.form.monthly_price) !== Number(p.monthly_price)" class="hint">Now {{ peso(p.monthly_price) }}. New checkouts use the new price; shops already on it keep theirs until they renew.</small>
             </label>
 
-            <label class="toggle">
+            <label class="toggle" :data-change="`${p.key}.featured`">
               <input v-model="p.form.featured" type="checkbox" :disabled="!canManage" />
               <span>Mark as <b>Most popular</b> on the pricing page</span>
             </label>
 
-            <label class="field">
+            <label class="field" :data-change="`${p.key}.description`">
               <span class="label">Description</span>
               <textarea v-model.trim="p.form.description" class="input" rows="2" maxlength="300" :disabled="!canManage"></textarea>
             </label>
 
-            <fieldset class="field fs">
+            <fieldset class="field fs" :data-change="`${p.key}.highlights`">
               <legend class="label">Highlights <small>(shown as a checklist, up to 6)</small></legend>
               <div v-for="(h, i) in p.form.highlights" :key="i" class="hl-row">
                 <input v-model="p.form.highlights[i]" class="input" maxlength="80" :disabled="!canManage" :aria-label="`Highlight ${i + 1}`" />
@@ -83,7 +83,7 @@
               <button v-if="canManage && p.form.highlights.length < 6" type="button" class="link-btn" @click="p.form.highlights.push('')">+ Add a highlight</button>
             </fieldset>
 
-            <fieldset class="field fs">
+            <fieldset class="field fs" :data-change="`${p.key}.limits`">
               <legend class="label">Limits <small>(leave unlimited ticked for no limit)</small></legend>
               <div v-for="l in LIMITS" :key="l.key" class="limit-row">
                 <span class="limit-name">{{ l.label }}</span>
@@ -106,7 +106,6 @@
 
             <div v-if="canManage" class="actions">
               <button type="button" class="ghost-btn" :disabled="p.busy || !p.updated_at" :title="p.updated_at ? '' : 'Already the original'" @click="reset(p)">Reset to original</button>
-              <button type="submit" class="primary-btn" :disabled="p.busy || !dirty(p)">{{ p.busy ? "Saving…" : "Save changes" }}</button>
             </div>
           </form>
         </div>
@@ -116,12 +115,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useAdminAccess } from "../../composables/useAdminAccess";
+import { guardUnsaved, saveUnsaved, useUnsavedChanges } from "../../composables/useUnsavedChanges";
 
 const { toggleMobile } = useSidebarState();
 const { can: adminCan } = useAdminAccess();
@@ -182,6 +182,7 @@ async function load() {
   try {
     const { data } = await api.get("/admin/subscription-plans");
     plans.value = (data.data?.plans ?? []).map(wrap);
+    markClean();
   } catch {
     error.value = "The plans couldn't be loaded.";
   } finally {
@@ -199,25 +200,74 @@ function validate(p) {
   return !Object.keys(p.errors).length;
 }
 
-async function save(p) {
-  p.formError = "";
-  if (!validate(p)) return;
-  p.busy = true;
+// Saves every plan that was changed (from the unsaved-changes bar)
+const saving = ref(false);
+async function saveAll() {
+  const changed = plans.value.filter(dirty);
+  changed.forEach((p) => (p.formError = ""));
+  // Check them all first, so nothing is half saved
+  const bad = changed.filter((p) => !validate(p));
+  if (bad.length) {
+    toast.error("Fix the highlighted plan before saving.");
+    nextTick(() => document.querySelector(".plan-card .err")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    return;
+  }
+  saving.value = true;
+  let saved = 0;
   try {
-    const { data } = await api.put(`/admin/subscription-plans/${p.key}`, payloadOf(p));
-    toast.success(data.message || "Saved.");
-    // Marking one plan "Most popular" clears it on the others
-    await load();
-  } catch (e) {
-    const errs = e?.response?.data?.errors ?? {};
-    for (const [k, v] of Object.entries(errs)) p.errors[k.startsWith("limits") ? "limits" : k] = Array.isArray(v) ? v[0] : v;
-    p.formError = e?.response?.data?.message || "Couldn't save the plan.";
+    for (const p of changed) {
+      p.busy = true;
+      try {
+        await api.put(`/admin/subscription-plans/${p.key}`, payloadOf(p));
+        saved++;
+      } catch (e) {
+        const errs = e?.response?.data?.errors ?? {};
+        for (const [k, v] of Object.entries(errs)) p.errors[k.startsWith("limits") ? "limits" : k] = Array.isArray(v) ? v[0] : v;
+        p.formError = e?.response?.data?.message || "Couldn't save the plan.";
+        toast.error(`${p.form.name || "A plan"} couldn't be saved.`);
+        return;
+      } finally {
+        p.busy = false;
+      }
+    }
   } finally {
-    p.busy = false;
+    saving.value = false;
+    // Marking one plan "Most popular" clears it on the others
+    if (saved) {
+      toast.success(saved === 1 ? "Plan saved." : `${saved} plans saved.`);
+      await load();
+    }
   }
 }
 
-async function reset(p) {
+function discardAll() {
+  for (const p of plans.value) {
+    p.form = formOf(p);
+    p.errors = {};
+    p.formError = "";
+  }
+}
+
+const FIELD_LABEL = { name: "Plan name", monthly_price: "Monthly price", featured: "Most popular", description: "Description", highlights: "Highlights", limits: "Limits" };
+const { markClean } = useUnsavedChanges({
+  look: "admin",
+  saveLabel: "Save",
+  saving: () => saving.value,
+  save: saveAll,
+  discard: discardAll,
+  enabled: () => canManage.value,
+  fields: () =>
+    plans.value.flatMap((p) => {
+      const now = payloadOf(p);
+      return Object.keys(FIELD_LABEL).map((k) => ({ key: `${p.key}.${k}`, label: `${p.name}: ${FIELD_LABEL[k]}`, value: now[k] }));
+    }),
+});
+
+function reset(p) {
+  // Reloading replaces every card, so unsaved edits are dealt with first
+  guardUnsaved(() => resetPlan(p));
+}
+async function resetPlan(p) {
   p.busy = true;
   try {
     const { data } = await api.post(`/admin/subscription-plans/${p.key}/reset`);

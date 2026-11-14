@@ -47,15 +47,10 @@
                 <h3 id="show-settings-title" class="show-title">Slideshow settings</h3>
                 <p class="panel-sub">How the banners play on the shop. Applies to every banner.</p>
               </div>
-              <div class="show-save">
-                <span v-if="slideshowDirty" class="hint">Unsaved changes</span>
-                <button type="button" class="ghost-btn" :disabled="!slideshowDirty || slideshowSaving" @click="resetSlideshow">Undo</button>
-                <button type="button" class="primary-btn" :disabled="!slideshowDirty || slideshowSaving" @click="saveSlideshow">{{ slideshowSaving ? "Saving…" : "Save settings" }}</button>
-              </div>
             </div>
             <div v-if="!slideshowLoaded" class="sk sk-row"></div>
             <div v-else class="show-grid">
-              <div class="show-time" :class="{ muted: !slideshow.autoplay }">
+              <div class="show-time" :class="{ muted: !slideshow.autoplay }" data-change="show.seconds">
                 <label for="slide-seconds" class="field-label">Time on each slide</label>
                 <div class="time-row">
                   <input
@@ -78,7 +73,7 @@
                 <span class="hint">{{ slideshow.autoplay ? `Moves to the next banner every ${slideshow.seconds} seconds (3–30).` : "Autoplay is off, so customers move between banners themselves." }}</span>
               </div>
               <div class="show-toggles">
-                <label v-for="opt in SLIDESHOW_TOGGLES" :key="opt.key" class="toggle" :class="{ muted: opt.needsAutoplay && !slideshow.autoplay }">
+                <label v-for="opt in SLIDESHOW_TOGGLES" :key="opt.key" :data-change="`show.${opt.key}`" class="toggle" :class="{ muted: opt.needsAutoplay && !slideshow.autoplay }">
                   <input v-model="slideshow[opt.key]" type="checkbox" role="switch" :disabled="opt.needsAutoplay && !slideshow.autoplay" />
                   <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
                   <span class="toggle-text">
@@ -217,15 +212,10 @@
                   <h3 id="bar-settings-title" class="show-title">Bar settings</h3>
                   <p class="panel-sub">How the announcement bar plays on the shop.</p>
                 </div>
-                <div class="show-save">
-                  <span v-if="bar.dirty" class="hint">Unsaved changes</span>
-                  <button type="button" class="ghost-btn" :disabled="!bar.dirty || bar.saving" @click="bar.reset">Undo</button>
-                  <button type="button" class="primary-btn" :disabled="!bar.dirty || bar.saving" @click="bar.save">{{ bar.saving ? "Saving…" : "Save settings" }}</button>
-                </div>
               </div>
               <div v-if="!bar.loaded" class="sk sk-row"></div>
               <div v-else class="show-grid">
-                <div class="show-time" :class="{ muted: !bar.values.autoplay }">
+                <div class="show-time" :class="{ muted: !bar.values.autoplay }" data-change="bar.seconds">
                   <label for="bar-seconds" class="field-label">Time on each announcement</label>
                   <div class="time-row">
                     <input
@@ -248,7 +238,7 @@
                   <span class="hint">{{ bar.values.autoplay ? `Moves to the next announcement every ${bar.values.seconds} seconds (3–30).` : "Autoplay is off, so customers step through announcements themselves." }}</span>
                 </div>
                 <div class="show-toggles">
-                  <label v-for="opt in BAR_TOGGLES" :key="opt.key" class="toggle" :class="{ muted: opt.needsAutoplay && !bar.values.autoplay }">
+                  <label v-for="opt in BAR_TOGGLES" :key="opt.key" :data-change="`bar.${opt.key}`" class="toggle" :class="{ muted: opt.needsAutoplay && !bar.values.autoplay }">
                     <input v-model="bar.values[opt.key]" type="checkbox" role="switch" :disabled="opt.needsAutoplay && !bar.values.autoplay" />
                     <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
                     <span class="toggle-text">
@@ -257,7 +247,7 @@
                     </span>
                   </label>
                 </div>
-                <div class="show-time" :class="{ muted: !bar.values.dismissible }">
+                <div class="show-time" :class="{ muted: !bar.values.dismissible }" data-change="bar.dismiss_for">
                   <span id="bar-dismiss-label" class="field-label">A closed announcement stays hidden</span>
                   <div class="seg small" role="radiogroup" aria-labelledby="bar-dismiss-label">
                     <button
@@ -318,11 +308,6 @@
               <h2 class="panel-title">Product tags</h2>
               <p class="panel-sub">The tags on shop cards and product pages. They update on their own from sales, carts, hearts and reviews. Set which ones show and how many products get each.</p>
             </div>
-            <div class="show-save">
-              <span v-if="tagsDirty" class="hint">Unsaved changes</span>
-              <button type="button" class="ghost-btn" :disabled="!tagsDirty || tagsSaving" @click="resetTagRules">Undo</button>
-              <button type="button" class="primary-btn" :disabled="!tagsDirty || tagsSaving" @click="saveTagRules">{{ tagsSaving ? "Saving…" : "Save rules" }}</button>
-            </div>
           </div>
 
           <SkeletonRows v-if="!tagsLoaded" :rows="4" />
@@ -333,7 +318,7 @@
                 <span class="field-label">Tag order</span>
                 <span class="hint">A shop card shows one tag. Drag to change the order, or use the arrows.</span>
               </div>
-              <label class="toggle tag-rotate">
+              <label class="toggle tag-rotate" data-change="tags.rotate_hourly">
                 <input v-model="tagRules.rotate_hourly" type="checkbox" role="switch" />
                 <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
                 <span class="toggle-text">
@@ -343,7 +328,7 @@
                     : "Cards always show the highest tag on this list that the product has." }}</span>
                 </span>
               </label>
-              <ol class="tag-rank" aria-label="Tag order, highest first">
+              <ol class="tag-rank" data-change="tags.order" aria-label="Tag order, highest first">
                 <li
                   v-for="(t, i) in tagRules.order"
                   :key="t"
@@ -373,7 +358,7 @@
             </div>
 
             <div class="tag-grid">
-              <article v-for="rule in TAG_RULES" :key="rule.tag" class="tag-card" :class="{ off: !tagRules[rule.enable] }">
+              <article v-for="rule in TAG_RULES" :key="rule.tag" :data-change="`tags.${rule.tag}`" class="tag-card" :class="{ off: !tagRules[rule.enable] }">
                 <header class="tag-card-head">
                   <ProductTag :tag="rule.tag" />
                   <span class="tag-count" :class="{ zero: !tagCounts[rule.tag] }" aria-live="polite">{{ countText(rule) }}</span>
@@ -676,6 +661,7 @@ import { ANNOUNCEMENT_TONES } from "../../constants/announcementTones";
 import "../../styles/bloomcraft.css"; // shop look for the review preview
 import { articleBlocks } from "../../utils/articleBlocks";
 import api from "../../plugins/axios";
+import { guardUnsaved, useUnsavedChanges } from "../../composables/useUnsavedChanges";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -773,7 +759,7 @@ const SLIDESHOW_TOGGLES = [
   { key: "show_dots", label: "Show dots", hint: "One dot per banner along the bottom." },
 ];
 /** A small settings form: load, edit, undo, save. Used by the slideshow and the announcement bar. */
-const settingsForm = ({ url, defaults, noun, savedMessage }) => {
+const settingsForm = ({ url, defaults, noun, savedMessage, onApply }) => {
   const values = reactive({ ...defaults });
   const saved = ref({ ...defaults });
   const loaded = ref(false);
@@ -782,6 +768,7 @@ const settingsForm = ({ url, defaults, noun, savedMessage }) => {
   const apply = (data) => {
     saved.value = { ...defaults, ...data };
     Object.assign(values, saved.value);
+    onApply?.();
   };
   const reset = () => Object.assign(values, saved.value);
   const load = async () => {
@@ -820,6 +807,7 @@ const {
   url: "/admin/content/banners/settings",
   defaults: { seconds: 6, autoplay: true, pause_on_hover: true, show_arrows: true, show_dots: true },
   noun: "Slideshow",
+  onApply: () => markClean((key) => key.startsWith("show.")),
   savedMessage: "Slideshow settings saved. The shop uses them straight away.",
 });
 
@@ -839,6 +827,7 @@ const bar = reactive(settingsForm({
   url: "/admin/content/announcements/settings",
   defaults: { seconds: 7, autoplay: true, pause_on_hover: true, show_arrows: true, dismissible: true, dismiss_for: "forever" },
   noun: "Announcement bar",
+  onApply: () => markClean((key) => key.startsWith("bar.")),
   savedMessage: "Announcement bar settings saved. The shop uses them straight away.",
 }));
 const fetchFeatured = () => get("featured", "/admin/content/featured", featured);
@@ -991,6 +980,7 @@ const applyTagRules = (data) => {
   savedTagRules.value = copyRules({ ...TAG_DEFAULTS, ...(data.rules || {}) });
   Object.assign(tagRules, copyRules(savedTagRules.value));
   if (data.counts) tagCounts.value = data.counts;
+  markClean((key) => key.startsWith("tags."));
 };
 const resetTagRules = () => Object.assign(tagRules, copyRules(savedTagRules.value));
 async function loadTagRules() {
@@ -1031,10 +1021,51 @@ async function saveTagRules() {
   }
 }
 
+// ── Unsaved changes bar: slideshow, announcement bar and tag rules ──
+// (the banner, article and announcement editors keep their own Save)
+const tagRuleValue = (rule) => [tagRules[rule.enable], ...rule.fields.map((f) => tagRules[f.key])];
+const { markClean, changes: unsavedChanges } = useUnsavedChanges({
+  look: "admin",
+  saving: () => slideshowSaving.value || bar.saving || tagsSaving.value,
+  fields: () => {
+    const out = [];
+    if (slideshowLoaded.value) {
+      out.push({ key: "show.seconds", label: "Slideshow: time on each slide", value: slideshow.seconds });
+      for (const o of SLIDESHOW_TOGGLES) out.push({ key: `show.${o.key}`, label: `Slideshow: ${o.label}`, value: slideshow[o.key] });
+    }
+    if (bar.loaded) {
+      out.push({ key: "bar.seconds", label: "Announcement bar: time on each", value: bar.values.seconds });
+      for (const o of BAR_TOGGLES) out.push({ key: `bar.${o.key}`, label: `Announcement bar: ${o.label}`, value: bar.values[o.key] });
+      out.push({ key: "bar.dismiss_for", label: "Announcement bar: stays hidden", value: bar.values.dismiss_for });
+    }
+    if (tagsLoaded.value) {
+      out.push({ key: "tags.rotate_hourly", label: "Tags: change every hour", value: tagRules.rotate_hourly });
+      out.push({ key: "tags.order", label: "Tags: order", value: [...tagRules.order] });
+      for (const r of TAG_RULES) out.push({ key: `tags.${r.tag}`, label: `Tags: ${r.name}`, value: tagRuleValue(r) });
+    }
+    return out;
+  },
+  save: async () => {
+    const keys = unsavedChanges.value.map((c) => c.key);
+    if (keys.some((k) => k.startsWith("show."))) await saveSlideshow();
+    if (keys.some((k) => k.startsWith("bar."))) await bar.save();
+    if (keys.some((k) => k.startsWith("tags."))) await saveTagRules();
+  },
+  discard: () => {
+    resetSlideshow();
+    bar.reset();
+    resetTagRules();
+  },
+});
+
 const setTab = (key) => {
-  tab.value = key;
-  router.replace({ query: { ...route.query, tab: key } });
-  loadTab(key);
+  if (key === tab.value) return;
+  // Save or discard edits first, so View changes never points at a hidden tab
+  guardUnsaved(() => {
+    tab.value = key;
+    router.replace({ query: { ...route.query, tab: key } });
+    loadTab(key);
+  });
 };
 
 // ── Ordering ─────────────────────────────────────────────────────

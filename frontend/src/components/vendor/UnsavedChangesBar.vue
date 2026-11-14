@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="ucb">
-      <div v-if="show" ref="bar" class="ucb" :class="{ alert: state.blocked, shake }" role="region" aria-label="Unsaved changes">
+      <div v-if="show" ref="bar" class="ucb" :class="{ alert: state.blocked, shake, admin: isAdmin }" role="region" aria-label="Unsaved changes">
         <span class="ucb-title" :role="state.blocked ? 'alert' : null">
           {{ state.blocked ? "Save or discard your changes first" : "Unsaved changes" }}
         </span>
@@ -51,6 +51,7 @@ const owner = computed(() => state.owner);
 const changes = computed(() => owner.value?.changes.value ?? []);
 const show = computed(() => !!owner.value && changes.value.length > 0);
 const saving = computed(() => !!owner.value?.saving.value);
+const isAdmin = computed(() => owner.value?.look === "admin");
 
 const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -64,7 +65,7 @@ function find(change) {
 }
 function unflash() {
   clearTimeout(flashTimer);
-  flashed?.classList.remove("bc-change-focus");
+  flashed?.classList.remove("bc-change-focus", "bc-change-focus--admin");
   flashed = null;
 }
 
@@ -80,6 +81,7 @@ function step(dir) {
   unflash();
   requestAnimationFrame(() => {
     el.classList.add("bc-change-focus");
+    if (isAdmin.value) el.classList.add("bc-change-focus--admin");
     flashed = el;
     flashTimer = setTimeout(unflash, 1800);
   });
@@ -138,6 +140,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .ucb {
+  --ucb-accent: var(--bc-accent, #4db173);
+  --ucb-accent-ink: var(--bc-accent-ink, #fff);
   position: fixed;
   z-index: 9990;
   left: 50%;
@@ -157,6 +161,56 @@ onBeforeUnmount(() => {
   font-family: var(--font-sans, "Poppins", system-ui, sans-serif);
   transform: translateX(-50%);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+/* Admin pages: the admin panel tokens and theme color */
+.ucb.admin {
+  --ucb-accent: var(--a-accent);
+  --ucb-accent-ink: var(--a-accent-ink);
+  border-color: var(--a-border);
+  background: var(--a-surface);
+  color: var(--a-text);
+}
+.ucb.admin .ucb-count {
+  color: var(--a-muted);
+}
+.ucb.admin .ucb-count small,
+.ucb.admin .ucb-arrows button {
+  color: var(--a-text);
+}
+.ucb.admin .ucb-arrows button:hover,
+.ucb.admin .ucb-btn:hover:not(:disabled) {
+  background: var(--a-subtle-2);
+}
+.ucb.admin .ucb-arrows button:hover {
+  color: var(--a-accent);
+}
+.ucb.admin .ucb-sep {
+  background: var(--a-border);
+}
+.ucb.admin .ucb-btn {
+  color: var(--a-text-2, var(--a-text));
+}
+.ucb.admin .ucb-save {
+  background: var(--a-accent);
+  color: var(--a-accent-ink);
+}
+.ucb.admin .ucb-save:hover:not(:disabled) {
+  background: var(--a-accent-hover, var(--a-accent));
+  color: var(--a-accent-ink);
+}
+.ucb.admin.alert {
+  border-color: var(--a-red-text);
+  box-shadow: 0 0 0 3px var(--a-red-soft), 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+.ucb.admin.alert .ucb-title,
+.ucb.admin.alert .ucb-title::before {
+  color: var(--a-red-text);
+}
+.ucb.admin.alert .ucb-title::before {
+  background: var(--a-red-text);
+}
+.ucb.admin .ucb-title::before {
+  background: var(--a-amber-text);
 }
 .ucb.alert {
   border-color: var(--v-red-text);
@@ -222,7 +276,7 @@ onBeforeUnmount(() => {
 }
 .ucb-arrows button:hover {
   background: var(--v-subtle-2);
-  color: var(--bc-accent, #4db173);
+  color: var(--ucb-accent);
 }
 .ucb-arrows svg {
   width: 22px;
@@ -259,15 +313,15 @@ onBeforeUnmount(() => {
   color: var(--v-ink-text);
 }
 .ucb-save:hover:not(:disabled) {
-  background: var(--bc-accent, #4db173);
-  color: var(--bc-accent-ink, #fff);
+  background: var(--ucb-accent);
+  color: var(--ucb-accent-ink);
 }
 .ucb-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 .ucb button:focus-visible {
-  outline: 2px solid var(--bc-accent, #4db173);
+  outline: 2px solid var(--ucb-accent);
   outline-offset: 2px;
 }
 .ucb.shake {
@@ -321,12 +375,17 @@ onBeforeUnmount(() => {
 <style>
 /* The field View changes jumped to, highlighted for a moment */
 .bc-change-focus {
+  --ucb-accent: var(--bc-accent, #4db173);
   border-radius: 12px;
   /* A tint over whatever the card's own background is */
-  background-image: linear-gradient(color-mix(in srgb, var(--bc-accent, #4db173) 8%, transparent), color-mix(in srgb, var(--bc-accent, #4db173) 8%, transparent));
-  box-shadow: 0 0 0 8px color-mix(in srgb, var(--bc-accent, #4db173) 8%, transparent),
-    0 0 0 9px color-mix(in srgb, var(--bc-accent, #4db173) 35%, transparent);
+  background-image: linear-gradient(color-mix(in srgb, var(--ucb-accent) 8%, transparent), color-mix(in srgb, var(--ucb-accent) 8%, transparent));
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--ucb-accent) 8%, transparent),
+    0 0 0 9px color-mix(in srgb, var(--ucb-accent) 35%, transparent);
   transition: box-shadow 0.3s ease;
   scroll-margin: 96px;
+}
+/* On admin pages the highlight follows the admin theme color */
+.bc-change-focus.bc-change-focus--admin {
+  --ucb-accent: var(--a-accent, #7c6ff7);
 }
 </style>

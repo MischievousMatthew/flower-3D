@@ -245,11 +245,11 @@
         </template>
 
         <!-- ═══ Platform settings ═══ -->
-        <form v-else-if="tab === 'settings'" class="panel settings" @submit.prevent="saveSettings">
+        <form v-else-if="tab === 'settings'" class="panel settings" @submit.prevent="saveUnsaved">
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Platform settings</h2>
-              <p class="panel-sub">Switches save the moment you flip them. Use Save settings for the message and numbers.</p>
+              <p class="panel-sub">Switches save the moment you flip them. Everything else waits for Save in the bar at the bottom.</p>
             </div>
           </div>
           <div v-if="!settings" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row"></span></div>
@@ -276,12 +276,12 @@
                 </div>
                 <input :checked="settings.checkout_paused_now" type="checkbox" class="switch danger" :disabled="switchSaving" @change="setCheckoutPause($event.target.checked)" />
               </label>
-              <label class="field">
+              <label class="field" data-change="set.checkout_pause_message">
                 <span>Message customers see while checkout is paused</span>
                 <input v-model="settings.checkout_pause_message" class="input" maxlength="200" />
               </label>
 
-              <div class="set-schedule">
+              <div class="set-schedule" data-change="set.pause_schedule">
                 <span class="field-label">
                   <span class="strong">Schedule a pause (maintenance)</span>
                   <InfoTip label="Schedule a pause">
@@ -298,7 +298,7 @@
                     <input v-model="pauseEnd" type="datetime-local" class="input" :min="pauseStart || nowLocal" aria-describedby="pause-help" />
                   </label>
                 </div>
-                <small id="pause-help" class="field-help">{{ scheduleSentence }} Save with <b>Save settings</b>.</small>
+                <small id="pause-help" class="field-help">{{ scheduleSentence }} Save with <b>Save</b> in the bar at the bottom.</small>
                 <button v-if="settings.checkout_pause_starts_at" type="button" class="mini-btn danger set-clear" :disabled="busy" @click="clearSchedule">Cancel the scheduled pause</button>
               </div>
 
@@ -306,7 +306,7 @@
               <p class="set-intro">Stops people from guessing passwords. These apply to customers, shops and staff alike.</p>
 
               <div class="two">
-                <div class="field">
+                <div class="field" data-change="set.login_max_attempts">
                   <span class="field-label">
                     <label for="set-max-attempts">Wrong passwords before a lock</label>
                     <InfoTip label="Wrong passwords before a lock">
@@ -316,7 +316,7 @@
                   <input id="set-max-attempts" v-model.number="settings.login_max_attempts" type="number" min="3" max="20" class="input" aria-describedby="set-max-attempts-help" />
                   <small id="set-max-attempts-help" class="field-help">Only that one account is locked, not the whole site. 3 to 20; 5 is usual.</small>
                 </div>
-                <div class="field">
+                <div class="field" data-change="set.login_lockout_minutes">
                   <span class="field-label">
                     <label for="set-lock-minutes">Lock lasts (minutes)</label>
                     <InfoTip label="Lock lasts">
@@ -341,7 +341,7 @@
                 <input v-model="settings.login_show_attempts" type="checkbox" class="switch" :disabled="switchSaving" @change="saveSwitch('login_show_attempts')" />
               </label>
 
-              <div class="field narrow">
+              <div class="field narrow" data-change="set.login_ip_per_minute">
                 <span class="field-label">
                   <label for="set-ip-limit">Sign-in tries a minute from one internet connection</label>
                   <InfoTip label="Sign-in tries a minute from one internet connection">
@@ -362,12 +362,9 @@
               </div>
 
               <h3 class="set-group">Monitoring</h3>
-              <label class="field narrow"><span>An order counts as stuck after this many days pending</span><input v-model.number="settings.stale_pending_days" type="number" min="1" max="30" class="input" /></label>
+              <label class="field narrow" data-change="set.stale_pending_days"><span>An order counts as stuck after this many days pending</span><input v-model.number="settings.stale_pending_days" type="number" min="1" max="30" class="input" /></label>
             </fieldset>
             <p v-if="settingsError" class="form-error">{{ settingsError }}</p>
-            <div v-if="canManage" class="form-actions">
-              <button type="submit" class="primary-btn" :disabled="busy">{{ busy ? "Saving…" : "Save settings" }}</button>
-            </div>
           </template>
         </form>
 
@@ -522,7 +519,7 @@
 
         <!-- ═══ Website info ═══ -->
         <section v-else-if="tab === 'website'" class="split website">
-          <form class="panel" @submit.prevent="saveWebsite">
+          <form class="panel" @submit.prevent="saveUnsaved">
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">Website information</h2>
@@ -531,20 +528,17 @@
             </div>
             <div v-if="!website" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row"></span></div>
             <fieldset v-else class="form-grid" :disabled="!canEditWebsite">
-              <label class="field"><span>Site name *</span><input v-model="website.site_name" class="input" maxlength="60" required /></label>
-              <label class="field"><span>Tagline</span><input v-model="website.tagline" class="input" maxlength="140" /></label>
-              <label class="field full"><span>About (footer text)</span><textarea v-model="website.about" class="input" rows="3" maxlength="600"></textarea></label>
-              <label class="field"><span>Contact email</span><input v-model="website.contact_email" type="email" class="input" /></label>
-              <label class="field"><span>Contact phone</span><input v-model="website.contact_phone" v-phone type="tel" class="input" /></label>
-              <label class="field full"><span>Address</span><input v-model="website.address" class="input" maxlength="255" /></label>
-              <label class="field"><span>Business hours</span><input v-model="website.business_hours" class="input" placeholder="Mon–Sat, 8 AM–6 PM" maxlength="120" /></label>
-              <label class="field"><span>Footer note</span><input v-model="website.footer_note" class="input" placeholder="All rights reserved." maxlength="200" /></label>
-              <label v-for="so in SOCIALS" :key="so.key" class="field"><span>{{ so.label }}</span><input v-model="website.socials[so.key]" type="url" class="input" :placeholder="so.placeholder" /></label>
+              <label class="field" data-change="web.site_name"><span>Site name *</span><input v-model="website.site_name" class="input" maxlength="60" required /></label>
+              <label class="field" data-change="web.tagline"><span>Tagline</span><input v-model="website.tagline" class="input" maxlength="140" /></label>
+              <label class="field full" data-change="web.about"><span>About (footer text)</span><textarea v-model="website.about" class="input" rows="3" maxlength="600"></textarea></label>
+              <label class="field" data-change="web.contact_email"><span>Contact email</span><input v-model="website.contact_email" type="email" class="input" /></label>
+              <label class="field" data-change="web.contact_phone"><span>Contact phone</span><input v-model="website.contact_phone" v-phone type="tel" class="input" /></label>
+              <label class="field full" data-change="web.address"><span>Address</span><input v-model="website.address" class="input" maxlength="255" /></label>
+              <label class="field" data-change="web.business_hours"><span>Business hours</span><input v-model="website.business_hours" class="input" placeholder="Mon–Sat, 8 AM–6 PM" maxlength="120" /></label>
+              <label class="field" data-change="web.footer_note"><span>Footer note</span><input v-model="website.footer_note" class="input" placeholder="All rights reserved." maxlength="200" /></label>
+              <label v-for="so in SOCIALS" :key="so.key" class="field" :data-change="`web.socials.${so.key}`"><span>{{ so.label }}</span><input v-model="website.socials[so.key]" type="url" class="input" :placeholder="so.placeholder" /></label>
             </fieldset>
             <p v-if="websiteError" class="form-error">{{ websiteError }}</p>
-            <div v-if="canEditWebsite" class="form-actions">
-              <button type="submit" class="primary-btn" :disabled="busy || !website">{{ busy ? "Saving…" : "Save changes" }}</button>
-            </div>
           </form>
           <div class="panel preview-panel">
             <h2 class="panel-title">Footer preview</h2>
@@ -670,6 +664,7 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import { useAdminAccess } from "../../composables/useAdminAccess";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import api from "../../plugins/axios";
+import { guardUnsaved, saveUnsaved, useUnsavedChanges } from "../../composables/useUnsavedChanges";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -913,6 +908,7 @@ const applySettings = (data) => {
   settings.value = data;
   pauseStart.value = toLocalInput(data.checkout_pause_starts_at);
   pauseEnd.value = toLocalInput(data.checkout_pause_ends_at);
+  markClean((key) => key.startsWith("set."));
 };
 const fetchSettings = async () => {
   try {
@@ -947,6 +943,7 @@ const setCheckoutPause = async (on) => {
     settings.value = { ...settings.value, checkout_paused: data.data.checkout_paused, checkout_paused_now: data.data.checkout_paused_now, checkout_pause_starts_at: data.data.checkout_pause_starts_at, checkout_pause_ends_at: data.data.checkout_pause_ends_at };
     pauseStart.value = toLocalInput(data.data.checkout_pause_starts_at);
     pauseEnd.value = toLocalInput(data.data.checkout_pause_ends_at);
+    markClean((key) => key === "set.pause_schedule");
     toast.success(`${on ? "Checkout is paused for every store." : "Checkout is open again."}${data.notified ? ` ${data.notified} ${data.notified === 1 ? "shop was" : "shops were"} notified.` : ""}`);
   } catch (e) {
     const errors = e.response?.data?.errors;
@@ -1277,9 +1274,13 @@ const loadTab = (key) => {
   }
 };
 const setTab = (key) => {
-  tab.value = key;
-  router.replace({ query: { ...route.query, tab: key } });
-  loadTab(key);
+  if (key === tab.value) return;
+  // Save or discard edits first, so View changes never points at a hidden tab
+  guardUnsaved(() => {
+    tab.value = key;
+    router.replace({ query: { ...route.query, tab: key } });
+    loadTab(key);
+  });
 };
 
 // ── Sign-in history ──────────────────────────────────────────────
@@ -1317,17 +1318,24 @@ const fetchWebsite = async () => {
   try {
     const { data } = await api.get("/admin/content/settings");
     website.value = { ...data.data, socials: data.data.socials ?? {} };
+    markClean((key) => key.startsWith("web."));
   } catch {
     toast.error("Website information couldn't be loaded.");
   }
 };
 const saveWebsite = async () => {
+  if (!website.value?.site_name?.trim()) {
+    websiteError.value = "Give the site a name.";
+    toast.error("Give the site a name before saving.");
+    return;
+  }
   busy.value = true;
   websiteError.value = "";
   try {
     const socials = Object.fromEntries(SOCIALS.map((so) => [so.key, website.value.socials?.[so.key]?.trim() || null]));
     const { data } = await api.put("/admin/content/settings", { ...website.value, socials });
     website.value = { ...data.data, socials: data.data.socials ?? {} };
+    markClean((key) => key.startsWith("web."));
     toast.success(data.message);
   } catch (e) {
     const errors = e.response?.data?.errors;
@@ -1336,6 +1344,52 @@ const saveWebsite = async () => {
     busy.value = false;
   }
 };
+
+// ── Unsaved changes bar (Platform settings and Website information) ──
+// Switches still save the moment they're flipped, so they aren't listed.
+const SETTING_FIELDS = [
+  ["checkout_pause_message", "Checkout paused message"],
+  ["login_max_attempts", "Wrong passwords before a lock"],
+  ["login_lockout_minutes", "Lock length"],
+  ["login_ip_per_minute", "Sign-in tries a minute"],
+  ["stale_pending_days", "Days before an order counts as stuck"],
+];
+const WEBSITE_FIELDS = [
+  ["site_name", "Site name"],
+  ["tagline", "Tagline"],
+  ["about", "About"],
+  ["contact_email", "Contact email"],
+  ["contact_phone", "Contact phone"],
+  ["address", "Address"],
+  ["business_hours", "Business hours"],
+  ["footer_note", "Footer note"],
+];
+const { markClean, changes: unsavedChanges } = useUnsavedChanges({
+  look: "admin",
+  saving: () => busy.value,
+  fields: () => {
+    const out = [];
+    if (settings.value && canManage.value) {
+      for (const [k, label] of SETTING_FIELDS) out.push({ key: `set.${k}`, label, value: settings.value[k] ?? null });
+      out.push({ key: "set.pause_schedule", label: "Scheduled pause", value: [pauseStart.value || "", pauseEnd.value || ""] });
+    }
+    if (website.value && canEditWebsite.value) {
+      for (const [k, label] of WEBSITE_FIELDS) out.push({ key: `web.${k}`, label, value: website.value[k] ?? "" });
+      for (const so of SOCIALS) out.push({ key: `web.socials.${so.key}`, label: so.label, value: website.value.socials?.[so.key] ?? "" });
+    }
+    return out;
+  },
+  save: async () => {
+    const keys = unsavedChanges.value.map((c) => c.key);
+    if (keys.some((k) => k.startsWith("set."))) await saveSettings();
+    if (keys.some((k) => k.startsWith("web."))) await saveWebsite();
+  },
+  discard: () => {
+    // Back to what was last loaded; the switches are already saved
+    if (settings.value) fetchSettings();
+    if (website.value) fetchWebsite();
+  },
+});
 
 // Pick the tab from ?tab= when this page allows it, else the first one
 const openSection = () => {

@@ -1,7 +1,7 @@
 import { computed, getCurrentInstance, markRaw, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 
-// Unsaved changes on a vendor page, shown in one bar at the bottom of the
+// Unsaved changes on a vendor or admin page, shown in one bar at the bottom of the
 // screen (components/vendor/UnsavedChangesBar.vue, mounted once in App.vue)
 // instead of a browser "Leave without saving?" box.
 //
@@ -74,14 +74,23 @@ export function stayOnPage() {
 
 const toJson = (v) => JSON.stringify(v ?? null);
 
-export function useUnsavedChanges({ fields, save, discard, saving, saveLabel = "Save", enabled = () => true }) {
+export function useUnsavedChanges({ fields, save, discard, saving, saveLabel = "Save", enabled = () => true, look = "vendor" }) {
   const router = useRouter();
   const baseline = ref(null); // key → { json, label, target }
 
   const list = () => (fields() ?? []).filter(Boolean);
 
-  function markClean() {
-    baseline.value = Object.fromEntries(list().map((f) => [f.key, { json: toJson(f.value), label: f.label, fallback: f.fallback }]));
+  // markClean() marks everything as saved; markClean((key) => …) only the
+  // matching fields, so one part of a page can reload without losing
+  // unsaved edits elsewhere on it
+  function markClean(only) {
+    const entry = (f) => [f.key, { json: toJson(f.value), label: f.label, fallback: f.fallback }];
+    if (typeof only !== "function") {
+      baseline.value = Object.fromEntries(list().map(entry));
+      return;
+    }
+    const kept = Object.entries(baseline.value ?? {}).filter(([key]) => !only(key));
+    baseline.value = Object.fromEntries([...kept, ...list().filter((f) => only(f.key)).map(entry)]);
   }
 
   // In the page's order; fields that were removed (an occasion deleted) come last
@@ -106,6 +115,7 @@ export function useUnsavedChanges({ fields, save, discard, saving, saveLabel = "
     dirty: computed(() => changes.value.length > 0),
     saving: computed(() => !!(typeof saving === "function" ? saving() : saving?.value)),
     saveLabel,
+    look, // "vendor" (shop green) or "admin" (the admin theme color)
     save: () => save(),
     discard: () => discard(),
     markClean,
