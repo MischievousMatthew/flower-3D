@@ -917,6 +917,16 @@ Route::middleware('token.auth')->group(function () {
         Route::delete('/products/{productId}/images/{imageId}', [ProductController::class, 'deleteImage'])->middleware('employee.module:inventory_products,delete');
         Route::delete('/products/{productId}/model', [ProductController::class, 'deleteModel'])->middleware('employee.module:inventory_products,delete');
 
+        // Wrappers, fillers, ribbons and cards: the same items as the vendor's
+        // 3D Bouquet Management, so ERP staff can add them from Add product
+        Route::get('/customization-options', [VendorCustomizationOptionController::class, 'index'])->middleware('employee.module:inventory_products,view');
+        Route::post('/customization-options', [VendorCustomizationOptionController::class, 'store'])->middleware('employee.module:inventory_products,create');
+        Route::middleware('employee.module:inventory_products,edit')->group(function () {
+            Route::post('/customization-options/{id}', [VendorCustomizationOptionController::class, 'update'])->whereNumber('id');
+            Route::patch('/customization-options/{id}/active', [VendorCustomizationOptionController::class, 'setActive'])->whereNumber('id');
+        });
+        Route::delete('/customization-options/{id}', [VendorCustomizationOptionController::class, 'destroy'])->whereNumber('id')->middleware('employee.module:inventory_products,delete');
+
         Route::middleware('employee.module:inventory_funding,view')->group(function () {
             Route::get('eligible-approvers',            [FundingRequestController::class, 'getEligibleApprovers']);
             Route::get('funding-requests/products',     [FundingRequestController::class, 'getProducts']);

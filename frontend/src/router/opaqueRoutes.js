@@ -55,7 +55,7 @@ export const opaqueRouteTokens = Object.freeze({
   CreateFundingRequest: "on3RmCPLinpI8SZLJVPg7OAzOwb8tra1Lo09SUCU18Z",
   EditFundingRequest: "vgmuIsnREMzKbE6bmfMrHaE9yOYqBBvwVsmRkIxclxc",
   FundingRequestDetails: "UCnVdEK07Rb1gIb6HTYW1S2s3HB4TvwzV6kjoGmWUIs",
-  Products: "UmqnMUDFUrRjZpc6VZVt7rXF7nfRkDDNDnaF75SFLZy",
+  InventoryAddProduct: "nFFGUUzmfrYLpS2na3zz2tNFShpSua817k2XDvNtVsk",
   AddProduct: "uVJtw3PemTR4vwNFgPw6BoXkLXWKaI0N0myB05Ok8yJ",
   SupplyChainDashboard: "dZwcBw4dGEuulOxLoECe3HjOWbqfXDNMLj4CGg788yC",
   SupplierList: "JepHb53ikFC79cG4qXyekthEvA1ZAzJKnY6GSiyjT92",

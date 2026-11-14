@@ -241,11 +241,10 @@ export const ERP_MODULES = [
     label: "Inventory & Stock",
     icon: "products",
     group: "Procurement",
-    path: "/erp/procurement/inventory/products",
+    path: "/erp/procurement/inventory/stock",
     children: [
       { label: "Stock & replenishment", path: "/erp/procurement/inventory/stock" },
-      { label: "Products", path: "/erp/procurement/inventory/products" },
-      { label: "Add Product", path: "/erp/procurement/inventory/add-product" },
+      { label: "Add product", path: "/erp/procurement/inventory/add" },
     ],
     description:
       "Allows you to manage product quantities, stock levels, product listings, and inventory records.",

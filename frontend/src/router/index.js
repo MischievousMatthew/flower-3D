@@ -559,13 +559,15 @@ const routes = [
                 component: () =>
                   import("../views/ERP/Procurement/Inventory/InventoryStock.vue"),
               },
+              // The old Products list is gone: Stock & replenishment lists everything
+              { path: "products", redirect: { name: "InventoryStock" } },
               {
-                path: "products",
-                name: "Products",
-                meta: { requiresInventoryManager: true },
-                props: () => ({ context: "inventory" }),
+                // Add product: flower or bouquet, wrapper, filler, ribbon, card, or a supply
+                path: "add",
+                name: "InventoryAddProduct",
+                meta: { requiresInventoryManager: true, erpLegacy: false },
                 component: () =>
-                  import("../views/ERP/Procurement/Inventory/ViewProduct.vue"),
+                  import("../views/ERP/Procurement/Inventory/AddInventoryItem.vue"),
               },
               {
                 path: "add-product",

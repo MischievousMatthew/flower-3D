@@ -1,11 +1,13 @@
 <template>
-  <div class="cz-page">
-    <VendorSidebar />
-    <vendorHeader title="3D Bouquets" />
+  <div class="cz-page" :class="{ 'cz-page--erp': erp }">
+    <template v-if="!erp">
+      <VendorSidebar />
+      <vendorHeader title="3D Bouquets" />
+    </template>
 
     <main class="cz-main">
-      <ShopLayout embedded />
-      <header class="cz-intro">
+      <ShopLayout v-if="!erp" embedded />
+      <header v-if="!erp" class="cz-intro">
         <div>
           <p class="cz-kicker">Flower customizer</p>
           <h1>3D Bouquets</h1>
@@ -16,7 +18,8 @@
         </div>
       </header>
 
-      <nav class="cz-tabs" role="tablist" aria-label="Customization items">
+      <!-- In the ERP, Add product picks the kind, so there are no tabs -->
+      <nav v-if="!erp" class="cz-tabs" role="tablist" aria-label="Customization items">
         <button
           v-for="tab in TABS"
           :key="tab.key"
@@ -660,7 +663,25 @@ const SLIDERS = [
 
 const MAX_MODEL_BYTES = 50 * 1024 * 1024;
 
-const activeTab = ref("wrapper");
+/*
+ * erp: shown inside the ERP's Add product page for one kind (type: wrapper,
+ * filler, ribbon or card), without the vendor sidebar, header and tabs, and
+ * through the ERP's own routes so staff with Inventory & Stock access can use it.
+ */
+const props = defineProps({
+  erp: { type: Boolean, default: false },
+  type: { type: String, default: "" },
+});
+const ERP_TYPES = ["wrapper", "filler", "ribbon", "card"];
+const API = props.erp ? "/procurement/inventory" : "/vendor";
+
+const activeTab = ref(props.erp && ERP_TYPES.includes(props.type) ? props.type : "wrapper");
+watch(
+  () => props.type,
+  (t) => {
+    if (props.erp && ERP_TYPES.includes(t)) switchTab(t);
+  },
+);
 const options = reactive({ wrapper: [], filler: [], ribbon: [], card: [], wrap_model: [] });
 const flowers = ref([]);
 const loadingOptions = ref(true);
@@ -859,13 +880,13 @@ const tabCount = (key) => (key === "presets" ? presetCount.value : key === "flow
 onMounted(() => {
   resetForm();
   loadOptions();
-  loadFlowers();
+  if (!props.erp) loadFlowers();
 });
 
 async function loadOptions() {
   loadingOptions.value = true;
   try {
-    const { data } = await api.get("/vendor/customization-options");
+    const { data } = await api.get(`${API}/customization-options`);
     const items = Array.isArray(data?.data) ? data.data : [];
     for (const type of Object.keys(options)) {
       options[type] = items.filter((item) => item.type === type);
@@ -1249,8 +1270,8 @@ async function submitForm() {
   uploadProgress.value = 0;
   try {
     const url = editingId.value
-      ? `/vendor/customization-options/${editingId.value}`
-      : "/vendor/customization-options";
+      ? `${API}/customization-options/${editingId.value}`
+      : `${API}/customization-options`;
     const { data } = await api.post(url, payload, {
       onUploadProgress: (event) => {
         if (event.total) uploadProgress.value = Math.round((event.loaded / event.total) * 100);
@@ -1289,7 +1310,7 @@ async function toggleWrapper(item, isActive) {
   const previous = item.is_active;
   item.is_active = isActive;
   try {
-    await api.patch(`/vendor/customization-options/${item.id}/active`, { is_active: isActive });
+    await api.patch(`${API}/customization-options/${item.id}/active`, { is_active: isActive });
     if (isPacked(item.type)) toast.success(isActive ? `${item.name} is available again.` : `${item.name} is marked sold out and hidden from customers.`);
     else toast.success(isActive ? `${item.name} is shown in the customizer.` : `${item.name} is hidden from the customizer.`);
   } catch (error) {
@@ -1303,7 +1324,7 @@ async function toggleWrapper(item, isActive) {
 async function deleteItem(item) {
   deletingId.value = item.id;
   try {
-    await api.delete(`/vendor/customization-options/${item.id}`);
+    await api.delete(`${API}/customization-options/${item.id}`);
     options[item.type] = options[item.type].filter((entry) => entry.id !== item.id);
     if (editingId.value === item.id) resetForm();
     toast.success(`${item.name} deleted.`);
@@ -1333,6 +1354,17 @@ const formatSize = (bytes) =>
   color: var(--v-text);
   font-family: "Poppins", sans-serif;
   transition: margin-left 0.3s ease;
+}
+
+/* Inside the ERP's Add product page: no sidebar, the page supplies the padding */
+.cz-page--erp {
+  margin-left: 0;
+  min-height: 0;
+  background: transparent;
+}
+.cz-page--erp .cz-main {
+  max-width: none;
+  padding: 0;
 }
 
 /* Only this page's own content: the shared sidebar and header keep their sizing */

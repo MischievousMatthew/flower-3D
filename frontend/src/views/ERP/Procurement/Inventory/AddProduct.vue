@@ -1154,7 +1154,7 @@ const submitProduct = async () => {
       }
     }
 
-    const response = await api.post("vendor/products", submitData, {
+    const response = await api.post("procurement/inventory/products", submitData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -1162,7 +1162,7 @@ const submitProduct = async () => {
 
     if (response.data.success) {
       toast.success(response.data.message || "Product added successfully!");
-      router.push("/erp/procurement/inventory/products");
+      router.push({ name: "InventoryStock" });
     }
   } catch (error) {
     console.error("Submit error:", error.response?.data);

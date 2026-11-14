@@ -43,6 +43,8 @@ const ICON_FOR = {
 // Pages outside a module's own paths that still belong to it
 const EXTRA_PATHS = {
   funding_requests: ["/erp/finance/funding-request/"],
+  // The flower or bouquet form opened from Add product
+  inventory_products: ["/erp/procurement/inventory/add-product"],
 };
 
 // Procurement holds two smaller groups in the sidebar: Inventory, then Supply

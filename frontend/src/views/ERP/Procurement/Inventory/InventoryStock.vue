@@ -1,8 +1,7 @@
 <template>
   <HrPage title="Stock & replenishment" subtitle="Everything the shop keeps: flowers, wrapping, ribbons, vases and supplies. See what's low, what to order and how much, and every change to the count.">
     <template #actions>
-      <router-link :to="{ name: 'Products' }" class="sp-btn sp-btn-ghost"><span v-html="ICONS.flower"></span>Products</router-link>
-      <button v-if="can('inventory_products', 'create')" type="button" class="sp-btn sp-btn-primary" @click="openMaterial"><span v-html="ICONS.plus"></span>Add material</button>
+      <router-link v-if="can('inventory_products', 'create')" :to="{ name: 'InventoryAddProduct' }" class="sp-btn sp-btn-primary"><span v-html="ICONS.plus"></span>Add product</router-link>
     </template>
 
     <div v-if="loadError" class="sp-banner error">
@@ -313,7 +312,7 @@
         <div v-if="mat" class="sp-modal-wrap">
           <form class="sp-modal wide st-form" role="dialog" aria-modal="true" aria-labelledby="st-mat-title" novalidate @submit.prevent="saveMaterial">
             <div class="sp-modal-head">
-              <div><h3 id="st-mat-title">Add a material</h3><p>Something the shop uses but doesn't sell, like wrapping, ribbon or vases. Customers never see it. Flowers are added as products.</p></div>
+              <div><h3 id="st-mat-title">Add a vase or supply</h3><p>Something the shop keeps but doesn't sell. Customers never see it. Flowers, bouquets, wrappers, fillers, ribbons and cards are added from Add product.</p></div>
               <button type="button" class="sp-icon-btn" aria-label="Close" @click="mat = null"><span v-html="ICONS.close"></span></button>
             </div>
             <div class="sp-grid-2">
@@ -373,7 +372,7 @@
             <p v-if="mat.error" class="sp-error">{{ mat.error }}</p>
             <div class="sp-modal-foot">
               <button type="button" class="sp-btn sp-btn-ghost" @click="mat = null">Cancel</button>
-              <button type="submit" class="sp-btn sp-btn-primary" :disabled="mat.busy">{{ mat.busy ? "Adding…" : "Add material" }}</button>
+              <button type="submit" class="sp-btn sp-btn-primary" :disabled="mat.busy">{{ mat.busy ? "Adding…" : "Add" }}</button>
             </div>
           </form>
         </div>
@@ -384,7 +383,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import HrPage from "../../../../components/hr/HrPage.vue";
 import ShowMore from "../../../../components/common/ShowMore.vue";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
@@ -438,6 +437,7 @@ function packText(it, n) {
 const packsToOrder = (it) => Math.max(1, Math.ceil(it.suggestion.qty / it.pack_size));
 
 const router = useRouter();
+const route = useRoute();
 const { can, canEdit } = useAssignment();
 const data = ref(null);
 const loadError = ref("");
@@ -651,7 +651,7 @@ async function saveLevels() {
 
 // ─── Add material ───
 function openMaterial() {
-  mat.value = { name: "", stock_kind: "wrapping", stock_unit: "", pack_unit: "", pack_size: "", on_hand: 0, unit_cost: "", min_stock_level: 0, max_stock_level: "", sku: "", supplier_lead_time: "", errors: {}, error: "", busy: false };
+  mat.value = { name: "", stock_kind: "vases", stock_unit: "", pack_unit: "", pack_size: "", on_hand: 0, unit_cost: "", min_stock_level: 0, max_stock_level: "", sku: "", supplier_lead_time: "", errors: {}, error: "", busy: false };
 }
 async function saveMaterial() {
   const m = mat.value;
@@ -680,6 +680,11 @@ watch(kind, () => (picked.value = picked.value.filter((id) => shown.value.some((
 onMounted(() => {
   load();
   loadHistory();
+  // Add product > Vase or supply comes here with ?add=material
+  if (route.query.add === "material" && can("inventory_products", "create")) {
+    openMaterial();
+    router.replace({ query: { ...route.query, add: undefined } });
+  }
 });
 </script>
 
