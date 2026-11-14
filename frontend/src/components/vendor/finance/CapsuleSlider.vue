@@ -1,5 +1,5 @@
 <!-- Segmented control: a row of choices in one rounded track; the picked one
-     sits on a raised tile that slides over to it (a radio group).
+     sits on a green tile that slides over to it (a radio group).
      options: [{ key, label }]; v-model is the picked key.
      Arrow keys / Home / End move along it; it scrolls inside itself on small screens. -->
 <template>
@@ -74,60 +74,48 @@ function onKey(e) {
 </script>
 
 <style scoped>
+/* The Supply Chain dashboard look: a bordered track, the picked choice on a
+   green tile that slides over to it. Same in light and dark (tokens). */
 .cs-scroll {
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
-  border-radius: 14px;
+  border-radius: 12px;
 }
 .cs-scroll::-webkit-scrollbar {
   display: none;
 }
 .cs {
-  /* Light: grey track, white tile. Dark values below. */
-  --cs-track: var(--v-subtle-2);
-  --cs-border: var(--v-border);
-  --cs-thumb: var(--v-surface);
-  --cs-thumb-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.1);
   position: relative;
   display: inline-flex;
-  gap: 2px;
-  padding: 5px;
-  border: 1px solid var(--cs-border);
-  border-radius: 14px;
-  background: var(--cs-track);
+  padding: 3px;
+  border: 1px solid var(--v-border-strong);
+  border-radius: 12px;
+  background: var(--v-surface);
   isolation: isolate;
-}
-:global(html[data-vendor-theme="dark"]) .cs,
-:global(html[data-admin-theme="dark"]) .cs {
-  --cs-track: var(--v-bg);
-  --cs-border: var(--v-border-strong);
-  --cs-thumb: var(--v-raised);
-  --cs-thumb-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .cs-thumb {
   position: absolute;
   z-index: -1;
-  top: 5px;
-  bottom: 5px;
+  top: 3px;
+  bottom: 3px;
   left: 0;
-  border-radius: 10px;
-  background: var(--cs-thumb);
-  box-shadow: var(--cs-thumb-shadow);
+  border-radius: 9px;
+  background: var(--bc-accent);
 }
 .cs-thumb.ready {
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .cs-opt {
-  min-height: 36px;
-  padding: 7px 16px;
+  min-height: 34px;
+  padding: 0 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 9px;
   background: none;
   font-family: "Poppins", sans-serif;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
-  color: var(--v-muted);
+  color: var(--v-text-2);
   white-space: nowrap;
   cursor: pointer;
   transition: color 0.2s;
@@ -136,12 +124,11 @@ function onKey(e) {
   color: var(--v-text);
 }
 .cs-opt.on {
-  color: var(--v-text);
-  font-weight: 600;
+  color: var(--bc-accent-ink);
 }
 .cs-opt:focus-visible {
   outline: 2px solid var(--bc-accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .cs-thumb.ready,

@@ -113,6 +113,17 @@
   border-color: var(--bc-accent-border);
   color: var(--bc-accent-strong);
 }
+/* Refresh beside a period picker: as tall as the picker's track, icon only */
+.sp-icon-btn.sp-refresh {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: var(--v-text);
+}
+.sp-icon-btn.sp-refresh:hover:not(:disabled) {
+  border-color: var(--bc-accent-border);
+  color: var(--bc-accent-strong);
+}
 .sp-icon-btn:disabled {
   opacity: 0.5;
   cursor: default;

@@ -20,11 +20,22 @@ class SupplyChainDashboardService
     /** Used when a product has no minimum stock level set */
     private const DEFAULT_MIN_STOCK = 10;
 
-    public function build(int $ownerId, int $days = 30): array
+    /** The periods the dashboard offers, each from its start up to today (weeks start Monday) */
+    public const PERIODS = ['today', 'week', 'month', 'year'];
+
+    public function build(int $ownerId, string $period = 'month'): array
     {
-        $since = now()->subDays($days - 1)->startOfDay();
+        $since = match ($period) {
+            'today' => now()->startOfDay(),
+            'week'  => now()->startOfWeek(CarbonInterface::MONDAY)->startOfDay(),
+            'year'  => now()->startOfYear(),
+            default => now()->startOfMonth(),
+        };
+        // Days in the period so far, today included; "before" is the same number of days just ahead of it
+        $days = (int) $since->copy()->startOfDay()->diffInDays(now()->startOfDay()) + 1;
 
         return [
+            'period'      => in_array($period, self::PERIODS, true) ? $period : 'month',
             'period_days' => $days,
             'orders'      => $this->orders($ownerId, $since, $days),
             'incoming'    => $this->incoming($ownerId),

@@ -1,10 +1,8 @@
 <template>
   <HrPage title="Supply Chain Dashboard" subtitle="Purchase orders, supplier deliveries on the way, stock running low, and what had to be thrown away.">
     <template #actions>
-      <div class="sc-range" role="group" aria-label="Period">
-        <button v-for="r in RANGES" :key="r.days" type="button" :class="{ on: days === r.days }" :aria-pressed="days === r.days" @click="setDays(r.days)">{{ r.label }}</button>
-      </div>
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="load"><span v-html="ICONS.restore"></span>Refresh</button>
+      <CapsuleSlider :model-value="period" :options="PERIODS" label="Period" @update:model-value="setPeriod" />
+      <button type="button" class="sp-icon-btn sp-refresh" :disabled="loading" aria-label="Refresh" title="Refresh" @click="load"><span v-html="ICONS.restore"></span></button>
     </template>
 
     <div v-if="error" class="sp-banner error">
@@ -90,7 +88,7 @@
 
       <!-- Purchase orders over time -->
       <section class="sp-card" aria-label="Purchase orders">
-        <div class="sp-card-head"><div><h2>Purchase orders</h2><p>Orders placed per day, last {{ days }} days</p></div></div>
+        <div class="sp-card-head"><div><h2>Purchase orders</h2><p>Orders placed per day, {{ periodText }}</p></div></div>
         <div v-if="!data" class="bc-skeleton sp-sk-block"></div>
         <template v-else>
           <TrendLine :points="data.orders.per_day" unit="orders" />
@@ -172,7 +170,7 @@
     <!-- Wastage -->
     <section class="sp-card" aria-label="Wastage">
       <div class="sp-card-head">
-        <div><h2>Wastage</h2><p>Stems thrown away, last {{ days }} days</p></div>
+        <div><h2>Wastage</h2><p>Stems thrown away, {{ periodText }}</p></div>
         <router-link v-if="canView('warehouse')" :to="{ name: 'WarehouseFloor' }" class="sp-btn sp-btn-ghost sp-btn-sm">Floor view</router-link>
       </div>
       <div v-if="!data" class="bc-skeleton sp-sk-block"></div>
@@ -214,23 +212,28 @@ import { computed, defineComponent, h, onMounted, ref } from "vue";
 import api from "../../../../../plugins/axios";
 import HrPage from "../../../../../components/hr/HrPage.vue";
 import TrendLine from "../../../../../components/procurement/TrendLine.vue";
+import CapsuleSlider from "../../../../../components/vendor/finance/CapsuleSlider.vue";
 import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../../../components/vendor/finance/financeUi";
 import { useAssignment } from "../../../../../composables/useAssignment";
 import "../../../../../components/vendor/finance/finance.css";
 
-const RANGES = [
-  { days: 7, label: "7 days" },
-  { days: 30, label: "30 days" },
-  { days: 90, label: "90 days" },
+// Each period runs from its start up to today (weeks start Monday)
+const PERIODS = [
+  { key: "today", label: "Today", text: "today" },
+  { key: "week", label: "This week", text: "this week" },
+  { key: "month", label: "This month", text: "this month" },
+  { key: "year", label: "This year", text: "this year" },
 ];
+const PERIOD_STORE = "sc-dashboard-period";
 
 const { canView } = useAssignment();
 const data = ref(null);
 const error = ref("");
 const loading = ref(false);
-const days = ref(readDays());
+const period = ref(readPeriod());
+const periodText = computed(() => PERIODS.find((p) => p.key === period.value)?.text ?? "this month");
 
 const Logo = defineComponent({
   props: { name: String, src: String },
@@ -259,7 +262,7 @@ const kpis = computed(() => {
   return [
     {
       key: "orders", label: "Purchase orders", icon: "receipt", tone: "blue", value: o.this_period.toLocaleString("en-PH"), to: sc,
-      trend: trend(o.this_period, o.previous_period), sub: `in ${days.value} days · ${o.total.toLocaleString("en-PH")} all time`,
+      trend: trend(o.this_period, o.previous_period), sub: `${periodText.value} · ${o.total.toLocaleString("en-PH")} all time`,
     },
     {
       key: "pending", label: "Pending deliveries", icon: "truck", tone: "violet", value: o.open.toLocaleString("en-PH"), hero: o.open > 0, to: sc,
@@ -319,24 +322,24 @@ const alerts = computed(() => {
   }
   const w = d.wastage;
   if (w.previous_units && w.units > w.previous_units * 1.25 && w.units - w.previous_units >= 5) {
-    list.push({ key: "waste", level: "warning", icon: "activity", title: "More waste than usual", detail: `${w.units} stems thrown away, up from ${w.previous_units} in the ${days.value} days before.`, to: floor, action: "Open floor" });
+    list.push({ key: "waste", level: "warning", icon: "activity", title: "More waste than usual", detail: `${w.units} stems thrown away, up from ${w.previous_units} in the ${data.value.period_days === 1 ? "day" : `${data.value.period_days} days`} before.`, to: floor, action: "Open floor" });
   }
   return list;
 });
 
-function readDays() {
+function readPeriod() {
   try {
-    const v = Number(localStorage.getItem("sc-dashboard-days"));
-    return RANGES.some((r) => r.days === v) ? v : 30;
+    const v = localStorage.getItem(PERIOD_STORE);
+    return PERIODS.some((p) => p.key === v) ? v : "month";
   } catch {
-    return 30;
+    return "month";
   }
 }
-function setDays(v) {
-  if (days.value === v) return;
-  days.value = v;
+function setPeriod(v) {
+  if (period.value === v) return;
+  period.value = v;
   try {
-    localStorage.setItem("sc-dashboard-days", String(v));
+    localStorage.setItem(PERIOD_STORE, v);
   } catch {
     /* only a convenience */
   }
@@ -359,7 +362,7 @@ async function load() {
   error.value = "";
   loading.value = true;
   try {
-    const res = await api.get("procurement/supply-chain/analytics/dashboard", { params: { days: days.value } });
+    const res = await api.get("procurement/supply-chain/analytics/dashboard", { params: { period: period.value } });
     data.value = res.data.data;
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load the supply chain dashboard.");
@@ -371,38 +374,6 @@ onMounted(load);
 </script>
 
 <style scoped>
-.sc-range {
-  display: inline-flex;
-  padding: 3px;
-  border: 1px solid var(--v-border-strong);
-  border-radius: 12px;
-  background: var(--v-surface);
-}
-.sc-range button {
-  min-height: 34px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 9px;
-  background: none;
-  color: var(--v-text-2);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.sc-range button:hover {
-  color: var(--v-text);
-}
-.sc-range button.on {
-  background: var(--bc-accent);
-  color: var(--bc-accent-ink);
-}
-.sc-range button:focus-visible {
-  outline: 2px solid var(--bc-accent);
-  outline-offset: 2px;
-}
-
 /* KPIs */
 .sc-kpi {
   color: inherit;

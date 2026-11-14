@@ -58,10 +58,10 @@ class SupplyChainAnalyticsController extends Controller
      */
     public function dashboard(Request $request, SupplyChainDashboardService $dashboard): JsonResponse
     {
-        $filters = $request->validate(['days' => ['nullable', 'integer', 'in:7,30,90']]);
+        $filters = $request->validate(['period' => ['nullable', 'in:' . implode(',', SupplyChainDashboardService::PERIODS)]]);
 
         return response()->json([
-            'data' => $dashboard->build($this->getOwnerId(), (int) ($filters['days'] ?? 30)),
+            'data' => $dashboard->build($this->getOwnerId(), $filters['period'] ?? 'month'),
         ]);
     }
 

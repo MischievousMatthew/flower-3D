@@ -2,7 +2,7 @@
   <HrPage title="CRM dashboard" subtitle="Who buys from the shop, who comes back, what customers are waiting on, and how happy they are.">
     <template #actions>
       <RangePicker @change="load" />
-      <button type="button" class="sp-icon-btn" :disabled="loading" aria-label="Refresh" title="Refresh" @click="load"><span v-html="ICONS.restore"></span></button>
+      <button type="button" class="sp-icon-btn sp-refresh" :disabled="loading" aria-label="Refresh" title="Refresh" @click="load"><span v-html="ICONS.restore"></span></button>
     </template>
 
     <div v-if="error" class="sp-banner error">
