@@ -1113,15 +1113,21 @@ textarea:focus,
 .card-img {
   position: relative;
   aspect-ratio: 4 / 3;
+  flex: none;
+  overflow: hidden;
   background: var(--a-subtle-2);
   display: flex;
   align-items: center;
   justify-content: center;
 }
+/* Pinned to the frame so tall or wide photos never stretch the card */
 .card-img img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 .img-fallback {
   font-size: 30px;
