@@ -149,6 +149,10 @@ export function useAuth() {
         quietStatuses: [401, 409],
       });
 
+      // Not a staff sign-in: the customer and vendor sign-in is tried next
+      if (data?.code === "not_staff") {
+        return { success: false, notStaff: true };
+      }
       if (!data?.success) {
         throw new Error(data?.message || "Employee login failed");
       }
@@ -300,7 +304,7 @@ export function useAuth() {
     if (employeeResult.success) return employeeResult;
     // A staff account that exists but can't sign in (store suspended, turned off,
     // too many tries), or no answer at all: the customer sign-in would fail the same way
-    if (employeeResult.code || employeeResult.status === 403) {
+    if (!employeeResult.notStaff && (employeeResult.code || employeeResult.status === 403)) {
       return { success: false, ...employeeResult };
     }
 

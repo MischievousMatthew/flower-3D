@@ -44,9 +44,11 @@ class EmployeeAuthController extends Controller
             [$employee, $passwordOk] = AccountLookup::signIn(Employee::query(), $request->username, $request->password);
 
             // No staff account by that name: the login form tries the customer
-            // and vendor sign-in next, which records the attempt
+            // and vendor sign-in next, which records the attempt. A normal
+            // answer, not a 401: every customer and vendor sign-in passes through
+            // here first, and the browser prints each failed request in red.
             if (!$employee) {
-                return response()->json(['success' => false, 'message' => 'Invalid credentials'], 401);
+                return $this->notStaffSignIn();
             }
             if (!$passwordOk) {
                 // The login form tries the customer and vendor sign-in next. When a
@@ -55,10 +57,8 @@ class EmployeeAuthController extends Controller
                 if (!AccountLookup::exists(User::query(), $request->username)) {
                     $guard->recordFailure($request, $identifier, 'wrong_password', null, 'employee');
                 }
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid credentials',
-                ], 401);
+                // The same answer as "no staff account", so it never tells which names are staff
+                return $this->notStaffSignIn();
             }
             // Told only after the right password, so it reveals nothing to a stranger
             if ($employee->status !== 'Active') {
@@ -270,5 +270,15 @@ class EmployeeAuthController extends Controller
         ];
 
         return $routes[$moduleKey] ?? '/erp/dashboard';
+    }
+
+    /**
+     * Not a staff sign-in (no such staff account, or not its password). The
+     * login form goes on to the customer and vendor sign-in, which gives the
+     * real answer; one wrong password still shows there as a failed sign-in.
+     */
+    private function notStaffSignIn(): JsonResponse
+    {
+        return response()->json(['success' => false, 'code' => 'not_staff', 'message' => 'Not a staff sign-in.']);
     }
 }
