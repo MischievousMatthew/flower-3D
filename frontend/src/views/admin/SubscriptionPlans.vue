@@ -43,7 +43,6 @@
           <form v-for="p in plans" v-else :key="p.key" class="plan-card" :class="{ featured: p.form.featured }" novalidate @submit.prevent="save(p)">
             <div class="plan-top">
               <span class="plan-tier">{{ TIER[p.key] }}</span>
-              <span class="subs" :title="`${p.subscribers} subscribed`" :aria-label="`${p.subscribers} subscribed`">{{ p.subscribers }}</span>
             </div>
 
             <label class="field">
@@ -336,13 +335,6 @@ onMounted(load);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--a-accent-text);
-}
-.subs {
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--a-subtle-2);
-  font-size: 11.5px;
-  color: var(--a-muted);
 }
 .field {
   display: flex;
