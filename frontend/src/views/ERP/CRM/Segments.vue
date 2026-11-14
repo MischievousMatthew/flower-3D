@@ -79,7 +79,7 @@
               <span class="sp-chip" :class="m.gets_offers ? 'green' : 'slate'">{{ m.gets_offers ? "Gets offers" : "No offers" }}</span>
             </li>
           </ul>
-          <ShowMore v-if="members && members.rows.length" tone="vendor" :has-more="memberList.hasMore.value" :loading="memberList.loadingMore.value" :shown="memberList.rows.value.length" :total="memberList.total.value" @more="memberList.showMore()" />
+          <PageNumbers v-if="members && members.rows.length" tone="vendor" :page="memberList.page.value" :pages="memberList.pages.value" :total="memberList.total.value" :shown="memberList.rows.value.length" :loading="memberList.loadingMore.value" @go="memberList.goTo" />
         </template>
       </section>
 
@@ -158,7 +158,7 @@
 import { computed, onMounted, ref } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -188,7 +188,7 @@ const error = ref("");
 const loading = ref(false);
 const selected = ref("");
 const members = ref(null);
-// 10 people first, then 10 more, then 20 at a time
+// 10 people a page
 const memberList = useShowMoreInto(members, "rows", async (p) =>
   (await api.get(`crm/segments/${selected.value}`, { params: { page: p, search: search.value.trim() || undefined } })).data.data,
 );

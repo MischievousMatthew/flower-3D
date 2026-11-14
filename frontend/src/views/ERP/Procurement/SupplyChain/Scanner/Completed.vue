@@ -48,7 +48,7 @@
             <span class="sp-chip" :class="STATUS[d.status]?.tone ?? 'slate'">{{ d.status_label ?? STATUS[d.status]?.label ?? d.status }}</span>
           </li>
         </ul>
-        <ShowMore tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="rows.length" :total="pager.total.value" @more="pager.showMore()" />
+        <PageNumbers tone="vendor" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="rows.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
       </template>
     </section>
   </HrPage>
@@ -58,7 +58,7 @@
 import { SCAN_TABS } from "../../../../../components/procurement/scanTabs";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import HrPage from "../../../../../components/hr/HrPage.vue";
-import ShowMore from "../../../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../../../components/common/PageNumbers.vue";
 import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../../../components/vendor/finance/financeUi";

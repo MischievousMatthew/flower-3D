@@ -487,7 +487,7 @@
               </table>
             </div>
 
-            <ShowMore v-if="tab === 'transactions' && transactions.length" tone="admin" :has-more="txList.hasMore.value" :loading="txList.loadingMore.value" :shown="txList.rows.value.length" :total="txList.total.value" @more="txList.showMore()" />
+            <PageNumbers v-if="tab === 'transactions' && transactions.length" tone="admin" :page="txList.page.value" :pages="txList.pages.value" :total="txList.total.value" :shown="txList.rows.value.length" :loading="txList.loadingMore.value" @go="txList.goTo" />
           </section>
         </template>
       </div>
@@ -502,7 +502,7 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMoreRows } from "../../composables/useShowMore";
 
 const { toggleMobile } = useSidebarState();
@@ -797,7 +797,7 @@ const fetchTransactions = async (page = 1) => {
     if (id === transactionRequest) transactionsLoading.value = false;
   }
 };
-// 10 rows first, then 10 more, then 20 at a time
+// 10 rows a page
 const txList = useShowMoreRows(transactions, meta, fetchTransactions);
 
 let subscriberRequest = 0;

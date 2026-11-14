@@ -143,7 +143,7 @@
               </article>
             </div>
 
-            <ShowMore v-if="products.length" tone="admin" :has-more="productList.hasMore.value" :loading="productList.loadingMore.value" :shown="productList.rows.value.length" :total="productList.total.value" @more="productList.showMore()" />
+            <PageNumbers v-if="products.length" tone="admin" :page="productList.page.value" :pages="productList.pages.value" :total="productList.total.value" :shown="productList.rows.value.length" :loading="productList.loadingMore.value" @go="productList.goTo" />
           </section>
         </template>
 
@@ -415,7 +415,7 @@ import { useProductTaxonomies } from "../../composables/useProductTaxonomies";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMoreRows } from "../../composables/useShowMore";
 import { linkedId } from "../../utils/hiddenIds";
 
@@ -519,7 +519,7 @@ const fetchProducts = async (page = 1) => {
     if (id === listRequest) loading.value = false;
   }
 };
-// 10 rows first, then 10 more, then 20 at a time
+// 10 rows a page
 const productList = useShowMoreRows(products, meta, fetchProducts);
 
 let searchTimer = null;

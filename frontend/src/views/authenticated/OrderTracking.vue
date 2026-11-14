@@ -387,8 +387,8 @@
           </button>
           <span>Or pick a tab above, like Processing or Completed.</span>
         </div>
-        <!-- 10 orders, then 10 more, then 20 at a time -->
-        <ShowMore v-else tone="customer" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="orders.length" :total="pager.total.value" @more="pager.showMore()" />
+        <!-- 10 orders a page -->
+        <PageNumbers v-else tone="customer" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="orders.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
       </template>
     </main>
 
@@ -585,7 +585,7 @@
 
 <script setup>
 import { watch, ref, reactive, onMounted, onUnmounted, nextTick } from "vue";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMorePaged } from "../../composables/useShowMore";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios";
@@ -718,7 +718,7 @@ function authHeaders() {
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
-/** One page of orders from the server, for the "Show more" list */
+/** One page of orders from the server, for the paged list */
 async function fetchOrdersPage(page) {
   const params = { page, per_page: meta.per_page };
   if (focusOrder.value) {
@@ -737,7 +737,7 @@ async function fetchOrdersPage(page) {
   Object.assign(meta, res.data.meta ?? {});
   return { items: res.data.data ?? [], lastPage: meta.last_page, total: meta.total };
 }
-// Orders show 10 at first, then 10 more, then 20 at a time
+// Orders show 10 a page
 const pager = useShowMorePaged(fetchOrdersPage);
 watch(() => pager.visible.value, (rows) => (orders.value = rows), { immediate: true });
 

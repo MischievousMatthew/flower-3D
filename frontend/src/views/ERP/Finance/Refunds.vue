@@ -141,7 +141,7 @@
             </div>
           </li>
         </ul>
-        <ShowMore v-if="data && data.rows.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
+        <PageNumbers v-if="data && data.rows.length" tone="vendor" :page="list.page.value" :pages="list.pages.value" :total="list.total.value" :shown="list.rows.value.length" :loading="list.loadingMore.value" @go="list.goTo" />
       </template>
     </section>
 
@@ -247,7 +247,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
@@ -334,7 +334,7 @@ const kpis = computed(() => {
   ];
 });
 
-// 10 refunds first, then 10 more, then 20 at a time
+// 10 refunds a page
 const list = useShowMoreInto(data, "rows", async (p) =>
   (await api.get(base.value, {
     params: {

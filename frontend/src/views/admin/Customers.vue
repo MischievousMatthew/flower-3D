@@ -131,7 +131,7 @@
               </table>
             </div>
 
-            <ShowMore v-if="rows.length" tone="admin" :has-more="customerList.hasMore.value" :loading="customerList.loadingMore.value" :shown="customerList.rows.value.length" :total="customerList.total.value" @more="customerList.showMore()" />
+            <PageNumbers v-if="rows.length" tone="admin" :page="customerList.page.value" :pages="customerList.pages.value" :total="customerList.total.value" :shown="customerList.rows.value.length" :loading="customerList.loadingMore.value" @go="customerList.goTo" />
           </section>
         </template>
 
@@ -400,7 +400,7 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMoreRows } from "../../composables/useShowMore";
 import { linkedId } from "../../utils/hiddenIds";
 
@@ -491,7 +491,7 @@ const fetchCustomers = async (page = 1) => {
     if (id === listRequest) loading.value = false;
   }
 };
-// 10 rows first, then 10 more, then 20 at a time
+// 10 rows a page
 const customerList = useShowMoreRows(rows, meta, fetchCustomers);
 
 let searchTimer = null;

@@ -291,8 +291,8 @@
           </tbody>
         </table>
 
-        <!-- 10 records, then 10 more, then 20 at a time -->
-        <ShowMore v-if="records.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="records.length" :total="pager.total.value" @more="pager.showMore()" />
+        <!-- 10 records a page -->
+        <PageNumbers v-if="records.length" tone="vendor" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="records.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
       </div>
     </div>
 
@@ -370,8 +370,8 @@ import { toast } from "@/utils/snackbar";
 
 import LoadingOverlay from "../../../../layouts/components/LoadingOverlay.vue";
 import attendanceService from "../../../../services/attendanceService";
-import employeeInfoService from "../../../../services/employeeInfoService";
-import ShowMore from "../../../../components/common/ShowMore.vue";
+import employeeInfoService from "../../../../services/employeeInfoService";
+import PageNumbers from "../../../../components/common/PageNumbers.vue";
 import { useShowMorePaged } from "../../../../composables/useShowMore";
 
 const router = useRouter();
@@ -434,7 +434,7 @@ onMounted(async () => {
 });
 
 // Load records
-/** One page of records from the server, for the "Show more" list */
+/** One page of records from the server, for the paged list */
 async function fetchRecordsPage(page) {
   const response = await attendanceService.getAll({ page, ...filters.value });
   if (!response.success) return { items: [], lastPage: 1, total: 0 };

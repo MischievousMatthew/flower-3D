@@ -462,7 +462,7 @@
           </div>
         </li>
       </ul>
-      <ShowMore v-if="requests.length" tone="vendor" :has-more="reqPager.hasMore.value" :loading="reqPager.loadingMore.value" :shown="requests.length" :total="reqPager.total.value" @more="reqPager.showMore()" />
+      <PageNumbers v-if="requests.length" tone="vendor" :page="reqPager.page.value" :pages="reqPager.pages.value" :total="reqPager.total.value" :shown="requests.length" :loading="reqPager.loadingMore.value" @go="reqPager.goTo" />
     </section>
 
     <!-- ── Existing modals (unchanged) ────────────────────────────────── -->
@@ -908,7 +908,6 @@
 </template>
 
 <script setup>
-import ShowMore from "../../../../../components/common/ShowMore.vue";
 import PageNumbers from "../../../../../components/common/PageNumbers.vue";
 import { useShowMorePaged } from "../../../../../composables/useShowMore";
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";

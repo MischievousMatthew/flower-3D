@@ -85,8 +85,8 @@
             </tbody>
           </table>
         </div>
-        <!-- 10 payrolls, then 10 more, then 20 at a time -->
-        <ShowMore v-if="rows && rows.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="rows.length" :total="pager.total.value" @more="pager.showMore()" />
+        <!-- 10 payrolls a page -->
+        <PageNumbers v-if="rows && rows.length" tone="vendor" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="rows.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
       </section>
     </template>
 
@@ -352,7 +352,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMorePaged } from "../../../composables/useShowMore";
 import { toast } from "@/utils/snackbar";
 import { SHOP_ICONS as ICONS } from "../../vendor/shop/shopIcons";
@@ -433,7 +433,7 @@ function toggleAll() {
 
 const params = () => ({ status: filters.status, month: filters.month || undefined, year: filters.year, search: search.value.trim() || undefined });
 
-/** One page of payrolls from the server, for the "Show more" list */
+/** One page of payrolls from the server, for the paged list */
 async function fetchPage(p) {
   const res = await props.api.list({ ...params(), page: p, per_page: 30 });
   page.value = res.pagination;

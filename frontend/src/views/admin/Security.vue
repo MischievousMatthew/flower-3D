@@ -167,7 +167,7 @@
               </tbody>
             </table>
           </div>
-          <ShowMore v-if="audit.length" tone="admin" :has-more="auditList.hasMore.value" :loading="auditList.loadingMore.value" :shown="auditList.rows.value.length" :total="auditList.total.value" @more="auditList.showMore()" />
+          <PageNumbers v-if="audit.length" tone="admin" :page="auditList.page.value" :pages="auditList.pages.value" :total="auditList.total.value" :shown="auditList.rows.value.length" :loading="auditList.loadingMore.value" @go="auditList.goTo" />
         </section>
 
         <!-- ═══ Sign-ins ═══ -->
@@ -469,7 +469,7 @@
                     </div>
                   </li>
                 </ul>
-                <ShowMore v-if="!lookup" tone="admin" :has-more="problems.hasMore.value" :loading="problems.loadingMore.value" :shown="problems.items.value.length" :total="problems.total.value" done-text="You're all caught up: that's every open problem" @more="problems.showMore()" />
+                <PageNumbers v-if="!lookup" tone="admin" :page="problems.page.value" :pages="problems.pages.value" :total="problems.total.value" :shown="problems.items.value.length" :loading="problems.loadingMore.value" @go="problems.goTo" />
               </template>
             </section>
           </template>
@@ -514,7 +514,7 @@
               </tbody>
             </table>
           </div>
-          <ShowMore v-if="history.length" tone="admin" :has-more="historyList.hasMore.value" :loading="historyList.loadingMore.value" :shown="historyList.rows.value.length" :total="historyList.total.value" @more="historyList.showMore()" />
+          <PageNumbers v-if="history.length" tone="admin" :page="historyList.page.value" :pages="historyList.pages.value" :total="historyList.total.value" :shown="historyList.rows.value.length" :loading="historyList.loadingMore.value" @go="historyList.goTo" />
         </section>
 
         <!-- ═══ Website info ═══ -->
@@ -653,7 +653,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import InfoTip from "./components/InfoTip.vue";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMoreRemote, useShowMoreRows } from "../../composables/useShowMore";
 import { loadChartJs } from "../../utils/chartjs";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
@@ -855,7 +855,7 @@ const fetchAudit = async (page = 1) => {
     loading.audit = false;
   }
 };
-// 10 rows first, then 10 more, then 20 at a time
+// 10 rows a page
 const auditList = useShowMoreRows(audit, auditMeta, fetchAudit);
 let auditTimer = null;
 watch(
@@ -1300,7 +1300,7 @@ const fetchHistory = async (page = 1) => {
     loading.history = false;
   }
 };
-// 10 rows first, then 10 more, then 20 at a time
+// 10 rows a page
 const historyList = useShowMoreRows(history, historyMeta, fetchHistory);
 let historyTimer = null;
 watch(

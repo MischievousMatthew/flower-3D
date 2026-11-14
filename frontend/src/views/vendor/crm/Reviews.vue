@@ -147,7 +147,7 @@
         </li>
       </ul>
 
-      <ShowMore v-if="data && data.reviews.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
+      <PageNumbers v-if="data && data.reviews.length" tone="vendor" :page="list.page.value" :pages="list.pages.value" :total="list.total.value" :shown="list.rows.value.length" :loading="list.loadingMore.value" @go="list.goTo" />
     </section>
   </component>
 </template>
@@ -156,7 +156,7 @@
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import HrPage from "../../../components/hr/HrPage.vue";
@@ -209,7 +209,7 @@ const trend = computed(() => {
 const pct = (n) => (s.value.count ? ((s.value.distribution?.[n] ?? 0) / s.value.count) * 100 : 0);
 const starFill = (n) => Math.max(0, Math.min(100, ((s.value.average ?? 0) - (n - 1)) * 100));
 
-// 10 reviews first, then 10 more, then 20 at a time
+// 10 reviews a page
 const list = useShowMoreInto(data, "reviews", async (page) => {
   const params = {
     page,

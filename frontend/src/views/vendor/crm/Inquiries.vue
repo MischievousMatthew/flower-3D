@@ -130,7 +130,7 @@
         </li>
       </ul>
 
-      <ShowMore v-if="data && data.inquiries.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
+      <PageNumbers v-if="data && data.inquiries.length" tone="vendor" :page="list.page.value" :pages="list.pages.value" :total="list.total.value" :shown="list.rows.value.length" :loading="list.loadingMore.value" @go="list.goTo" />
     </section>
   </component>
 </template>
@@ -140,7 +140,7 @@ import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import HrPage from "../../../components/hr/HrPage.vue";
@@ -172,7 +172,7 @@ const STATUS = { open: ["Waiting for you", "amber"], answered: ["Answered", "gre
 
 const router = useRouter();
 const data = ref(null);
-// 10 questions first, then 10 more, then 20 at a time
+// 10 questions a page
 const list = useShowMoreInto(
   data,
   "inquiries",

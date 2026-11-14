@@ -110,7 +110,7 @@
                 </div>
               </li>
             </ul>
-            <ShowMore v-if="reviews.length" tone="admin" :has-more="reviewList.hasMore.value" :loading="reviewList.loadingMore.value" :shown="reviewList.rows.value.length" :total="reviewList.total.value" @more="reviewList.showMore()" />
+            <PageNumbers v-if="reviews.length" tone="admin" :page="reviewList.page.value" :pages="reviewList.pages.value" :total="reviewList.total.value" :shown="reviewList.rows.value.length" :loading="reviewList.loadingMore.value" @go="reviewList.goTo" />
           </section>
         </template>
 
@@ -162,7 +162,7 @@
               </div>
             </li>
           </ul>
-          <ShowMore v-if="reports.length" tone="admin" :has-more="reportList.hasMore.value" :loading="reportList.loadingMore.value" :shown="reportList.rows.value.length" :total="reportList.total.value" @more="reportList.showMore()" />
+          <PageNumbers v-if="reports.length" tone="admin" :page="reportList.page.value" :pages="reportList.pages.value" :total="reportList.total.value" :shown="reportList.rows.value.length" :loading="reportList.loadingMore.value" @go="reportList.goTo" />
         </section>
       </div>
     </main>
@@ -212,7 +212,7 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import { useAdminAccess } from "../../composables/useAdminAccess";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import api from "../../plugins/axios";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMoreRows } from "../../composables/useShowMore";
 
 const { toggleMobile } = useSidebarState();
@@ -264,7 +264,7 @@ const fetchReviews = async (page = 1) => {
     if (id === reviewRequest) loading.reviews = false;
   }
 };
-// 10 rows first, then 10 more, then 20 at a time
+// 10 rows a page
 const reviewList = useShowMoreRows(reviews, reviewMeta, fetchReviews);
 let reviewTimer = null;
 watch(
@@ -316,7 +316,7 @@ const fetchReports = async (page = 1) => {
     if (id === reportRequest) loading.reports = false;
   }
 };
-// 10 rows first, then 10 more, then 20 at a time
+// 10 rows a page
 const reportList = useShowMoreRows(reports, reportMeta, fetchReports);
 let reportTimer = null;
 watch(

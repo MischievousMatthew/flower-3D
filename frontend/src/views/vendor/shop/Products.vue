@@ -197,6 +197,9 @@
       </table>
     </div>
 
+    <!-- 10 a page, in the grid and the list -->
+    <PageNumbers v-if="products && matched.length" tone="vendor" :page="productPager.page.value" :pages="productPager.pages.value" :total="matched.length" :shown="visible.length" label="Product pages" @go="productPager.goTo" />
+
     <ProductEditor :product-id="editing" @close="editing = null" @saved="load" />
     <PhotoViewer :images="zoomed ? [zoomed.image] : []" :open="!!zoomed" :alt="zoomed?.name || 'Product'" @close="zoomed = null" />
     <SalePriceModal :product="saleFor" @close="saleFor = null" @saved="replace" />
@@ -232,6 +235,8 @@ import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import ProductEditor from "../../../components/vendor/shop/ProductEditor.vue";
 import PhotoViewer from "../../../components/common/PhotoViewer.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
+import { useShowMoreLocal } from "../../../composables/useShowMore";
 import SalePriceModal from "../../../components/vendor/shop/SalePriceModal.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage, money, useVendorCatalog } from "../../../components/vendor/shop/useVendorCatalog";
@@ -298,7 +303,7 @@ const counts = computed(() =>
 const untagged = computed(() => (products.value ?? []).filter((p) => p.status !== "inactive" && p.selling_type !== "per_piece_customizable" && !p.occasion_tags.length).length);
 const usedCategories = computed(() => [...new Set((products.value ?? []).map((p) => p.category).filter(Boolean))]);
 
-const visible = computed(() => {
+const matched = computed(() => {
   const q = search.value.trim().toLowerCase();
   const list = (products.value ?? []).filter(
     (p) =>
@@ -316,6 +321,9 @@ const visible = computed(() => {
   };
   return [...list].sort(sorters[sort.value]);
 });
+// 10 a page; a new search, filter or sort starts at page 1
+const productPager = useShowMoreLocal(matched, () => [search.value, status.value, category.value, sort.value]);
+const visible = productPager.visible;
 
 const isSelected = (p) => selected.value.includes(p.id);
 const toggle = (p) => {

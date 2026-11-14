@@ -103,7 +103,7 @@
           </div>
         </li>
       </ul>
-      <ShowMore tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="suppliers.length" :total="pager.total.value" @more="pager.showMore()" />
+      <PageNumbers tone="vendor" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="suppliers.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
     </template>
 
     <!-- Blacklist / delete -->
@@ -136,7 +136,7 @@
 <script setup>
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import HrPage from "../../../../../components/hr/HrPage.vue";
-import ShowMore from "../../../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../../../components/common/PageNumbers.vue";
 import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { SUPPLIER_TYPES, STATUS, typeOf, daysText, leadText, initials } from "../../../../../components/procurement/supplierUi";

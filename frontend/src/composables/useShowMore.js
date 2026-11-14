@@ -1,51 +1,54 @@
 import { computed, ref, unref, watch } from "vue";
 
-// Every long list on the site works the same way: 10 rows first, "Show more"
-// adds 10, then 20 at a time, and the end says "You're all caught up".
-export const FIRST_ROWS = 10;
-const STEPS = [10, 20];
+// Every long list on the site works the same way: 10 rows a page, with page
+// numbers under it (components/common/PageNumbers.vue):
+//   Showing 11–20 of 37        ‹ Prev  1 [2] 3 4  Next ›
+// Each helper below returns the rows of the current page plus
+//   page, pages, total, goTo(n)
+// The older names (hasMore, showMore, loadingMore…) still work: showMore()
+// goes to the next page and loadingMore is true while a page loads.
+export const PER_PAGE = 10;
 
-/** How many rows the next "Show more" adds, after `clicks` earlier clicks */
-export const stepAfter = (clicks) => STEPS[Math.min(clicks, STEPS.length - 1)];
-
-/** How many rows show after `clicks` clicks: 10, 20, 40, 60, … */
-export const rowsAfter = (clicks) => {
-  let rows = FIRST_ROWS;
-  for (let i = 0; i < clicks; i++) rows += stepAfter(i);
-  return rows;
-};
+const pagesFor = (total) => Math.max(1, Math.ceil((Number(total) || 0) / PER_PAGE));
+const sliceOf = (list, page) => list.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+const errorText = (e, fallback) => e?.response?.data?.message || e?.message || fallback;
 
 /**
  * For a list the page already has in full (filtered on the page).
- * Pass the whole list; show `visible`. Starts over when `resetOn` changes
+ * Pass the whole list; show `visible`. Back to page 1 when `resetOn` changes
  * (a new filter or search).
  */
 export function useShowMoreLocal(list, resetOn = null) {
-  const clicks = ref(0);
+  const page = ref(1);
   const all = computed(() => unref(list) ?? []);
-  const visible = computed(() => all.value.slice(0, rowsAfter(clicks.value)));
-  const hasMore = computed(() => all.value.length > visible.value.length);
-  const showMore = () => {
-    if (hasMore.value) clicks.value++;
+  const total = computed(() => all.value.length);
+  const pages = computed(() => pagesFor(total.value));
+  // A page that no longer exists (the list got shorter) shows the last one
+  const current = computed(() => Math.min(page.value, pages.value));
+  const visible = computed(() => sliceOf(all.value, current.value));
+  const hasMore = computed(() => current.value < pages.value);
+  const goTo = (n) => {
+    page.value = Math.min(Math.max(1, n), pages.value);
   };
+  const showMore = () => goTo(current.value + 1);
   const reset = () => {
-    clicks.value = 0;
+    page.value = 1;
   };
   if (resetOn) watch(resetOn, reset, { deep: true });
 
-  return { visible, hasMore, showMore, reset, total: computed(() => all.value.length), shown: computed(() => visible.value.length) };
+  return { visible, hasMore, showMore, reset, goTo, page: current, pages, total, shown: computed(() => visible.value.length), loadingMore: ref(false) };
 }
 
 /**
  * For a list the server hands out in numbered pages (?page=1, 2, …) of any size.
- * Pages are fetched behind the scenes as rows are needed; people only ever see
- * 10, then 10 more, then 20 at a time. `fetchPage(page)` returns
- * { items, lastPage } (or { items, hasMore }), plus `total` when known.
+ * The server's pages are fetched behind the scenes as needed; people see 10
+ * rows a page. `fetchPage(page)` returns { items, lastPage } (or
+ * { items, hasMore }), plus `total` when known.
  */
 export function useShowMorePaged(fetchPage) {
   const buffer = ref([]);
-  const clicks = ref(0);
-  const page = ref(0);
+  const page = ref(1);
+  const serverPage = ref(0);
   const lastPage = ref(1);
   const serverHasMore = ref(false);
   const total = ref(0);
@@ -57,27 +60,31 @@ export function useShowMorePaged(fetchPage) {
   const failure = ref(null);
   let request = 0;
 
-  const visible = computed(() => buffer.value.slice(0, rowsAfter(clicks.value)));
-  const hasMore = computed(() => buffer.value.length > visible.value.length || serverHasMore.value);
+  const pages = computed(() =>
+    total.value ? pagesFor(total.value) : Math.ceil(buffer.value.length / PER_PAGE) + (serverHasMore.value ? 1 : 0) || 1,
+  );
+  const visible = computed(() => sliceOf(buffer.value, page.value));
+  const hasMore = computed(() => page.value < pages.value);
 
   async function fetchNext(mine) {
-    const next = page.value + 1;
+    const next = serverPage.value + 1;
     const res = await fetchPage(next);
     if (mine !== request) return false;
     buffer.value = [...buffer.value, ...(res.items ?? [])];
-    page.value = next;
+    serverPage.value = next;
     lastPage.value = res.lastPage ?? lastPage.value;
     serverHasMore.value = res.hasMore ?? next < (res.lastPage ?? 1);
-    if (res.total !== undefined) total.value = res.total;
+    if (res.total !== undefined && res.total !== null) total.value = Number(res.total);
     else if (!serverHasMore.value) total.value = buffer.value.length;
     return true;
   }
 
-  /** Enough rows for what should show, fetching more pages if needed */
-  async function fill(mine) {
-    while (serverHasMore.value && buffer.value.length < rowsAfter(clicks.value)) {
-      if (!(await fetchNext(mine))) return;
+  /** Enough rows for page `n`, fetching more of the server's pages if needed */
+  async function fill(mine, n) {
+    while (serverHasMore.value && buffer.value.length < n * PER_PAGE) {
+      if (!(await fetchNext(mine))) return false;
     }
+    return mine === request;
   }
 
   async function load() {
@@ -85,42 +92,43 @@ export function useShowMorePaged(fetchPage) {
     loading.value = true;
     error.value = "";
     failure.value = null;
-    clicks.value = 0;
-    page.value = 0;
+    page.value = 1;
+    serverPage.value = 0;
     buffer.value = [];
+    total.value = 0;
     serverHasMore.value = true;
     try {
-      await fill(mine);
+      await fill(mine, 1);
       if (mine === request) loaded.value = true;
     } catch (e) {
       if (mine === request) {
         serverHasMore.value = false;
         failure.value = e;
-        error.value = e?.response?.data?.message || e?.message || "This list couldn't be loaded.";
+        error.value = errorText(e, "This list couldn't be loaded.");
       }
     } finally {
       if (mine === request) loading.value = false;
     }
   }
 
-  async function showMore() {
-    if (!hasMore.value || loadingMore.value) return;
+  async function goTo(n) {
+    if (loadingMore.value || n < 1 || n === page.value) return;
     const mine = request;
     loadingMore.value = true;
     try {
-      clicks.value++;
-      await fill(mine);
+      if (await fill(mine, n)) page.value = Math.min(n, pages.value);
     } catch (e) {
-      error.value = e?.response?.data?.message || e?.message || "More couldn't be loaded.";
+      error.value = errorText(e, "That page couldn't be loaded.");
     } finally {
       loadingMore.value = false;
     }
   }
+  const showMore = () => goTo(page.value + 1);
 
-  /** Loads again after a change (an order cancelled…), keeping as many rows showing as before */
+  /** Loads again after a change (an order cancelled…), staying on the same page */
   async function refresh() {
     const mine = ++request;
-    const keep = clicks.value;
+    const keep = page.value;
     error.value = "";
     try {
       const fresh = [];
@@ -128,115 +136,119 @@ export function useShowMorePaged(fetchPage) {
       let more = true;
       let last = 1;
       let count;
-      while (more && fresh.length < rowsAfter(keep)) {
+      while (more && fresh.length < keep * PER_PAGE) {
         next++;
         const res = await fetchPage(next);
         if (mine !== request) return;
         fresh.push(...(res.items ?? []));
         last = res.lastPage ?? last;
         more = res.hasMore ?? next < last;
-        if (res.total !== undefined) count = res.total;
+        if (res.total !== undefined && res.total !== null) count = Number(res.total);
       }
       buffer.value = fresh;
-      page.value = next;
+      serverPage.value = next;
       lastPage.value = last;
       serverHasMore.value = more;
       total.value = count ?? (more ? total.value : fresh.length);
-      clicks.value = keep;
+      page.value = Math.min(keep, pages.value);
     } catch (e) {
-      if (mine === request) error.value = e?.response?.data?.message || e?.message || "This list couldn't be refreshed.";
+      if (mine === request) error.value = errorText(e, "This list couldn't be refreshed.");
     }
   }
 
-  return { items: visible, visible, buffer, total, hasMore, loading, loadingMore, loaded, error, failure, load, showMore, refresh };
+  return { items: visible, visible, buffer, total, page, pages, goTo, hasMore, loading, loadingMore, loaded, error, failure, load, showMore, refresh };
 }
 
 /**
  * For pages that keep the whole answer in one writable object (data.value =
- * { items, meta, … }) and change it in place. Pages are added to that list as
- * needed; show `rows` (10, then 10 more, then 20 at a time).
+ * { items, meta, … }) and change it in place. The server's pages are added to
+ * that list as needed; show `rows` (the current page's 10).
  * fetchPayload(page) returns the answer for one page; onPage(payload, page)
  * runs after each one (e.g. to copy preferences out of it).
  */
 export function useShowMoreInto(dataRef, listKey, fetchPayload, onPage = null) {
-  const clicks = ref(0);
-  const page = ref(0);
+  const page = ref(1);
+  const serverPage = ref(0);
   const lastPage = ref(1);
   const loadingMore = ref(false);
   let request = 0;
 
   const list = () => dataRef.value?.[listKey] ?? [];
-  const rows = computed(() => list().slice(0, rowsAfter(clicks.value)));
-  const hasMore = computed(() => list().length > rows.value.length || page.value < lastPage.value);
   const total = computed(() => dataRef.value?.meta?.total ?? list().length);
+  const pages = computed(() => pagesFor(total.value));
+  const rows = computed(() => sliceOf(list(), page.value));
+  const hasMore = computed(() => page.value < pages.value);
 
   async function fetchInto(next, mine, replace) {
     const payload = await fetchPayload(next);
     if (mine !== request) return false;
     if (replace) dataRef.value = payload;
     else dataRef.value[listKey].push(...(payload?.[listKey] ?? []));
-    page.value = next;
+    serverPage.value = next;
     lastPage.value = payload?.meta?.last_page ?? 1;
     onPage?.(payload, next);
     return true;
   }
 
-  async function fill(mine) {
-    while (page.value < lastPage.value && list().length < rowsAfter(clicks.value)) {
-      if (!(await fetchInto(page.value + 1, mine, false))) return;
+  async function fill(mine, n) {
+    while (serverPage.value < lastPage.value && list().length < n * PER_PAGE) {
+      if (!(await fetchInto(serverPage.value + 1, mine, false))) return false;
     }
+    return mine === request;
   }
 
   /** Starts over (opening the page, a new filter); throws like the page's own request would */
   async function load() {
     const mine = ++request;
-    clicks.value = 0;
+    page.value = 1;
     if (!(await fetchInto(1, mine, true))) return;
-    await fill(mine);
+    await fill(mine, 1);
   }
 
-  async function showMore() {
-    if (!hasMore.value || loadingMore.value) return;
+  async function goTo(n) {
+    if (loadingMore.value || n < 1 || n === page.value) return;
     const mine = request;
     loadingMore.value = true;
     try {
-      clicks.value++;
-      await fill(mine);
+      if (await fill(mine, n)) page.value = Math.min(n, pages.value);
     } finally {
       loadingMore.value = false;
     }
   }
+  const showMore = () => goTo(page.value + 1);
 
-  /** Loads again after a change, keeping as many rows showing */
+  /** Loads again after a change, staying on the same page */
   async function refresh() {
-    const keep = clicks.value;
+    const keep = page.value;
     const mine = ++request;
     if (!(await fetchInto(1, mine, true))) return;
-    clicks.value = keep;
-    await fill(mine);
+    await fill(mine, keep);
+    page.value = Math.min(keep, pages.value);
   }
 
-  return { rows, hasMore, total, loadingMore, load, showMore, refresh };
+  return { rows, hasMore, total, page, pages, goTo, loadingMore, load, showMore, refresh };
 }
 
 /**
  * For pages whose own fetch(page) fills a rows ref and a meta ref
  * ({ current_page, last_page, total }). The fetch adds to the rows for
  * page > 1 (rows.value = page > 1 ? [...rows.value, ...new] : new); this
- * decides which pages to ask for and shows `rows` 10, 10, then 20 at a time.
+ * decides which of the server's pages to ask for and shows `rows`, the
+ * current page's 10.
  */
 export function useShowMoreRows(rowsRef, metaRef, fetchPage) {
-  const clicks = ref(0);
+  const page = ref(1);
   const loadingMore = ref(false);
   const all = () => rowsRef.value ?? [];
-  const rows = computed(() => all().slice(0, rowsAfter(clicks.value)));
   const current = () => Number(metaRef.value?.current_page ?? 1);
   const last = () => Number(metaRef.value?.last_page ?? 1);
-  const hasMore = computed(() => all().length > rows.value.length || current() < last());
   const total = computed(() => metaRef.value?.total ?? all().length);
+  const pages = computed(() => pagesFor(total.value));
+  const rows = computed(() => sliceOf(all(), Math.min(page.value, pages.value)));
+  const hasMore = computed(() => page.value < pages.value);
 
-  async function fill() {
-    while (all().length < rowsAfter(clicks.value) && current() < last()) {
+  async function fill(n) {
+    while (all().length < n * PER_PAGE && current() < last()) {
       const before = current();
       await fetchPage(before + 1);
       if (current() <= before) return; // the page didn't load; don't loop
@@ -244,96 +256,101 @@ export function useShowMoreRows(rowsRef, metaRef, fetchPage) {
   }
   /** Starts over (opening the page, a new filter or search) */
   async function load() {
-    clicks.value = 0;
+    page.value = 1;
     await fetchPage(1);
-    await fill();
+    await fill(1);
   }
-  async function showMore() {
-    if (!hasMore.value || loadingMore.value) return;
+  async function goTo(n) {
+    if (loadingMore.value || n < 1 || n === page.value) return;
     loadingMore.value = true;
     try {
-      clicks.value++;
-      await fill();
+      await fill(n);
+      page.value = Math.min(n, pages.value);
     } finally {
       loadingMore.value = false;
     }
   }
-  /** Loads again after a change, keeping as many rows showing */
+  const showMore = () => goTo(page.value + 1);
+  /** Loads again after a change, staying on the same page */
   async function refresh() {
+    const keep = page.value;
     await fetchPage(1);
-    await fill();
+    await fill(keep);
+    page.value = Math.min(keep, pages.value);
   }
 
-  return { rows, hasMore, total, loadingMore, load, showMore, refresh };
+  return { rows, hasMore, total, page, pages, goTo, loadingMore, load, showMore, refresh };
 }
 
 /**
  * For a list the server hands out in slices (?offset=&limit=, answering
  * { items, meta: { has_more, total } }). `fetchSlice({ offset, limit })`
- * returns that answer; `load()` starts over, `showMore()` adds the next slice.
+ * returns that answer; `load()` starts over, `goTo(n)` fetches page n.
  */
 export function useShowMoreRemote(fetchSlice) {
   const items = ref([]);
   const total = ref(0);
-  const hasMore = ref(false);
+  const page = ref(1);
+  const serverHasMore = ref(false);
   const loading = ref(false);
   const loadingMore = ref(false);
   const loaded = ref(false);
   const error = ref("");
-  const clicks = ref(0);
   let request = 0;
+
+  const pages = computed(() => (total.value ? pagesFor(total.value) : page.value + (serverHasMore.value ? 1 : 0)));
+  const hasMore = computed(() => page.value < pages.value);
+
+  async function fetchAt(n, mine) {
+    const res = await fetchSlice({ offset: (n - 1) * PER_PAGE, limit: PER_PAGE });
+    if (mine !== request) return false;
+    items.value = res.items ?? [];
+    serverHasMore.value = !!res.meta?.has_more;
+    total.value = res.meta?.total ?? (n - 1) * PER_PAGE + items.value.length;
+    page.value = n;
+    return true;
+  }
 
   async function load() {
     const mine = ++request;
     loading.value = true;
     error.value = "";
-    clicks.value = 0;
     try {
-      const res = await fetchSlice({ offset: 0, limit: FIRST_ROWS });
-      if (mine !== request) return;
-      items.value = res.items ?? [];
-      hasMore.value = !!res.meta?.has_more;
-      total.value = res.meta?.total ?? items.value.length;
-      loaded.value = true;
+      if (await fetchAt(1, mine)) loaded.value = true;
     } catch (e) {
-      if (mine === request) error.value = e?.response?.data?.message || e?.message || "This list couldn't be loaded.";
+      if (mine === request) error.value = errorText(e, "This list couldn't be loaded.");
     } finally {
       if (mine === request) loading.value = false;
     }
   }
 
-  async function showMore() {
-    if (!hasMore.value || loadingMore.value) return;
-    const mine = request;
+  async function goTo(n) {
+    if (loadingMore.value || loading.value || n < 1 || n === page.value) return;
+    const mine = ++request;
     loadingMore.value = true;
     try {
-      const res = await fetchSlice({ offset: items.value.length, limit: stepAfter(clicks.value) });
-      if (mine !== request) return;
-      items.value = [...items.value, ...(res.items ?? [])];
-      hasMore.value = !!res.meta?.has_more;
-      total.value = res.meta?.total ?? total.value;
-      clicks.value++;
+      await fetchAt(n, mine);
     } catch (e) {
-      error.value = e?.response?.data?.message || e?.message || "More couldn't be loaded.";
+      error.value = errorText(e, "That page couldn't be loaded.");
     } finally {
       loadingMore.value = false;
     }
   }
+  const showMore = () => goTo(page.value + 1);
 
-  /** Reloads what's showing (same number of rows) without starting over, e.g. for live updates */
+  /** Reloads the page that's showing without starting over, e.g. for live updates */
   async function refresh() {
     if (loading.value || loadingMore.value) return;
     const mine = request;
     try {
-      const res = await fetchSlice({ offset: 0, limit: Math.max(FIRST_ROWS, Math.min(items.value.length, 50)) });
-      if (mine !== request) return;
-      items.value = res.items ?? [];
-      hasMore.value = !!res.meta?.has_more;
-      total.value = res.meta?.total ?? items.value.length;
+      const keep = page.value;
+      if (!(await fetchAt(keep, mine))) return;
+      // That page emptied out (rows went away): the last page there is
+      if (!items.value.length && keep > 1) await fetchAt(pages.value, mine);
     } catch {
       // keep what's on screen; the next refresh tries again
     }
   }
 
-  return { items, total, hasMore, loading, loadingMore, loaded, error, load, showMore, refresh };
+  return { items, total, page, pages, goTo, hasMore, loading, loadingMore, loaded, error, load, showMore, refresh };
 }

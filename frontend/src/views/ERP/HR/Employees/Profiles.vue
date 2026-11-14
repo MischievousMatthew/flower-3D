@@ -113,8 +113,8 @@
           </table>
         </div>
 
-        <!-- 10 people, then 10 more, then 20 at a time -->
-        <ShowMore v-if="employees && employees.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="employees.length" :total="pager.total.value" @more="pager.showMore()" />
+        <!-- 10 people a page -->
+        <PageNumbers v-if="employees && employees.length" tone="vendor" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="employees.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
       </template>
     </section>
 
@@ -450,7 +450,7 @@ import HrPage from "../../../../components/hr/HrPage.vue";
 import EmployeeDocuments from "../../../../components/hr/EmployeeDocuments.vue";
 import EmployeeQRCode from "../../../../layouts/components/EmployeeQRCode.vue";
 import employeeInfoService from "../../../../services/employeeInfoService";
-import ShowMore from "../../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../../components/common/PageNumbers.vue";
 import { useShowMorePaged } from "../../../../composables/useShowMore";
 import { useAssignment } from "../../../../composables/useAssignment";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
@@ -539,7 +539,7 @@ const statTiles = computed(() => {
 const masked = (n) => (String(n).length > 4 ? `•••• ${String(n).slice(-4)}` : n);
 const quickStatuses = (e) => ["Regular", "Probationary"].filter((s) => s !== e.employment_status);
 
-/** One page of profiles from the server, for the "Show more" list */
+/** One page of profiles from the server, for the paged list */
 async function fetchPage(p) {
   const res = await employeeInfoService.getAll({
     page: p,

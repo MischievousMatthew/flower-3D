@@ -61,8 +61,8 @@
               </button>
             </li>
           </ul>
-          <!-- 10 requests, then 10 more, then 20 at a time -->
-          <ShowMore v-if="cases && cases.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="cases.length" :total="pager.total.value" @more="pager.showMore()" />
+          <!-- 10 requests a page -->
+          <PageNumbers v-if="cases && cases.length" tone="vendor" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="cases.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
         </section>
       </div>
 
@@ -106,7 +106,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMorePaged } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import ReturnCasePanel from "../../../components/returns/ReturnCasePanel.vue";
@@ -131,7 +131,7 @@ const search = ref("");
 const cases = ref(null);
 const counts = ref(null);
 const meta = ref({ current_page: 1, last_page: 1 });
-/** One page of requests from the server, for the "Show more" list */
+/** One page of requests from the server, for the paged list */
 async function fetchPage(p) {
   const { data } = await api.get("sc/order-requests", {
     params: { status: tab.value || undefined, search: search.value.trim() || undefined, page: p, per_page: 15 },
@@ -141,7 +141,7 @@ async function fetchPage(p) {
   return { items: data.data, lastPage: data.meta.last_page, total: data.meta.total };
 }
 const pager = useShowMorePaged(fetchPage);
-// Once loaded, the list follows "Show more" (before that, null shows the skeleton)
+// Once loaded, the list follows the page numbers (before that, null shows the skeleton)
 watch(() => pager.visible.value, (rows) => {
   if (cases.value !== null) cases.value = rows;
 });

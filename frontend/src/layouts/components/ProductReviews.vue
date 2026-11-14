@@ -190,8 +190,8 @@
         </div>
       </div>
 
-      <!-- 10 reviews, then 10 more, then 20 at a time -->
-      <ShowMore v-if="reviews.length" :tone="vendor ? 'vendor' : 'customer'" :has-more="reviewList.hasMore.value" :loading="reviewList.loadingMore.value" :shown="reviewList.rows.value.length" :total="reviewList.total.value" @more="reviewList.showMore()" />
+      <!-- 10 reviews a page -->
+      <PageNumbers v-if="reviews.length" :tone="vendor ? 'vendor' : 'customer'" :page="reviewList.page.value" :pages="reviewList.pages.value" :total="reviewList.total.value" :shown="reviewList.rows.value.length" :loading="reviewList.loadingMore.value" @go="reviewList.goTo" />
     </template>
 
     <!-- ── Edit modal ────────────────────────────────────────────────────────── -->
@@ -285,7 +285,7 @@
 import { computed, ref, reactive, onMounted, watch } from "vue";
 import api from "../../plugins/axios";
 import { productCode } from "../../utils/productLink.js";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMoreRows } from "../../composables/useShowMore";
 
 const props = defineProps({
@@ -350,7 +350,7 @@ async function load(page = 1) {
   }
 }
 
-// 10 reviews first, then 10 more, then 20 at a time
+// 10 reviews a page
 const reviewList = useShowMoreRows(reviews, computed(() => meta), load);
 
 async function loadSummary() {

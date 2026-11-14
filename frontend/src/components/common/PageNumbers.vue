@@ -5,7 +5,7 @@
     <PageNumbers :page="meta.current_page" :pages="meta.last_page" :total="meta.total"
                  :per-page="10" :shown="rows.length" :loading="loading" label="Deliveries pages" @go="goTo" />
   -->
-  <nav v-if="shown" class="pn" :class="{ 'pn--admin': tone === 'admin' }" :aria-label="label">
+  <nav v-if="shown" ref="root" class="pn" :class="`pn--${tone}`" :aria-label="label">
     <span class="pn-count" aria-live="polite">
       Showing <b>{{ from }}–{{ to }}</b> of <b>{{ total }}</b>
     </span>
@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
   page: { type: Number, default: 1 },
@@ -46,7 +46,7 @@ const props = defineProps({
   shown: { type: Number, default: 0 }, // rows on this page
   loading: { type: Boolean, default: false },
   label: { type: String, default: "Pages" },
-  tone: { type: String, default: "vendor" }, // "vendor" (portal/ERP) or "admin" (admin panel colors)
+  tone: { type: String, default: "vendor" }, // "vendor" (portal/ERP), "admin" (admin panel) or "customer" (navy/green)
 });
 const emit = defineEmits(["go"]);
 
@@ -69,9 +69,15 @@ const items = computed(() => {
   return out;
 });
 
+const root = ref(null);
 function go(n) {
   if (n < 1 || n > props.pages || n === props.page || props.loading) return;
   emit("go", n);
+  // Back to the top of the list when it starts above the screen
+  const list = root.value?.closest("section, .sp-card, .panel, .card") ?? root.value?.parentElement;
+  if (list && list.getBoundingClientRect().top < 0) {
+    list.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
 }
 </script>
 
@@ -100,6 +106,19 @@ function go(n) {
   --pn-faint: var(--a-faint);
   --pn-accent: var(--a-accent);
   --pn-accent-ink: var(--a-accent-ink);
+}
+.pn--customer {
+  --pn-border: var(--line, rgba(54, 63, 78, 0.12));
+  --pn-border-strong: rgba(54, 63, 78, 0.28);
+  --pn-surface: #fff;
+  --pn-hover: var(--line-soft, rgba(54, 63, 78, 0.07));
+  --pn-text: var(--ink, #363f4e);
+  --pn-text-2: var(--ink, #363f4e);
+  --pn-muted: var(--ink-soft, #5f6776);
+  --pn-faint: var(--ink-soft, #5f6776);
+  /* the deeper brand green: white on #4DB173 is too faint to read */
+  --pn-accent: var(--leaf-deep, #2e7a4f);
+  --pn-accent-ink: #fff;
 }
 .pn {
   display: flex;

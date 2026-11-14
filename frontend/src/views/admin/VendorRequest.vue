@@ -203,15 +203,17 @@
             </table>
           </div>
 
-          <!-- 10 rows, then 10 more, then 20 at a time -->
-          <ShowMore
+          <!-- 10 a page -->
+          <PageNumbers
             v-if="isApplicationTab ? applications.length : vendors.length"
             tone="admin"
-            :has-more="isApplicationTab ? appList.hasMore.value : vendorList.hasMore.value"
-            :loading="appList.loadingMore.value"
+            :page="pageList.page.value"
+            :pages="pageList.pages.value"
+            :total="pageList.total.value"
             :shown="isApplicationTab ? appList.rows.value.length : vendorList.shown.value"
-            :total="isApplicationTab ? appList.total.value : vendorList.total.value"
-            @more="isApplicationTab ? appList.showMore() : vendorList.showMore()"
+            :loading="pageList.loadingMore.value"
+            :label="isApplicationTab ? 'Application pages' : 'Vendor pages'"
+            @go="pageList.goTo"
           />
         </section>
       </div>
@@ -619,7 +621,7 @@ import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import VendorApplicationDetails from "./components/VendorApplicationDetails.vue";
 import api from "../../plugins/axios";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMoreLocal, useShowMoreRows } from "../../composables/useShowMore";
 import { linkedId } from "../../utils/hiddenIds";
 import { useAdminAccess } from "../../composables/useAdminAccess";
@@ -732,8 +734,10 @@ const fetchList = async (page = 1) => {
   }
 };
 
-// 10 applications first, then 10 more, then 20 at a time
+// 10 applications a page
 const appList = useShowMoreRows(applications, computed(() => ({ current_page: pager.page, last_page: pager.lastPage, total: pager.total })), fetchList);
+// The pager under the table follows the tab that's showing
+const pageList = computed(() => (isApplicationTab.value ? appList : vendorList));
 
 const setTab = (key) => {
   if (tab.value === key) return;

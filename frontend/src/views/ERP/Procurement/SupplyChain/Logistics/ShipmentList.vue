@@ -40,7 +40,7 @@
             </router-link>
           </li>
         </ul>
-        <ShowMore tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="rows.length" :total="pager.total.value" @more="pager.showMore()" />
+        <PageNumbers tone="vendor" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="rows.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
       </template>
     </section>
 
@@ -90,7 +90,7 @@
 import { ref, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import HrPage from "../../../../../components/hr/HrPage.vue";
-import ShowMore from "../../../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../../../components/common/PageNumbers.vue";
 import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { SHIP_STATUS, shipStatus } from "../../../../../components/procurement/shipmentUi";

@@ -202,7 +202,7 @@
               </div>
             </li>
           </ul>
-          <ShowMore v-if="orders && orders.orders.length" tone="vendor" :has-more="orderList.hasMore.value" :loading="orderList.loadingMore.value" :shown="orderList.rows.value.length" :total="orderList.total.value" @more="orderList.showMore()" />
+          <PageNumbers v-if="orders && orders.orders.length" tone="vendor" :page="orderList.page.value" :pages="orderList.pages.value" :total="orderList.total.value" :shown="orderList.rows.value.length" :loading="orderList.loadingMore.value" @go="orderList.goTo" />
         </template>
       </template>
     </section>
@@ -212,7 +212,7 @@
 <script setup>
 import { computed, defineComponent, h, onMounted, ref, watch } from "vue";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
@@ -251,7 +251,7 @@ const loading = ref(false);
 const view = ref("date");
 
 const orders = ref(null);
-// 10 orders first, then 10 more, then 20 at a time
+// 10 orders a page
 const orderList = useShowMoreInto(orders, "orders", async (p) =>
   (await api.get(`${base.value}/orders`, {
     params: { from: financeRange.from, to: financeRange.to, page: p, status: orderStatus.value || undefined, payment: orderPayment.value || undefined, search: orderSearch.value.trim() || undefined },

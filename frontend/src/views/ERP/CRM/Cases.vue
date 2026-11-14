@@ -85,7 +85,7 @@
             </button>
           </li>
         </ul>
-        <ShowMore v-if="data && data.rows.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
+        <PageNumbers v-if="data && data.rows.length" tone="vendor" :page="list.page.value" :pages="list.pages.value" :total="list.total.value" :shown="list.rows.value.length" :loading="list.loadingMore.value" @go="list.goTo" />
       </template>
     </section>
 
@@ -294,7 +294,7 @@
 import { computed, onMounted, ref } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -379,7 +379,7 @@ function ago(at) {
   return `${Math.floor(m / 1440)} d ago`;
 }
 
-// 10 cases first, then 10 more, then 20 at a time
+// 10 cases a page
 const list = useShowMoreInto(data, "rows", async (p) =>
   (await api.get("crm/cases", { params: { page: p, status: status.value, priority: priority.value || undefined, assigned: assigned.value || undefined, search: search.value.trim() || undefined } })).data.data,
 );

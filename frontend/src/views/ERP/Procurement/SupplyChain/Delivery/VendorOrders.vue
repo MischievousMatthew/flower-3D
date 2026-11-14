@@ -107,7 +107,7 @@
           </div>
         </li>
       </ul>
-      <ShowMore v-if="orders.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="orders.length" :total="pager.total.value" @more="pager.showMore()" />
+      <PageNumbers v-if="orders.length" tone="vendor" :page="pager.page.value" :pages="pager.pages.value" :total="pager.total.value" :shown="orders.length" :loading="pager.loadingMore.value" @go="pager.goTo" />
     </section>
 
     <!-- Next step (asks for the photo before it goes out) -->
@@ -150,7 +150,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import HrPage from "../../../../../components/hr/HrPage.vue";
-import ShowMore from "../../../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../../../components/common/PageNumbers.vue";
 import OrderActionModal from "../../../../../components/vendor/orders/OrderActionModal.vue";
 import BarcodeModal from "../../../../../layouts/components/BarcodeModal.vue";
 import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";

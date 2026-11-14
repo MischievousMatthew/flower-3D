@@ -113,6 +113,8 @@
             </div>
           </li>
         </ul>
+        <!-- 10 a page; stock changes stay waiting on other pages too -->
+        <PageNumbers v-if="rows.length" tone="vendor" :page="stockPager.page.value" :pages="stockPager.pages.value" :total="matchedRows.length" :shown="rows.length" label="Stock pages" @go="stockPager.goTo" />
       </section>
 
       <!-- History -->
@@ -244,6 +246,8 @@ import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage, money, useVendorCatalog } from "../../../components/vendor/shop/useVendorCatalog";
 import { useUnsavedChanges } from "../../../composables/useUnsavedChanges";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
+import { useShowMoreLocal } from "../../../composables/useShowMore";
 import "../../../components/vendor/shop/shop.css";
 
 const { products, reasons, error, load, replace } = useVendorCatalog();
@@ -353,13 +357,16 @@ const totals = computed(() => ({
   units: (items.value ?? []).reduce((n, p) => n + Math.max(0, p.stock), 0),
   value: (items.value ?? []).reduce((n, p) => n + (p.stock_value || 0), 0),
 }));
-const rows = computed(() => {
+const matchedRows = computed(() => {
   const q = search.value.trim().toLowerCase();
   const order = { out: 0, low: 1, ok: 2 };
   return (items.value ?? [])
     .filter((p) => (filter.value === "all" || p.stock_state === filter.value) && (!q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q)))
     .sort((a, b) => order[a.stock_state] - order[b.stock_state] || a.stock - b.stock);
 });
+// 10 a page; a new tab, group or search starts at page 1
+const stockPager = useShowMoreLocal(matchedRows, () => [tab.value, filter.value, search.value]);
+const rows = stockPager.visible;
 
 // Bar: stock against the max (or twice the alert level), with a tick at the alert level
 const scale = (p) => Math.max(p.max_stock || 0, (p.min_stock || 0) * 2, p.stock, 1);

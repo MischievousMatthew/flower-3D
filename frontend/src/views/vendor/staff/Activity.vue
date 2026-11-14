@@ -60,7 +60,7 @@
         </section>
       </div>
 
-      <ShowMore v-if="data && data.entries.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
+      <PageNumbers v-if="data && data.entries.length" tone="vendor" :page="list.page.value" :pages="list.pages.value" :total="list.total.value" :shown="list.rows.value.length" :loading="list.loadingMore.value" @go="list.goTo" />
     </section>
   </ShopLayout>
 </template>
@@ -68,7 +68,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -80,7 +80,7 @@ import "../../../components/vendor/staff/staff.css";
 
 const today = ymd(new Date());
 const data = ref(null);
-// 10 changes first, then 10 more, then 20 at a time
+// 10 changes a page
 const list = useShowMoreInto(data, "entries", async (page) =>
   (await api.get("vendor/staff/activity", { params: { page, search: search.value.trim() || undefined, employee_id: who.value || undefined, area: area.value || undefined, from: from.value || undefined, to: to.value || undefined } })).data.data,
 );

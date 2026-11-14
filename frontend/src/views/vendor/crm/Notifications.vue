@@ -47,7 +47,7 @@
               </li>
             </ul>
           </section>
-          <ShowMore v-if="data && data.items.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
+          <PageNumbers v-if="data && data.items.length" tone="vendor" :page="list.page.value" :pages="list.pages.value" :total="list.total.value" :shown="list.rows.value.length" :loading="list.loadingMore.value" @go="list.goTo" />
         </template>
       </section>
 
@@ -74,7 +74,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -98,7 +98,7 @@ const KIND_FOR = {
 };
 
 const data = ref(null);
-// 10 notifications first, then 10 more, then 20 at a time
+// 10 notifications a page
 const list = useShowMoreInto(
   data,
   "items",

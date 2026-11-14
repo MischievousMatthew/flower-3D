@@ -166,7 +166,7 @@
             </span>
           </li>
         </ul>
-        <ShowMore tone="vendor" :has-more="hasMore" :shown="visible.length" :total="shown.length" @more="showMore" />
+        <PageNumbers tone="vendor" :page="stockPage" :pages="stockPages" :total="shown.length" :shown="visible.length" label="Stock pages" @go="goToStockPage" />
       </template>
     </section>
 
@@ -390,7 +390,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import HrPage from "../../../../components/hr/HrPage.vue";
-import ShowMore from "../../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../../components/common/PageNumbers.vue";
 import PhotoViewer from "../../../../components/common/PhotoViewer.vue";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../components/vendor/shop/useVendorCatalog";
@@ -487,7 +487,7 @@ const shown = computed(() => {
     .filter((it) => !q || it.name.toLowerCase().includes(q) || (it.sku ?? "").toLowerCase().includes(q))
     .sort((a, b) => order[a.state] - order[b.state] || b.suggestion.qty - a.suggestion.qty || a.name.localeCompare(b.name));
 });
-const { visible, hasMore, showMore } = useShowMoreLocal(shown, computed(() => `${kind.value}|${state.value}|${search.value}`));
+const { visible, page: stockPage, pages: stockPages, goTo: goToStockPage } = useShowMoreLocal(shown, computed(() => `${kind.value}|${state.value}|${search.value}`));
 
 const pickedItems = computed(() => (data.value?.items ?? []).filter((it) => picked.value.includes(it.id)));
 const pickedUnits = computed(() => pickedItems.value.reduce((s, it) => s + it.suggestion.qty, 0));

@@ -90,7 +90,7 @@
             <div v-if="!data || (loading && requestsLoading)" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row"></span></div>
             <p v-else-if="!filteredRequests.length" class="empty">{{ data.disputes.length ? "No request matches your search." : "No requests here." }}</p>
             <ul v-else class="row-list">
-              <li v-for="d in filteredRequests" :key="d.id" tabindex="0" :class="{ selected: caseId === d.id }" @click="caseId = d.id" @keydown.enter="caseId = d.id">
+              <li v-for="d in requestPager.visible.value" :key="d.id" tabindex="0" :class="{ selected: caseId === d.id }" @click="caseId = d.id" @keydown.enter="caseId = d.id">
                 <VendorAvatar :vendor="d.vendor" :size="34" />
                 <div class="row-main">
                   <span class="strong">
@@ -115,6 +115,7 @@
                 </div>
               </li>
             </ul>
+            <PageNumbers tone="admin" :page="requestPager.page.value" :pages="requestPager.pages.value" :total="filteredRequests.length" :shown="requestPager.visible.value.length" label="Request pages" @go="requestPager.goTo" />
           </section>
 
           <!-- Refunds paid -->
@@ -129,7 +130,7 @@
             <div v-if="!data" class="sk-list"><span v-for="n in 3" :key="n" class="sk sk-row"></span></div>
             <p v-else-if="!filteredRefunds.length" class="empty">{{ data.refunds.length ? "No refund matches your search." : "No refunds yet." }}</p>
             <ul v-else class="row-list">
-              <li v-for="r in filteredRefunds" :key="`${r.order_id}-${r.refunded_at}`" tabindex="0" @click="openOrder(r.order_id)" @keydown.enter="openOrder(r.order_id)">
+              <li v-for="r in refundPager.visible.value" :key="`${r.order_id}-${r.refunded_at}`" tabindex="0" @click="openOrder(r.order_id)" @keydown.enter="openOrder(r.order_id)">
                 <VendorAvatar :vendor="r.vendor" :size="34" />
                 <div class="row-main">
                   <span class="strong mono">{{ r.order_number }}</span>
@@ -144,6 +145,7 @@
                 </div>
               </li>
             </ul>
+            <PageNumbers tone="admin" :page="refundPager.page.value" :pages="refundPager.pages.value" :total="filteredRefunds.length" :shown="refundPager.visible.value.length" label="Refund pages" @go="refundPager.goTo" />
           </section>
         </template>
       </div>
@@ -179,6 +181,8 @@ import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import ReturnCasePanel from "../../components/returns/ReturnCasePanel.vue";
 import api from "../../plugins/axios";
+import PageNumbers from "../../components/common/PageNumbers.vue";
+import { useShowMoreLocal } from "../../composables/useShowMore";
 
 const { toggleMobile } = useSidebarState();
 const router = useRouter();
@@ -247,6 +251,9 @@ const filteredRefunds = computed(() => {
   const term = refundSearch.value.trim().toLowerCase();
   return (data.value?.refunds ?? []).filter((r) => matches(term, r.order_number, r.customer, r.vendor?.store_name));
 });
+// 10 a page each; a new search or filter starts at page 1
+const requestPager = useShowMoreLocal(filteredRequests, () => [status.value, requestSearch.value, requestType.value]);
+const refundPager = useShowMoreLocal(filteredRefunds, () => [status.value, refundSearch.value]);
 const isOverdue = (d) => !!d.next_actor && Date.now() - new Date(d.last_activity_at) > OVERDUE_DAYS * 86_400_000;
 const describe = (resolution, amount) =>
   resolution === "replacement" ? "a replacement" : `a ${resolution === "full_refund" ? "full" : "partial"} refund of ${money(amount)}`;

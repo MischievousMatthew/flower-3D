@@ -66,7 +66,7 @@
             </button>
           </li>
         </ul>
-        <ShowMore v-if="data && data.rows.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
+        <PageNumbers v-if="data && data.rows.length" tone="vendor" :page="list.page.value" :pages="list.pages.value" :total="list.total.value" :shown="list.rows.value.length" :loading="list.loadingMore.value" @go="list.goTo" />
       </template>
     </section>
 
@@ -274,7 +274,7 @@
 import { computed, defineComponent, h, onMounted, reactive, ref } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import TagInput from "../../../components/crm/TagInput.vue";
@@ -370,7 +370,7 @@ const notesLabel = (n) => `${n} internal ${n === 1 ? "note" : "notes"}`;
 const shortDate = (d, time = false) =>
   d ? new Date(d).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", ...(time ? { hour: "numeric", minute: "2-digit" } : {}) }) : "—";
 
-// 10 customers first, then 10 more, then 20 at a time
+// 10 customers a page
 const list = useShowMoreInto(data, "rows", async (p) =>
   (await api.get("crm/customers", { params: { page: p, filter: filter.value, search: search.value.trim() || undefined } })).data.data,
 );

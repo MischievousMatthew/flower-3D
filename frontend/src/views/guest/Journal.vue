@@ -67,7 +67,7 @@
             </li>
           </ul>
 
-          <ShowMore v-if="articles.length" tone="customer" :has-more="meta.current_page < meta.last_page" :loading="loading" :shown="articles.length" :total="meta.total || 0" done-text="You've read every story so far" @more="load(meta.current_page + 1, true)" />
+          <PageNumbers v-if="articles.length" tone="customer" :page="meta.current_page" :pages="meta.last_page" :total="meta.total || 0" :per-page="PER_PAGE" :shown="articles.length" :loading="loading" label="Journal pages" @go="load" />
         </template>
       </section>
     </main>
@@ -80,7 +80,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios";
-import ShowMore from "../../components/common/ShowMore.vue";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import NavHeader from "../../layouts/NavHeader.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
 import { useSiteContent } from "../../composables/useSiteContent";
@@ -97,15 +97,17 @@ const loading = ref(false);
 const error = ref(false);
 const category = ref(typeof route.query.topic === "string" ? route.query.topic : "");
 
-const lead = computed(() => articles.value[0] ?? null);
-const rest = computed(() => articles.value.slice(1));
+// 10 stories a page; the first page opens with the newest one large
+const PER_PAGE = 10;
+const lead = computed(() => (meta.value.current_page === 1 ? articles.value[0] ?? null : null));
+const rest = computed(() => (meta.value.current_page === 1 ? articles.value.slice(1) : articles.value));
 
-const load = async (page = 1, append = false) => {
+const load = async (page = 1) => {
   loading.value = true;
   error.value = false;
   try {
-    const { data } = await api.get("/site/articles", { params: { page, category: category.value || undefined } });
-    articles.value = append ? [...articles.value, ...data.data] : data.data;
+    const { data } = await api.get("/site/articles", { params: { page, per_page: PER_PAGE, category: category.value || undefined } });
+    articles.value = data.data;
     meta.value = data.meta;
     categories.value = data.categories ?? {};
   } catch {

@@ -78,7 +78,7 @@
             <span class="fx-amt" :class="e.direction">{{ e.direction === "in" ? "+" : "−" }}{{ money(e.amount) }}</span>
           </li>
         </ul>
-        <ShowMore v-if="data && data.entries.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
+        <PageNumbers v-if="data && data.entries.length" tone="vendor" :page="list.page.value" :pages="list.pages.value" :total="list.total.value" :shown="list.rows.value.length" :loading="list.loadingMore.value" @go="list.goTo" />
       </section>
 
       <!-- How customers paid -->
@@ -111,7 +111,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import api from "../../../plugins/axios";
-import ShowMore from "../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../components/common/PageNumbers.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
@@ -128,7 +128,7 @@ const DIRECTIONS = [
 ];
 
 const data = ref(null);
-// 10 transactions first, then 10 more, then 20 at a time
+// 10 transactions a page
 const list = useShowMoreInto(data, "entries", async (p) =>
   (await api.get("vendor/books/transactions", {
     params: { from: financeRange.from, to: financeRange.to, direction: direction.value || undefined, kind: kind.value || undefined, search: search.value.trim() || undefined, page: p },
