@@ -270,34 +270,7 @@
         </li>
       </ul>
       <!-- 10 a page -->
-      <nav v-if="orders.length" class="dl-pager" aria-label="Deliveries pages">
-        <span class="dl-pager-count" aria-live="polite">
-          Showing <b>{{ orderRange.from }}–{{ orderRange.to }}</b> of <b>{{ orderTotal }}</b>
-        </span>
-        <div v-if="orderPages > 1" class="dl-pager-btns">
-          <button type="button" class="dl-page dl-page-step" :disabled="orderPage <= 1 || loading" aria-label="Previous page" @click="goToOrderPage(orderPage - 1)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
-            <span>Prev</span>
-          </button>
-          <template v-for="it in orderPageItems" :key="it.key">
-            <span v-if="it.gap" class="dl-page-gap" aria-hidden="true">…</span>
-            <button
-              v-else
-              type="button"
-              class="dl-page"
-              :class="{ active: it.page === orderPage }"
-              :aria-current="it.page === orderPage ? 'page' : null"
-              :aria-label="`Page ${it.page}`"
-              :disabled="loading && it.page !== orderPage"
-              @click="goToOrderPage(it.page)"
-            >{{ it.page }}</button>
-          </template>
-          <button type="button" class="dl-page dl-page-step" :disabled="orderPage >= orderPages || loading" aria-label="Next page" @click="goToOrderPage(orderPage + 1)">
-            <span>Next</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
-          </button>
-        </div>
-      </nav>
+      <PageNumbers :page="orderPage" :pages="orderPages" :total="orderTotal" :per-page="ORDERS_PER_PAGE" :shown="orders.length" :loading="loading" label="Deliveries pages" @go="goToOrderPage" />
     </section>
 
     <!-- ══════════════════════════════════════════════════════════════════
@@ -936,6 +909,7 @@
 
 <script setup>
 import ShowMore from "../../../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../../../components/common/PageNumbers.vue";
 import { useShowMorePaged } from "../../../../../composables/useShowMore";
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
@@ -1275,28 +1249,8 @@ async function fetchOrders(page = 1, silent = false) {
 const orderPage = computed(() => meta.value.current_page ?? 1);
 const orderPages = computed(() => Math.max(1, meta.value.last_page ?? 1));
 const orderTotal = computed(() => meta.value.total ?? orders.value.length);
-const orderRange = computed(() => {
-  const from = (orderPage.value - 1) * ORDERS_PER_PAGE + 1;
-  return { from, to: Math.min(from + orders.value.length - 1, orderTotal.value) };
-});
-// 1 … 4 5 6 … 12: the first, the last, and two either side of the current one
-const orderPageItems = computed(() => {
-  const last = orderPages.value;
-  const cur = orderPage.value;
-  const keep = new Set([1, last, cur - 1, cur, cur + 1].filter((n) => n >= 1 && n <= last));
-  if (cur <= 3) [2, 3, 4].forEach((n) => n <= last && keep.add(n));
-  if (cur >= last - 2) [last - 1, last - 2, last - 3].forEach((n) => n >= 1 && keep.add(n));
-  const nums = [...keep].sort((a, b) => a - b);
-  const out = [];
-  nums.forEach((n, i) => {
-    if (i && n - nums[i - 1] > 1) out.push({ gap: true, key: `gap-${n}` });
-    out.push({ page: n, key: n });
-  });
-  return out;
-});
 const ordersTop = ref(null);
 async function goToOrderPage(n) {
-  if (n < 1 || n > orderPages.value || n === orderPage.value || loading.value) return;
   await fetchOrders(n);
   const top = ordersTop.value?.getBoundingClientRect().top ?? 0;
   if (top < 0) ordersTop.value.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
@@ -1958,99 +1912,6 @@ onUnmounted(() => clearInterval(pollTimer));
 .dl-list-card {
   padding: 6px;
   scroll-margin-top: 80px;
-}
-
-/* ── Page numbers under the list (10 a page) ───────────────────── */
-.dl-pager {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  margin-top: 6px;
-  padding: 12px 10px 6px;
-  border-top: 1px solid var(--v-border);
-}
-.dl-pager-count {
-  font-size: 12.5px;
-  color: var(--v-muted);
-  font-variant-numeric: tabular-nums;
-}
-.dl-pager-count b {
-  color: var(--v-text);
-  font-weight: 600;
-}
-.dl-pager-btns {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.dl-page {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 36px;
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--v-border);
-  border-radius: 10px;
-  background: var(--v-surface);
-  color: var(--v-text-2);
-  font: 600 13px var(--font-sans, "Poppins", system-ui, sans-serif);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-.dl-page svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.dl-page:hover:not(:disabled):not(.active) {
-  border-color: var(--v-border-strong);
-  background: var(--v-subtle-2);
-  color: var(--v-text);
-}
-.dl-page.active {
-  border-color: var(--bc-accent);
-  background: var(--bc-accent);
-  color: var(--bc-accent-ink);
-  cursor: default;
-}
-.dl-page:disabled:not(.active) {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.dl-page:focus-visible {
-  outline: 2px solid var(--bc-accent);
-  outline-offset: 2px;
-}
-.dl-page-gap {
-  min-width: 20px;
-  text-align: center;
-  color: var(--v-faint);
-}
-@media (max-width: 640px) {
-  .dl-pager {
-    justify-content: center;
-  }
-  .dl-pager-count {
-    width: 100%;
-    text-align: center;
-  }
-  /* Arrows only on phones, so the numbers fit */
-  .dl-page-step span {
-    display: none;
-  }
-  .dl-page {
-    min-width: 40px;
-    height: 40px;
-  }
 }
 
 .dl-list {

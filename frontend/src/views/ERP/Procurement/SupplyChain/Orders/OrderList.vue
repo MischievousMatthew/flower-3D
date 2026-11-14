@@ -44,7 +44,7 @@
       <button type="button" @click="load">Try again</button>
     </div>
 
-    <section class="sp-card ol-card" aria-label="Purchase orders">
+    <section ref="listTop" class="sp-card ol-card" aria-label="Purchase orders">
       <div v-if="orders === null" class="ol-rows">
         <div v-for="n in 6" :key="n" class="ol-row sk"><div class="bc-skeleton sp-sk-line w30"></div><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div>
       </div>
@@ -59,7 +59,7 @@
         <div class="ol-head" aria-hidden="true">
           <span>Order</span><span>Supplier &amp; items</span><span>Dates</span><span class="num">Total</span><span>Stage</span>
         </div>
-        <ul class="ol-rows" :class="{ dim: pager.loading.value }">
+        <ul class="ol-rows" :class="{ dim: listLoading }">
           <li v-for="o in orders" :key="o.id">
             <router-link :to="{ name: 'OrderDetail', params: { id: o.id } }" class="ol-row">
               <span class="ol-no">
@@ -83,7 +83,8 @@
             </router-link>
           </li>
         </ul>
-        <ShowMore tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="orders.length" :total="pager.total.value" @more="pager.showMore()" />
+        <!-- 10 a page -->
+        <PageNumbers :page="meta.current_page" :pages="meta.last_page" :total="meta.total" :per-page="PER_PAGE" :shown="orders.length" :loading="listLoading" label="Purchase order pages" @go="goToPage" />
       </template>
     </section>
 
@@ -144,15 +145,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import HrPage from "../../../../../components/hr/HrPage.vue";
-import ShowMore from "../../../../../components/common/ShowMore.vue";
+import PageNumbers from "../../../../../components/common/PageNumbers.vue";
 import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../../../components/vendor/finance/financeUi";
 import { PO_FILTER_STAGES as PO_STAGES, ORDERED_STEP, stageOf, poDate, dueText, daysUntil, isReceivable } from "../../../../../components/procurement/poUi";
-import { useShowMorePaged } from "../../../../../composables/useShowMore";
 import { useAssignment } from "../../../../../composables/useAssignment";
 import { orderService } from "../../../../../services/orderService";
 import { supplierService } from "../../../../../services/supplierService";
@@ -196,10 +196,15 @@ const received = (o) => {
 };
 const isLate = (o) => isReceivable(o.status) && daysUntil(o.expected_date) < 0;
 
+// 10 a page, with page numbers under the list
+const PER_PAGE = 10;
+const meta = ref({ current_page: 1, last_page: 1, total: 0 });
+const listLoading = ref(false);
+
 async function fetchPage(page) {
   const res = await orderService.list({
     page,
-    per_page: 20,
+    per_page: PER_PAGE,
     stage: stage.value || undefined,
     overdue: overdue.value ? 1 : undefined,
     search: search.value.trim() || undefined,
@@ -209,23 +214,44 @@ async function fetchPage(page) {
   });
   const body = res.data ?? {};
   counts.value = body.counts ?? counts.value;
-  return { items: body.data ?? [], lastPage: body.last_page ?? 1, total: body.total };
+  meta.value = {
+    current_page: Number(body.current_page ?? page),
+    last_page: Math.max(1, Number(body.last_page ?? 1)),
+    total: Number(body.total ?? (body.data ?? []).length),
+  };
+  return { items: body.data ?? [], lastPage: meta.value.last_page };
 }
-const pager = useShowMorePaged(fetchPage);
-watch(() => pager.visible.value, (rows) => {
-  if (orders.value !== null) orders.value = rows;
-});
 
-async function load() {
+// Page 1 by default (a new stage, filter or search); a page that no longer
+// exists shows the last one instead
+let loadSeq = 0;
+async function load(page = 1) {
+  const mine = ++loadSeq;
   loadError.value = "";
+  listLoading.value = true;
   try {
-    await pager.load();
-    if (pager.failure.value) throw pager.failure.value;
-    orders.value = pager.visible.value;
+    let result = await fetchPage(typeof page === "number" ? page : 1);
+    if (mine !== loadSeq) return;
+    if (result.lastPage < meta.value.current_page) {
+      result = await fetchPage(result.lastPage);
+      if (mine !== loadSeq) return;
+    }
+    orders.value = result.items;
   } catch (e) {
+    if (mine !== loadSeq) return;
     orders.value = orders.value ?? [];
     counts.value = counts.value ?? { total: 0, stages: {}, overdue: 0 };
     loadError.value = apiMessage(e, "Couldn't load the purchase orders.");
+  } finally {
+    if (mine === loadSeq) listLoading.value = false;
+  }
+}
+
+const listTop = ref(null);
+async function goToPage(n) {
+  await load(n);
+  if ((listTop.value?.getBoundingClientRect().top ?? 0) < 0) {
+    listTop.value.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
 }
 
