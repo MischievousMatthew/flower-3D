@@ -29,6 +29,20 @@ class EnsureUserIsVendor
             ], 403);
         }
 
+        // Still on the temporary password: only changing it is allowed
+        if ($user->mustChangePassword() && ! $request->is('api/vendor/profile/change-password', 'api/v1/vendor/profile/change-password')) {
+            return self::passwordChangeRequired();
+        }
+
         return $next($request);
+    }
+
+    public static function passwordChangeRequired(): Response
+    {
+        return response()->json([
+            'success' => false,
+            'code'    => 'password_change_required',
+            'message' => 'Change your temporary password first.',
+        ], 403);
     }
 }

@@ -1339,6 +1339,18 @@ router.beforeEach(async (to, from, next) => {
   const role = user?.role;
   const subscriptionModule = to.meta.subscriptionModule;
 
+  // A vendor still on the temporary password changes it before anything
+  // else, ERP pages included (the server refuses everything else too)
+  const needsPasswordChange = user?.vendor_data?.needs_password_change === true;
+  if (role === "vendor" && needsPasswordChange) {
+    if (
+      canonicalPath !== "/vendor/force-change-password" &&
+      canonicalPath !== "/guest/login"
+    ) {
+      return next("/vendor/force-change-password");
+    }
+  }
+
   // Subscription access belongs to the vendor company. It applies before the
   // existing employee permission checks, so an employee cannot reach a module
   // merely because their individual role allows it.
@@ -1409,17 +1421,6 @@ router.beforeEach(async (to, from, next) => {
     if (role === "vendor") return next();
     if (role === "customer") return next("/shop");
     return next("/guest/login");
-  }
-
-  // Handle vendor forced password change
-  const needsPasswordChange = user?.vendor_data?.needs_password_change === true;
-  if (role === "vendor" && needsPasswordChange) {
-    if (
-      canonicalPath !== "/vendor/force-change-password" &&
-      canonicalPath !== "/guest/login"
-    ) {
-      return next("/vendor/force-change-password");
-    }
   }
 
   if (to.meta.requiresAdmin && role !== "admin") {

@@ -146,6 +146,18 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // ================= TEMPORARY PASSWORD =================
+    // The server refuses a vendor still on the password from the approval
+    // email: open the page where they change it.
+    if (error.response?.status === 403 && error.response?.data?.code === "password_change_required") {
+      import("../router").then(({ default: router }) => {
+        if (router.currentRoute.value.name !== "VendorForceChangePassword") {
+          router.replace({ name: "VendorForceChangePassword" });
+        }
+      });
+      return Promise.reject(error);
+    }
+
     // ================= ADMIN PERMISSION =================
     // Page loads handle their own empty states; actions say why they failed.
     if (

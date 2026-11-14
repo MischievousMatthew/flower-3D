@@ -35,6 +35,11 @@ class EnsureErpActor
             ], 403);
         }
 
+        // A shop owner still on the temporary password changes it first
+        if ($actor instanceof User && $actor->mustChangePassword()) {
+            return EnsureUserIsVendor::passwordChangeRequired();
+        }
+
         return $next($request);
     }
 }

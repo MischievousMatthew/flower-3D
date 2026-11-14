@@ -176,6 +176,12 @@ class User extends Authenticatable
         return $this->role === self::ROLE_VENDOR;
     }
 
+    /** A vendor account still on the temporary password from its approval email */
+    public function mustChangePassword(): bool
+    {
+        return $this->isVendor() && ($this->vendor_data['needs_password_change'] ?? false) === true;
+    }
+
     public function isCustomer(): bool
     {
         return $this->role === self::ROLE_CUSTOMER;
