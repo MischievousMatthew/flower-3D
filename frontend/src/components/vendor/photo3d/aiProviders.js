@@ -68,7 +68,8 @@ export const PROVIDERS = [
       const out = await client.predict("/generate_and_extract_glb", {
         image: pre.data[0],
         multiimages: [],
-        seed: 0,
+        // A new seed each run, so "Make another version" gives a different model
+        seed: Math.floor(Math.random() * 2147483647),
         ss_guidance_strength: 7.5,
         ss_sampling_steps: 12,
         slat_guidance_strength: 3,

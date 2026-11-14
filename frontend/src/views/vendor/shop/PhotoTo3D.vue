@@ -66,7 +66,10 @@
             <span v-html="ICONS.alert"></span>
             <div><b>{{ aiError.title }}</b><p>{{ aiError.body }}</p></div>
           </div>
-          <button type="button" class="sp-btn sp-btn-primary" @click="useMatched">Build a matching 3D instead</button>
+          <div class="p3-actions">
+            <button v-if="aiError.code !== 'bad-photo'" type="button" class="sp-btn sp-btn-primary" @click="makeWithAI"><span v-html="ICONS.sparkle"></span>Try the free AI again</button>
+            <button type="button" class="sp-btn" :class="aiError.code === 'bad-photo' ? 'sp-btn-primary' : 'sp-btn-ghost'" @click="useMatched">Build a matching 3D instead</button>
+          </div>
         </div>
 
         <div v-else-if="result" class="p3-result">
@@ -114,9 +117,17 @@
 
         <!-- What to do with it -->
         <div v-if="result && !working" class="p3-use">
+          <!-- Not happy with the AI's model: make another from the same photo -->
+          <div v-if="result.source === 'ai'" class="p3-redo">
+            <div class="p3-redo-text">
+              <b>Not happy with this one?</b>
+              <small>{{ redoHint }}</small>
+            </div>
+            <button type="button" class="sp-btn sp-btn-ghost" @click="makeWithAI"><span v-html="ICONS.sparkle"></span>Make another version</button>
+          </div>
           <div class="p3-actions">
             <button type="button" class="sp-btn sp-btn-primary" :disabled="exporting" title="Saves your rotation, size and brightness changes in the file" @click="download"><span v-html="ICONS.download"></span>{{ exporting ? "Preparing…" : "Download .glb" }}</button>
-            <button type="button" class="sp-btn sp-btn-ghost" @click="reset">Start over</button>
+            <button type="button" class="sp-btn sp-btn-ghost" @click="useAnotherPhoto">Use a different photo</button>
           </div>
           <div class="p3-attach">
             <span class="p3-label">Attach to a product</span>
@@ -216,6 +227,13 @@ const resultHint = computed(() => {
   return "It will show up here.";
 });
 
+// TripoSR gives the same shape for the same photo; TRELLIS and Hunyuan vary each try
+const redoHint = computed(() =>
+  result.value?.provider === "TripoSR"
+    ? "Try again: if the detailed model is free by then, you'll get a sharper result. A clearer photo (one flower, plain background, good light) helps most."
+    : "Each try comes out a little different. A clearer photo (one flower, plain background, good light) also helps.",
+);
+
 const fileSize = (bytes) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
 // ── Photo ──────────────────────────────────────────────────────────────
@@ -296,6 +314,16 @@ function reset() {
   mode.value = null;
 }
 
+// Clears the photo and the result, then opens the photo picker
+function useAnotherPhoto() {
+  reset();
+  photo.value = null;
+  if (photoUrl.value) URL.revokeObjectURL(photoUrl.value);
+  photoUrl.value = "";
+  photoError.value = "";
+  document.querySelector(".p3-drop input")?.click();
+}
+
 const retryText = (seconds) => {
   if (!seconds) return "later today";
   const h = Math.floor(seconds / 3600), m = Math.round((seconds % 3600) / 60);
@@ -317,7 +345,9 @@ function explain(err) {
 
 async function makeWithAI() {
   if (!photo.value || working.value) return;
-  reset();
+  // The current model stays until the new one is ready, so a failed retry loses nothing
+  const prevMode = mode.value;
+  aiError.value = null;
   mode.value = "ai";
   working.value = true;
   stage.value = "connect";
@@ -341,7 +371,13 @@ async function makeWithAI() {
     showResult(blob, "ai", provider.label);
   } catch (err) {
     if (!alive) return;
-    aiError.value = explain(err);
+    const why = { ...explain(err), code: err?.code };
+    if (result.value) {
+      mode.value = prevMode;
+      toast.error(`${why.title}. Your current 3D model is still here.`);
+    } else {
+      aiError.value = why;
+    }
   } finally {
     window.clearInterval(ticker);
     if (alive) working.value = false;
@@ -596,6 +632,31 @@ onBeforeUnmount(() => {
 .p3-size {
   margin: 6px 0 0;
   font-size: 12px;
+  color: var(--v-muted);
+}
+.p3-redo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--v-subtle);
+}
+.p3-redo-text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.p3-redo-text b {
+  font-size: 13.5px;
+  color: var(--v-text);
+}
+.p3-redo-text small {
+  font-size: 12px;
+  line-height: 1.45;
   color: var(--v-muted);
 }
 .p3-tune,
