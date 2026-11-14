@@ -6,13 +6,12 @@ const pad = (n) => String(n).padStart(2, "0");
 export const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 export const PRESETS = [
-  // short: the word on the capsule slider (the period picker)
-  { key: "today", label: "Today", short: "Day" },
-  { key: "this_week", label: "This week", short: "Week" },
-  { key: "this_month", label: "This month", short: "Month" },
-  { key: "this_quarter", label: "This quarter", short: "Quarter" },
-  { key: "this_year", label: "This year", short: "Year" },
-  { key: "custom", label: "Custom", short: "Custom" },
+  { key: "today", label: "Today" },
+  { key: "this_week", label: "This week" },
+  { key: "this_month", label: "This month" },
+  { key: "this_quarter", label: "This quarter" },
+  { key: "this_year", label: "This year" },
+  { key: "custom", label: "Custom" },
 ];
 
 export function presetRange(key) {

@@ -19,7 +19,7 @@ import { PRESETS, financeRange, presetRange, rangeLabel, setRange, ymd } from ".
 const emit = defineEmits(["change"]);
 const today = ymd(new Date());
 
-const options = PRESETS.map((p) => ({ key: p.key, label: p.short || p.label }));
+const options = PRESETS.map((p) => ({ key: p.key, label: p.label }));
 const label = computed(() => rangeLabel(financeRange));
 
 function pick(key) {

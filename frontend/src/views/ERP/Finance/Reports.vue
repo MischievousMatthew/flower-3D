@@ -12,7 +12,7 @@
     <section class="sp-card rp-bar" aria-label="Report options">
       <div class="rp-options">
         <RangePicker @change="load" />
-        <CapsuleSlider v-if="current.units" :model-value="unit" :options="UNITS" label="Rows" :min-width="76" @update:model-value="(u) => u !== unit && setOption('unit', u)" />
+        <CapsuleSlider v-if="current.units" :model-value="unit" :options="UNITS" label="Rows" @update:model-value="(u) => u !== unit && setOption('unit', u)" />
         <div v-if="type === 'profit_loss'" class="sp-seg" role="radiogroup" aria-label="Count flower costs">
           <button type="button" role="radio" :aria-checked="basis === 'sold'" :class="{ on: basis === 'sold' }" @click="setOption('basis', 'sold')">Flowers when sold</button>
           <button type="button" role="radio" :aria-checked="basis === 'bought'" :class="{ on: basis === 'bought' }" @click="setOption('basis', 'bought')">When bought</button>

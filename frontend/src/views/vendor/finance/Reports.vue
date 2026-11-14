@@ -10,7 +10,7 @@
     </template>
 
     <div class="sp-toolbar">
-      <CapsuleSlider :model-value="unit" :options="UNITS" label="Group by" :min-width="76" @update:model-value="setUnit" />
+      <CapsuleSlider :model-value="unit" :options="UNITS" label="Group by" @update:model-value="setUnit" />
       <RangePicker @change="notice = ''; load()" />
     </div>
 
