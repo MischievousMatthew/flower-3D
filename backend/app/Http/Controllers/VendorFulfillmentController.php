@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\CloudinaryHelper;
+use App\Models\CustomerNote;
 use App\Models\Order;
 use App\Models\OrderRequest;
 use App\Models\VendorApplication;
@@ -233,6 +234,7 @@ class VendorFulfillmentController extends Controller
                 'discount' => (float) $order->discount_amount,
                 'notes' => $order->customer_notes ?: null,
                 'loves' => $this->loves($order, $unpaidCheckout),
+                'team_notes' => $this->teamNotes($vendorId, $order),
                 'paid_at' => $order->paid_at?->toIso8601String(),
                 'items' => $items,
                 'timeline' => $timeline->sortBy('at')->values(),
@@ -251,6 +253,28 @@ class VendorFulfillmentController extends Controller
      * they chose to share with shops. `state` tells the shop why there is
      * nothing to show: "private" (not shared) or "none" (shared, but empty).
      */
+    /**
+     * The team's notes about this customer (CRM > Customers), pinned first, so
+     * whoever works on the order knows how to handle them. Shop staff only:
+     * never sent to the customer.
+     */
+    private function teamNotes(int $vendorId, Order $order): array
+    {
+        if (! $order->user_id) {
+            return [];
+        }
+
+        return CustomerNote::where('vendor_id', $vendorId)->where('customer_id', $order->user_id)
+            ->orderByDesc('pinned')->orderByDesc('created_at')->limit(20)->get()
+            ->map(fn ($n) => [
+                'id' => $n->id,
+                'body' => $n->body,
+                'pinned' => (bool) $n->pinned,
+                'author' => $n->author_name,
+                'at' => $n->created_at?->toIso8601String(),
+            ])->values()->all();
+    }
+
     private function loves(Order $order, ?array $unpaidCheckout): ?array
     {
         if ($unpaidCheckout || ! $order->user_id) {

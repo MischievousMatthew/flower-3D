@@ -248,6 +248,7 @@
                 <textarea v-model="noteDraft" class="sp-textarea" rows="3" maxlength="2000" placeholder="e.g. Asked for no plastic wrapping. Prefers delivery after 5pm."></textarea>
                 <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="busy === 'note' || !noteDraft.trim()">{{ busy === "note" ? "Adding…" : "Add note" }}</button>
               </form>
+              <p class="sp-hint">Your team also sees these notes on this customer's order details. The customer never does.</p>
               <p v-if="!profile.notes.length" class="sp-hint">No notes yet.</p>
               <ul v-else class="cu-notes">
                 <li v-for="n in profile.notes" :key="n.id" :class="{ pinned: n.pinned }">

@@ -117,6 +117,20 @@
             <div><h2>Note from the customer</h2><p>{{ order.notes }}</p></div>
           </section>
 
+          <!-- The team's notes about this customer (CRM > Customers). Staff only, never shown to the customer -->
+          <section v-if="order.team_notes?.length" class="sp-card team-notes" aria-labelledby="od-team-notes-title">
+            <div class="team-notes-head">
+              <span class="team-notes-icon" v-html="ICONS.users"></span>
+              <div><h2 id="od-team-notes-title">Notes from your team</h2><p>How to handle this customer. Only your team sees these.</p></div>
+            </div>
+            <ul class="team-notes-list">
+              <li v-for="n in order.team_notes" :key="n.id" :class="{ pinned: n.pinned }">
+                <p>{{ n.body }}</p>
+                <small><span v-if="n.pinned" class="sp-chip amber">Pinned</span>{{ n.author || "The shop" }}<template v-if="n.at"> · {{ noteDate(n.at) }}</template></small>
+              </li>
+            </ul>
+          </section>
+
           <section v-if="order.return_case" class="sp-card" aria-label="Return or refund">
             <div class="sp-card-head"><div><h2>Return / refund</h2><p>Settle it with the customer here.</p></div></div>
             <ReturnCasePanel :case-id="order.return_case.id" role="vendor" api-base="/sc/order-requests" @changed="load" />
@@ -253,6 +267,8 @@ const presetOf = (item) => {
   const known = DEFAULT_PRESETS.find((p) => p.key === saved.key);
   return { label: saved.label || known?.label || saved.key, size: saved.size, wrapper: known?.wrapper, ribbon: known?.ribbon };
 };
+
+const noteDate = (at) => new Date(at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 
 const order = ref(null);
 const error = ref("");
@@ -606,6 +622,70 @@ onMounted(() => {
 .note-icon :deep(svg) {
   width: 18px;
   height: 18px;
+}
+
+/* Notes from your team (CRM), staff only */
+.team-notes-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.team-notes-head h2 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.team-notes-head p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+.team-notes-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
+}
+.team-notes-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.team-notes-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.team-notes-list li {
+  padding: 10px 12px;
+  border: 1px solid var(--v-border);
+  border-radius: 10px;
+}
+.team-notes-list li.pinned {
+  border-color: var(--v-amber-soft);
+  background: var(--v-amber-soft);
+}
+.team-notes-list p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--v-text);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.team-notes-list small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--v-muted);
 }
 
 /* Flowers they love: the customer's shared preferences */
