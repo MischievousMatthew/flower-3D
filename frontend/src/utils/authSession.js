@@ -25,6 +25,8 @@ export const clearStoredAuth = () => {
   localStorage.removeItem("user");
   localStorage.removeItem("user_type");
   localStorage.removeItem("last_activity");
+  // "Don't remind me again" on modals lasts one sign-in only
+  localStorage.removeItem("bc_modal_guard_muted");
 };
 
 export const hasStoredAuthSession = (path = window.location.pathname) =>

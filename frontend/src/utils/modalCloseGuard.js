@@ -52,10 +52,47 @@ const panelsFor = (backdrop) => {
 const changed = (panels) =>
   panels.some((panel) => [...panel.querySelectorAll(FIELDS)].some((el) => before.has(el) && valueOf(el) !== before.get(el)));
 
+// "Don't remind me again": no warning until the next sign-in. Saved with a
+// fingerprint of the sign-in token, so it covers every tab of this sign-in and a
+// new sign-in (a new token) shows the reminder again. Guests: this tab only.
+const MUTE_KEY = "bc_modal_guard_muted";
+const signInToken = () => {
+  try {
+    return ["auth_token", "employee_token", "vendor_token", "admin_token"].map((k) => localStorage.getItem(k)).find(Boolean) || "";
+  } catch {
+    return "";
+  }
+};
+// A short hash, so no part of the token itself is stored again
+const fingerprint = (text) => {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+};
+const isMuted = () => {
+  try {
+    const token = signInToken();
+    return token ? localStorage.getItem(MUTE_KEY) === fingerprint(token) : sessionStorage.getItem(MUTE_KEY) === "guest";
+  } catch {
+    return false;
+  }
+};
+const mute = () => {
+  try {
+    const token = signInToken();
+    if (token) localStorage.setItem(MUTE_KEY, fingerprint(token));
+    else sessionStorage.setItem(MUTE_KEY, "guest");
+  } catch {
+    // Storage blocked: the reminder simply keeps showing
+  }
+  toast.info("Okay, no more reminders. Clicking outside a form now closes it right away until you sign in again.", { toastId: "modal-close-guard" });
+};
+
 const guard = (event) => {
   const backdrop = event.target;
   // Only a click on the backdrop itself, never inside the modal
   if (!isBackdrop(backdrop)) return;
+  if (isMuted()) return;
   if (!changed(panelsFor(backdrop))) return;
 
   const last = warnedAt.get(backdrop) ?? 0;
@@ -70,6 +107,7 @@ const guard = (event) => {
   toast.warning("You've entered information here. Click outside again to close without saving, or keep editing.", {
     toastId: "modal-close-guard",
     autoClose: SECOND_CLICK_WITHIN_MS,
+    action: { label: "Don't remind me again", onClick: mute },
   });
 };
 
@@ -84,4 +122,4 @@ export function installModalCloseGuard() {
 }
 
 // For tests
-export const _internals = { isBackdrop, panelsFor, changed, before, valueOf };
+export const _internals = { isBackdrop, panelsFor, changed, before, valueOf, isMuted, mute, MUTE_KEY };
