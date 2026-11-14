@@ -250,7 +250,12 @@
             <!-- Gallery -->
             <div class="gallery">
               <div class="gallery-main">
-                <img v-if="activeImage" :src="activeImage" :alt="detail.name" />
+                <button v-if="activeImage" type="button" class="gallery-open" :aria-label="`View ${detail.name} photo full screen`" @click="viewer.open = true">
+                  <img :src="activeImage" :alt="detail.name" />
+                  <span class="gallery-zoom" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+                  </span>
+                </button>
                 <span v-else class="img-fallback big">🌸</span>
               </div>
               <div v-if="detail.images.length > 1" class="thumbs">
@@ -259,6 +264,25 @@
                 </button>
               </div>
             </div>
+
+            <!-- Full-screen photo viewer -->
+            <Teleport to="body">
+              <Transition name="viewer">
+                <div v-if="viewer.open && activeImage" class="photo-viewer" role="dialog" aria-modal="true" :aria-label="`${detail.name} photos`" @click.self="viewer.open = false">
+                  <button type="button" class="pv-btn pv-close" aria-label="Close photo" @click="viewer.open = false">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
+                  <button v-if="photoCount > 1" type="button" class="pv-btn pv-prev" aria-label="Previous photo" @click="stepPhoto(-1)">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                  </button>
+                  <img :src="activeImage" :alt="detail.name" class="pv-img" />
+                  <button v-if="photoCount > 1" type="button" class="pv-btn pv-next" aria-label="Next photo" @click="stepPhoto(1)">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                  </button>
+                  <span v-if="photoCount > 1" class="pv-count">{{ drawer.image + 1 }} / {{ photoCount }}</span>
+                </div>
+              </Transition>
+            </Teleport>
 
             <!-- Why it is / isn't visible -->
             <div class="box status-box" :class="`vis-${detail.visibility}`">
@@ -547,6 +571,16 @@ const drawer = reactive({ id: null, error: "", image: 0 });
 const drawerEl = ref(null);
 const detail = ref(null);
 const activeImage = computed(() => detail.value?.images[drawer.image] ?? detail.value?.image ?? null);
+
+// Full-screen photo viewer (opened from the drawer's main photo)
+const viewer = reactive({ open: false });
+const photoCount = computed(() => detail.value?.images?.length ?? 0);
+const stepPhoto = (dir) => {
+  if (photoCount.value < 2) return;
+  drawer.image = (drawer.image + dir + photoCount.value) % photoCount.value;
+};
+// Closing or switching products also closes the viewer
+watch(() => drawer.id, () => (viewer.open = false));
 let lastFocus = null;
 
 let detailRequest = 0;
@@ -722,6 +756,12 @@ const formatDateTime = (v) =>
 
 // ── Lifecycle ────────────────────────────────────────────────────
 const onKeydown = (e) => {
+  if (viewer.open) {
+    if (e.key === "ArrowLeft") stepPhoto(-1);
+    else if (e.key === "ArrowRight") stepPhoto(1);
+    else if (e.key === "Escape") viewer.open = false;
+    return;
+  }
   if (e.key !== "Escape") return;
   if (dialog.action) closeDialog();
   else if (drawer.id) closeProduct();
@@ -1540,6 +1580,130 @@ textarea:focus,
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.gallery-open {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.gallery-open:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+.gallery-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #fff;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+.gallery-open:hover .gallery-zoom,
+.gallery-open:focus-visible .gallery-zoom {
+  opacity: 1;
+}
+
+/* Full-screen photo viewer: always dark so photos read true in both themes */
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 72px;
+  background: rgba(2, 6, 23, 0.92);
+}
+.pv-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  user-select: none;
+}
+.pv-btn {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pv-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.pv-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.pv-close {
+  top: 16px;
+  right: 16px;
+}
+.pv-prev {
+  left: 16px;
+}
+.pv-next {
+  right: 16px;
+}
+.pv-count {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.viewer-enter-active,
+.viewer-leave-active {
+  transition: opacity 0.2s ease;
+}
+.viewer-enter-from,
+.viewer-leave-to {
+  opacity: 0;
+}
+@media (max-width: 640px) {
+  .photo-viewer {
+    padding: 64px 12px;
+  }
+  .pv-prev,
+  .pv-next {
+    top: auto;
+    bottom: 12px;
+  }
+  .pv-prev {
+    left: 12px;
+  }
+  .pv-next {
+    right: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viewer-enter-active,
+  .viewer-leave-active {
+    transition: none;
+  }
 }
 .thumbs {
   display: flex;
