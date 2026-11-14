@@ -1600,34 +1600,8 @@ class CheckoutController extends Controller
         return response()->json(['success' => true, 'status' => 'processed']);
     }
 
-    private function verifyWebhookSignature(Request $request): bool
-    {
-        if (app()->environment(['local', 'testing'])) {
-            return true;
-        }
-
-        $secretKey = env('PAYMONGO_WEBHOOK_SECRET');
-        $signature = $request->header('Paymongo-Signature');
-        
-        if (!$secretKey || !$signature) {
-            Log::warning('Missing webhook secret or signature');
-            return false;
-        }
-
-        $payload = $request->getContent();
-        $parts = [];
-
-        foreach (explode(',', $signature) as $part) {
-            [$key, $value] = explode('=', $part, 2);
-            $parts[$key] = $value;
-        }
-
-        $timestamp = $parts['t'] ?? '';
-        $expectedSignature = $parts['te'] ?? '';
-        $computedSignature = hash_hmac('sha256', $timestamp . '.' . $payload, $secretKey);
-        
-        return $expectedSignature !== '' && hash_equals($expectedSignature, $computedSignature);
-    }
+    // The webhook signature is checked before this controller runs
+    // (App\Http\Middleware\VerifyPayMongoWebhook).
 
     /**
      * Handle test webhooks for local development
