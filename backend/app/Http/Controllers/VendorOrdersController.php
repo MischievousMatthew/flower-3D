@@ -112,8 +112,11 @@ class VendorOrdersController extends Controller
             }
 
             // Apply sorting
-            $sortBy = $request->input('sort_by', 'reservation_date');
-            $sortOrder = $request->input('sort_order', 'desc');
+            // Only these columns: a column name can't be sent as a ? value, so
+            // anything else from the request never reaches the SQL
+            $sortBy = $request->input('sort_by');
+            $sortBy = in_array($sortBy, ['reservation_date', 'created_at', 'updated_at', 'total_amount', 'order_number', 'status'], true) ? $sortBy : 'reservation_date';
+            $sortOrder = strtolower((string) $request->input('sort_order')) === 'asc' ? 'asc' : 'desc';
             $query->orderBy($sortBy, $sortOrder);
 
             // Pagination

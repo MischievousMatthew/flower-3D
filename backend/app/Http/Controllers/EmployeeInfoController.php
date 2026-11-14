@@ -60,8 +60,11 @@ class EmployeeInfoController extends Controller
                 $query->byLocation($request->location);
             }
 
-            $sortBy = $request->input('sort_by', 'created_at');
-            $sortOrder = $request->input('sort_order', 'desc');
+            // Only these columns: a column name can't be sent as a ? value, so
+            // anything else from the request never reaches the SQL
+            $sortBy = $request->input('sort_by');
+            $sortBy = in_array($sortBy, ['created_at', 'updated_at', 'first_name', 'last_name', 'employee_id', 'position', 'department', 'employment_status', 'date_hired'], true) ? $sortBy : 'created_at';
+            $sortOrder = strtolower((string) $request->input('sort_order')) === 'asc' ? 'asc' : 'desc';
             $query->orderBy($sortBy, $sortOrder);
 
             $perPage = $request->input('per_page', 15);
