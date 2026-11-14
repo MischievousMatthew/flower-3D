@@ -306,6 +306,9 @@
                 <select v-if="f.key === 'employment_status'" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
                   <option v-for="o in employmentStatusChoices(form.id ? form.statusAtOpen : '', !form.id)" :key="o.value" :value="o.value">{{ o.label }}</option>
                 </select>
+                <select v-else-if="f.team" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
+                  <option v-for="o in reportsToChoices(team, form.id ?? null, form[f.key])" :key="o.value" :value="o.value">{{ o.label }}</option>
+                </select>
                 <select v-else-if="f.options" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
                   <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
                 </select>
@@ -467,7 +470,7 @@ import { PHONE_MESSAGE, isPhone } from "../../../../utils/phone";
 import { buildMultipartFormData, getSelectedFile, readImagePreview, validateImageFile } from "../../../../utils/imageUpload";
 import {
   ACCESS_FILTERS, CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
-  REQUIRED_FIELDS, day10, employmentStatusChoices, employmentStatusHint, hm5, hourlyRate, initialsOf, restDaysList, statusTone,
+  REQUIRED_FIELDS, day10, employmentStatusChoices, employmentStatusHint, hm5, hourlyRate, reportsToChoices, initialsOf, restDaysList, statusTone,
 } from "../../../../components/hr/hrUi";
 
 const NO_PERMISSION = {
@@ -512,6 +515,8 @@ const detailTab = ref("profile");
 const form = ref(null);
 // The shop's address (sent with the list), offered as a work location
 const storeAddress = ref("");
+// Everyone still working here (sent with the list), for "Reports to"
+const team = ref([]);
 function useStoreAddress() {
   form.value.work_location = storeAddress.value.slice(0, 200);
   delete errors.work_location;
@@ -551,6 +556,7 @@ async function fetchPage(p) {
   });
   page.value = res.pagination ?? page.value;
   if (res.store_address) storeAddress.value = res.store_address;
+  if (Array.isArray(res.team)) team.value = res.team;
   return { items: res.data ?? [], lastPage: page.value.last_page ?? 1, total: page.value.total };
 }
 const pager = useShowMorePaged(fetchPage);

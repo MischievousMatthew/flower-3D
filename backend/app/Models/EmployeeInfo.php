@@ -111,7 +111,7 @@ class EmployeeInfo extends Model
         'position' => 'Position',
         'department' => 'Department',
         'work_location' => 'Work location',
-        'reporting_manager' => 'Reports to',
+        // "Reports to" is optional, so leaving it empty doesn't make a profile incomplete
         'shift_start' => 'Usual hours',
     ];
 

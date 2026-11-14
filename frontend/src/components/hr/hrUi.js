@@ -72,12 +72,30 @@ export const JOB_FIELDS = [
   // notFuture: today or earlier (the server checks it too)
   { key: "date_hired", label: "Hired on", type: "date", notFuture: true },
   { key: "work_location", label: "Work location", max: 200, placeholder: "e.g. Main shop" },
-  { key: "reporting_manager", label: "Reports to", max: 150 },
+  // A dropdown of the team (see reportsToChoices); optional
+  { key: "reporting_manager", label: "Reports to (optional)", max: 150, team: true },
 ];
+
+/**
+ * Choices for "Reports to": nobody, the shop owner, or someone on the team
+ * (not the person themselves, not people who left). team: [{ id, name, position }].
+ * The name is what gets saved; an older typed value stays selectable.
+ */
+export function reportsToChoices(team = [], selfId = null, current = "") {
+  const list = [
+    { value: "", label: "No one" },
+    { value: "Shop owner", label: "Shop owner" },
+    ...team
+      .filter((p) => p.name && p.id !== selfId && !/inactive|resign|terminat/i.test(p.employment_status ?? ""))
+      .map((p) => ({ value: p.name.slice(0, 150), label: p.position ? `${p.name} · ${p.position}` : p.name })),
+  ];
+  if (current && !list.some((c) => c.value === current)) list.splice(2, 0, { value: current, label: current });
+  return list;
+}
 export const REQUIRED_FIELDS = [
   "first_name", "last_name", "gender", "date_of_birth", "civil_status", "work_email", "personal_email", "mobile_number", "address",
   "emergency_contact_name", "emergency_relationship", "emergency_contact_number", "position", "department", "employment_status",
-  "employment_type", "date_hired", "work_location", "reporting_manager", "shift_start", "shift_end",
+  "employment_type", "date_hired", "work_location", "shift_start", "shift_end",
 ];
 export const PROFILE_KEYS = [...PERSONAL_FIELDS, ...CONTACT_FIELDS, ...EMERGENCY_FIELDS, ...JOB_FIELDS]
   .map((f) => f.key)

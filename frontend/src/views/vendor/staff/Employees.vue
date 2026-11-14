@@ -440,6 +440,9 @@
                 <select v-if="f.key === 'employment_status'" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
                   <option v-for="o in employmentStatusChoices(pform.id ? (profileStatusAtOpen ?? '') : '', !pform.id)" :key="o.value" :value="o.value">{{ o.label }}</option>
                 </select>
+                <select v-else-if="f.team" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
+                  <option v-for="o in reportsToChoices(data?.profiles ?? [], pform.id ?? null, pform[f.key])" :key="o.value" :value="o.value">{{ o.label }}</option>
+                </select>
                 <select v-else-if="f.options" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
                   <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
                 </select>
@@ -562,7 +565,7 @@ import { STATUS_LABEL, STATUS_TONE, personColor, range12, relativeTime, time12 }
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
 import { PHONE_MESSAGE, isPhone } from "../../../utils/phone";
-import { ACCESS_FILTERS, CONTACT_FIELDS as CONTACT, DAYS, EMERGENCY_FIELDS as EMERGENCY, JOB_FIELDS as JOB, PER, PERSONAL_FIELDS as PERSONAL, PROFILE_KEYS, REQUIRED_FIELDS as REQUIRED, day10, employmentStatusChoices, employmentStatusHint, hm5, missingSummary } from "../../../components/hr/hrUi";
+import { ACCESS_FILTERS, CONTACT_FIELDS as CONTACT, DAYS, EMERGENCY_FIELDS as EMERGENCY, JOB_FIELDS as JOB, PER, PERSONAL_FIELDS as PERSONAL, PROFILE_KEYS, REQUIRED_FIELDS as REQUIRED, day10, employmentStatusChoices, employmentStatusHint, hm5, missingSummary, reportsToChoices } from "../../../components/hr/hrUi";
 
 const today = ymd(new Date());
 

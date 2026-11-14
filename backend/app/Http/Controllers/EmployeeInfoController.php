@@ -74,6 +74,13 @@ class EmployeeInfoController extends Controller
                 'data' => PayAccess::reveal($request->user(), $employees->items()),
                 // The profile form offers the shop's address as a work location
                 'store_address' => \App\Models\VendorApplication::findApprovedForVendorUser(\App\Models\User::find($ownerId))?->full_store_address ?: null,
+                // Everyone still working here, for the "Reports to" dropdown
+                'team' => EmployeeInfo::forOwner($ownerId)
+                    ->where(fn ($q) => $q->whereNull('employment_status')->orWhere('employment_status', '!=', 'Inactive'))
+                    ->orderBy('first_name')
+                    ->get(['id', 'first_name', 'last_name', 'position'])
+                    ->map(fn ($p) => ['id' => $p->id, 'name' => trim("{$p->first_name} {$p->last_name}"), 'position' => $p->position])
+                    ->values(),
                 'pagination' => [
                     'total' => $employees->total(),
                     'per_page' => $employees->perPage(),
@@ -132,7 +139,7 @@ class EmployeeInfoController extends Controller
             'employment_type' => 'required|in:Full-time,Part-time',
             'date_hired' => 'required|date|before_or_equal:today',
             'work_location' => 'required|string|max:200',
-            'reporting_manager' => 'required|string|max:150',
+            'reporting_manager' => 'nullable|string|max:150', // optional: picked from the team list
             
             // Work Schedule
             'work_schedule' => 'required|in:Fixed,Shifting',
@@ -432,7 +439,7 @@ class EmployeeInfoController extends Controller
             'employment_type' => 'required|in:Full-time,Part-time',
             'date_hired' => 'required|date|before_or_equal:today',
             'work_location' => 'required|string|max:200',
-            'reporting_manager' => 'required|string|max:150',
+            'reporting_manager' => 'nullable|string|max:150', // optional: picked from the team list
             'work_schedule' => 'required|in:Fixed,Shifting',
             'shift_start' => ['required', 'regex:/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/'],
             'shift_end' => ['required', 'regex:/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/'],
