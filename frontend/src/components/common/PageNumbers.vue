@@ -5,7 +5,7 @@
     <PageNumbers :page="meta.current_page" :pages="meta.last_page" :total="meta.total"
                  :per-page="10" :shown="rows.length" :loading="loading" label="Deliveries pages" @go="goTo" />
   -->
-  <nav v-if="shown" class="pn" :aria-label="label">
+  <nav v-if="shown" class="pn" :class="{ 'pn--admin': tone === 'admin' }" :aria-label="label">
     <span class="pn-count" aria-live="polite">
       Showing <b>{{ from }}–{{ to }}</b> of <b>{{ total }}</b>
     </span>
@@ -46,6 +46,7 @@ const props = defineProps({
   shown: { type: Number, default: 0 }, // rows on this page
   loading: { type: Boolean, default: false },
   label: { type: String, default: "Pages" },
+  tone: { type: String, default: "vendor" }, // "vendor" (portal/ERP) or "admin" (admin panel colors)
 });
 const emit = defineEmits(["go"]);
 
@@ -75,6 +76,31 @@ function go(n) {
 </script>
 
 <style scoped>
+/* Colors: the portal's --v-* tokens, or the admin panel's --a-* ones */
+.pn {
+  --pn-border: var(--v-border);
+  --pn-border-strong: var(--v-border-strong);
+  --pn-surface: var(--v-surface);
+  --pn-hover: var(--v-subtle-2);
+  --pn-text: var(--v-text);
+  --pn-text-2: var(--v-text-2);
+  --pn-muted: var(--v-muted);
+  --pn-faint: var(--v-faint);
+  --pn-accent: var(--bc-accent);
+  --pn-accent-ink: var(--bc-accent-ink);
+}
+.pn--admin {
+  --pn-border: var(--a-border);
+  --pn-border-strong: var(--a-border-strong);
+  --pn-surface: var(--a-surface);
+  --pn-hover: var(--a-subtle-2);
+  --pn-text: var(--a-text);
+  --pn-text-2: var(--a-text-2);
+  --pn-muted: var(--a-muted);
+  --pn-faint: var(--a-faint);
+  --pn-accent: var(--a-accent);
+  --pn-accent-ink: var(--a-accent-ink);
+}
 .pn {
   display: flex;
   flex-wrap: wrap;
@@ -83,15 +109,15 @@ function go(n) {
   gap: 10px 16px;
   margin-top: 6px;
   padding: 12px 10px 6px;
-  border-top: 1px solid var(--v-border);
+  border-top: 1px solid var(--pn-border);
 }
 .pn-count {
   font-size: 12.5px;
-  color: var(--v-muted);
+  color: var(--pn-muted);
   font-variant-numeric: tabular-nums;
 }
 .pn-count b {
-  color: var(--v-text);
+  color: var(--pn-text);
   font-weight: 600;
 }
 .pn-btns {
@@ -107,10 +133,10 @@ function go(n) {
   min-width: 36px;
   height: 36px;
   padding: 0 10px;
-  border: 1px solid var(--v-border);
+  border: 1px solid var(--pn-border);
   border-radius: 10px;
-  background: var(--v-surface);
-  color: var(--v-text-2);
+  background: var(--pn-surface);
+  color: var(--pn-text-2);
   font: 600 13px var(--font-sans, "Poppins", system-ui, sans-serif);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
@@ -126,14 +152,14 @@ function go(n) {
   stroke-linejoin: round;
 }
 .pn-btn:hover:not(:disabled):not(.active) {
-  border-color: var(--v-border-strong);
-  background: var(--v-subtle-2);
-  color: var(--v-text);
+  border-color: var(--pn-border-strong);
+  background: var(--pn-hover);
+  color: var(--pn-text);
 }
 .pn-btn.active {
-  border-color: var(--bc-accent);
-  background: var(--bc-accent);
-  color: var(--bc-accent-ink);
+  border-color: var(--pn-accent);
+  background: var(--pn-accent);
+  color: var(--pn-accent-ink);
   cursor: default;
 }
 .pn-btn:disabled:not(.active) {
@@ -141,13 +167,13 @@ function go(n) {
   cursor: not-allowed;
 }
 .pn-btn:focus-visible {
-  outline: 2px solid var(--bc-accent);
+  outline: 2px solid var(--pn-accent);
   outline-offset: 2px;
 }
 .pn-gap {
   min-width: 20px;
   text-align: center;
-  color: var(--v-faint);
+  color: var(--pn-faint);
 }
 @media (max-width: 640px) {
   .pn {

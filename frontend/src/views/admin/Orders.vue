@@ -82,7 +82,7 @@
           </button>
         </section>
 
-        <section class="panel">
+        <section ref="tableTop" class="panel">
           <!-- Toolbar -->
           <div class="toolbar">
             <div class="search-wrap">
@@ -149,7 +149,7 @@
                 <tr>
                   <td colspan="8" class="empty-cell">
                     The orders couldn't be loaded.
-                    <button type="button" class="link-btn" @click="orderList.refresh()">Try again</button>
+                    <button type="button" class="link-btn" @click="fetchOrders(meta.current_page)">Try again</button>
                   </td>
                 </tr>
               </tbody>
@@ -162,7 +162,7 @@
               </tbody>
               <tbody v-else :class="{ dim: listLoading }">
                 <tr
-                  v-for="order in orderList.rows.value"
+                  v-for="order in orders"
                   :key="order.id"
                   class="order-row"
                   :class="{ selected: drawer.id === order.id }"
@@ -221,7 +221,8 @@
             </table>
           </div>
 
-          <ShowMore v-if="orders.length" tone="admin" :has-more="orderList.hasMore.value" :loading="orderList.loadingMore.value" :shown="orderList.rows.value.length" :total="orderList.total.value" @more="orderList.showMore()" />
+          <!-- 10 a page -->
+          <PageNumbers tone="admin" :page="meta.current_page" :pages="meta.last_page" :total="meta.total" :per-page="PER_PAGE" :shown="orders.length" :loading="listLoading" label="Order pages" @go="goToPage" />
         </section>
       </div>
     </main>
@@ -498,8 +499,7 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
-import ShowMore from "../../components/common/ShowMore.vue";
-import { useShowMoreRows } from "../../composables/useShowMore";
+import PageNumbers from "../../components/common/PageNumbers.vue";
 import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
@@ -566,7 +566,9 @@ const blankFilters = () => ({
 });
 const filters = reactive({ ...blankFilters(), bucket: typeof route.query.tab === "string" ? route.query.tab : "" });
 const orders = ref([]);
-const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 });
+// 10 a page, with page numbers under the table
+const PER_PAGE = 10;
+const meta = ref({ current_page: 1, last_page: 1, per_page: PER_PAGE, total: 0 });
 const listLoading = ref(false);
 const listError = ref(false);
 
@@ -581,11 +583,13 @@ const fetchOrders = async (page = 1) => {
   listError.value = false;
   try {
     const params = Object.fromEntries(
-      Object.entries({ ...filters, search: filters.search.trim(), page, per_page: 15 }).filter(([, v]) => v !== "" && v !== null),
+      Object.entries({ ...filters, search: filters.search.trim(), page, per_page: PER_PAGE }).filter(([, v]) => v !== "" && v !== null),
     );
     const { data } = await api.get("/admin/orders", { params });
     if (id !== listRequest) return;
-    orders.value = page > 1 ? [...orders.value, ...(data.data ?? [])] : data.data;
+    // That page is gone (orders moved to another filter): show the last one there is
+    if (page > 1 && data.meta?.last_page && page > data.meta.last_page) return fetchOrders(data.meta.last_page);
+    orders.value = data.data ?? [];
     meta.value = data.meta;
   } catch {
     if (id !== listRequest) return;
@@ -595,8 +599,13 @@ const fetchOrders = async (page = 1) => {
     if (id === listRequest) listLoading.value = false;
   }
 };
-// 10 rows first, then 10 more, then 20 at a time
-const orderList = useShowMoreRows(orders, meta, fetchOrders);
+const tableTop = ref(null);
+const goToPage = async (n) => {
+  await fetchOrders(n);
+  if ((tableTop.value?.getBoundingClientRect().top ?? 0) < 0) {
+    tableTop.value.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+};
 
 const setBucket = (key) => {
   filters.bucket = filters.bucket === key ? "" : key;
@@ -607,7 +616,7 @@ const clearFilters = () => Object.assign(filters, blankFilters());
 
 const refresh = () => {
   fetchSummary();
-  orderList.refresh();
+  fetchOrders(meta.value.current_page);
   if (drawer.id) loadDetail(drawer.id);
 };
 
@@ -617,7 +626,7 @@ watch(
   (now, before) => {
     clearTimeout(searchTimer);
     const delay = now.search !== before.search ? 300 : 0;
-    searchTimer = setTimeout(() => orderList.load(), delay);
+    searchTimer = setTimeout(() => fetchOrders(1), delay);
     if (now.bucket !== before.bucket) {
       router.replace({ query: { ...route.query, tab: now.bucket || undefined } });
     }
@@ -720,7 +729,7 @@ const onKeydown = (event) => {
 
 onMounted(() => {
   fetchSummary();
-  orderList.load();
+  fetchOrders(1);
   const fromLink = linkedId("order");
   if (fromLink) openOrder(fromLink);
   window.addEventListener("keydown", onKeydown);
