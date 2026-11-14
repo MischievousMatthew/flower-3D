@@ -1378,12 +1378,10 @@ async function placeOrder() {
           }),
     };
 
-    console.log("Sending order data:", orderData);
 
     const response = await api.post("/checkout/create-order", orderData);
     if (response.data?.success || response.data?.checkout_url) await saveOfferOptIn();
 
-    console.log("Order response:", response.data);
 
     const checkoutUrl = response.data.checkout_url;
 
@@ -1427,7 +1425,6 @@ async function placeOrder() {
       toast.error(response.data.message || "Failed to place order");
     }
   } catch (error) {
-    console.log("Validation errors:", error.response?.data?.errors);
     console.error("Checkout error:", error.response?.data || error);
     const data = error.response?.data ?? {};
     // The order this checkout made has ended (its payment failed, or the

@@ -59,7 +59,6 @@ const attendanceApi = {
         params: cleanParams,
       });
 
-      console.log("Sending params:", cleanParams);
 
       return response.data;
     } catch (error) {

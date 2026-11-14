@@ -18,7 +18,6 @@ export function useOtp() {
         contact_number: contactNumber,
       });
 
-      console.log("OTP Response:", response.data);
 
       startCooldown(60);
 

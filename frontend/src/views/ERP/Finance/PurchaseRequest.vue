@@ -1100,7 +1100,6 @@ const toggleMenu = (id) => {
 };
 
 const toggleFilter = (filter) => {
-  console.log("Toggle filter:", filter);
 };
 
 const openApprovalModal = (request) => {
@@ -1159,7 +1158,6 @@ const submitApproval = () => {
 };
 
 const editRequest = (request) => {
-  console.log("Edit request:", request);
   openMenuId.value = null;
 };
 

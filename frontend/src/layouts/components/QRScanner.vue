@@ -199,7 +199,6 @@ function startScanning() {
 
 // Handle QR code detected
 function handleQRCodeDetected(data) {
-  console.log("QR Code detected:", data);
 
   isScanning.value = false;
   statusMessage.value = "QR Code detected!";

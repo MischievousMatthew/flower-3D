@@ -203,10 +203,6 @@ let resetTimer = null;
 function submitManual() {
   const val = buffer.value.trim().toUpperCase();
 
-  console.log("[Scanner] Manual submit triggered");
-  console.log("[Scanner] Buffer value:", buffer.value);
-  console.log("[Scanner] Trimmed value:", val);
-  console.log("[Scanner] Type:", typeof val);
 
   if (!val || scanning.value) {
     console.warn("[Scanner] Ignored manual scan - empty or scanning");
@@ -215,7 +211,6 @@ function submitManual() {
 
   buffer.value = "";
 
-  console.log("[Scanner] Emitting scan event with:", val);
 
   emit("scan", val);
 }
@@ -356,7 +351,6 @@ function handleDetected(result) {
   lastCode = cleanCode;
   lastCodeTime = now;
 
-  console.log("[Scanner] Detected:", cleanCode);
 
   // Green flash
   flashVisible.value = true;
