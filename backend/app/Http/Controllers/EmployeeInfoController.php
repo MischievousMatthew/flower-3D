@@ -158,7 +158,6 @@ class EmployeeInfoController extends Controller
             'payment_method' => 'nullable|in:Bank,Cash',
             'bank_name' => 'nullable|string|max:150',
             'account_number' => 'nullable|string|max:50',
-            'tax_status' => 'nullable|string|max:20',
             'allowance' => 'nullable|numeric|min:0|max:999999999.99',
         ];
 
@@ -309,7 +308,6 @@ class EmployeeInfoController extends Controller
                 'payment_method' => $request->payment_method,
                 'bank_name' => $request->bank_name,
                 'account_number' => $request->account_number,
-                'tax_status' => $request->tax_status,
                 'allowance' => $request->allowance,
             ];
 
@@ -452,7 +450,6 @@ class EmployeeInfoController extends Controller
             'payment_method' => 'nullable|in:Bank,Cash',
             'bank_name' => 'nullable|string|max:150',
             'account_number' => 'nullable|string|max:50',
-            'tax_status' => 'nullable|string|max:20',
             'allowance' => 'nullable|numeric|min:0|max:999999999.99',
         ];
 
@@ -574,7 +571,6 @@ class EmployeeInfoController extends Controller
                 'payment_method' => $request->payment_method,
                 'bank_name' => $request->bank_name,
                 'account_number' => $request->account_number,
-                'tax_status' => $request->tax_status,
                 'allowance' => $request->allowance,
             ];
 

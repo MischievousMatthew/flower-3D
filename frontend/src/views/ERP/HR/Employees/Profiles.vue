@@ -220,7 +220,6 @@
                 <dt>Hourly rate</dt><dd>{{ hourlyRate(selected) ? `${money(hourlyRate(selected))} an hour` : "—" }}</dd>
                 <dt>Paid by</dt><dd>{{ selected.payment_method || "—" }}<template v-if="selected.payment_method === 'Bank' && selected.bank_name"> · {{ selected.bank_name }}</template></dd>
                 <dt>Account number</dt><dd>{{ selected.account_number ? masked(selected.account_number) : "—" }}</dd>
-                <dt>Tax status</dt><dd>{{ selected.tax_status || "—" }}</dd>
                 <dt>Allowance</dt><dd>{{ selected.allowance ? money(selected.allowance) : "—" }}</dd>
               </dl>
               </template>
@@ -401,10 +400,6 @@
                   <input v-model="form.account_number" class="sp-input" maxlength="50" autocomplete="off" />
                 </label>
               </template>
-              <label class="sp-field">
-                <span class="sp-label">Tax status <small>(optional)</small></span>
-                <input v-model="form.tax_status" class="sp-input" maxlength="20" placeholder="e.g. S, ME1" />
-              </label>
               <label class="sp-field">
                 <span class="sp-label">Allowance <small>(optional)</small></span>
                 <input v-model="form.allowance" type="number" min="0" step="0.01" class="sp-input" />

@@ -101,7 +101,7 @@ export const PROFILE_KEYS = [...PERSONAL_FIELDS, ...CONTACT_FIELDS, ...EMERGENCY
   .map((f) => f.key)
   .concat([
     "work_schedule", "shift_start", "shift_end", "salary_type", "basic_salary", "standard_work_hours_per_day",
-    "working_days_per_week", "working_days_per_month", "payment_method", "bank_name", "account_number", "tax_status", "allowance",
+    "working_days_per_week", "working_days_per_month", "payment_method", "bank_name", "account_number", "allowance",
   ]);
 
 // Who has a team account (signs in to the ERP) and whose profile still has blanks (EmployeeInfo::scopeByAccess)
