@@ -72,6 +72,8 @@ class EmployeeInfoController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => PayAccess::reveal($request->user(), $employees->items()),
+                // The profile form offers the shop's address as a work location
+                'store_address' => \App\Models\VendorApplication::findApprovedForVendorUser(\App\Models\User::find($ownerId))?->full_store_address ?: null,
                 'pagination' => [
                     'total' => $employees->total(),
                     'per_page' => $employees->perPage(),
@@ -128,7 +130,7 @@ class EmployeeInfoController extends Controller
             'position' => 'required|string|max:150',
             'department' => 'required|string|max:150',
             'employment_type' => 'required|in:Full-time,Part-time',
-            'date_hired' => 'required|date',
+            'date_hired' => 'required|date|before_or_equal:today',
             'work_location' => 'required|string|max:200',
             'reporting_manager' => 'required|string|max:150',
             
@@ -157,7 +159,7 @@ class EmployeeInfoController extends Controller
             $rules['avatar'] = 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120';
         }
 
-        $validator = Validator::make($request->all(), $rules);
+        $validator = Validator::make($request->all(), $rules, ['date_hired.before_or_equal' => "The hire date can't be in the future."]);
 
         // ✅ ADDED: Conditional validation for salary type
         $validator->after(function ($validator) use ($request) {
@@ -428,7 +430,7 @@ class EmployeeInfoController extends Controller
             'position' => 'required|string|max:150',
             'department' => 'required|string|max:150',
             'employment_type' => 'required|in:Full-time,Part-time',
-            'date_hired' => 'required|date',
+            'date_hired' => 'required|date|before_or_equal:today',
             'work_location' => 'required|string|max:200',
             'reporting_manager' => 'required|string|max:150',
             'work_schedule' => 'required|in:Fixed,Shifting',
@@ -451,7 +453,7 @@ class EmployeeInfoController extends Controller
             $rules['avatar'] = 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120';
         }
 
-        $validator = Validator::make($request->all(), $rules);
+        $validator = Validator::make($request->all(), $rules, ['date_hired.before_or_equal' => "The hire date can't be in the future."]);
 
         $validator->after(function ($validator) use ($request) {
             if ($request->shift_start && $request->shift_end) {

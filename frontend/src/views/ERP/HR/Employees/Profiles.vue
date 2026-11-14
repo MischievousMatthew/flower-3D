@@ -309,9 +309,13 @@
                 <select v-else-if="f.options" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
                   <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
                 </select>
-                <input v-else v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
+                <input v-else v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :max="f.notFuture ? today : undefined" :placeholder="f.placeholder" />
                 <small v-if="errors[f.key]" class="sp-error">{{ errors[f.key] }}</small>
                 <small v-else-if="f.key === 'employment_status'" class="sp-hint">{{ employmentStatusHint(!form.id) }}</small>
+                <button v-if="f.key === 'work_location' && storeAddress && form.work_location !== storeAddress" type="button" class="pf-use-store" :title="storeAddress" @click.prevent="useStoreAddress">
+                  <span v-html="ICONS.store"></span>Use store address
+                </button>
+                <small v-else-if="f.key === 'work_location' && storeAddress" class="sp-hint">Your store address</small>
               </label>
             </div>
 
@@ -506,6 +510,12 @@ function photoChanged(id, url) {
 }
 const detailTab = ref("profile");
 const form = ref(null);
+// The shop's address (sent with the list), offered as a work location
+const storeAddress = ref("");
+function useStoreAddress() {
+  form.value.work_location = storeAddress.value.slice(0, 200);
+  delete errors.work_location;
+}
 const errors = reactive({});
 const formError = ref("");
 const saving = ref(false);
@@ -540,6 +550,7 @@ async function fetchPage(p) {
     location: filters.location || undefined,
   });
   page.value = res.pagination ?? page.value;
+  if (res.store_address) storeAddress.value = res.store_address;
   return { items: res.data ?? [], lastPage: page.value.last_page ?? 1, total: page.value.total };
 }
 const pager = useShowMorePaged(fetchPage);
@@ -685,6 +696,7 @@ function validate() {
   for (const k of ["mobile_number", "emergency_contact_number"]) if (f[k] && !isPhone(f[k])) errors[k] = PHONE_MESSAGE;
   for (const k of ["work_email", "personal_email"]) if (f[k] && !/^\S+@\S+\.\S+$/.test(String(f[k]).trim())) errors[k] = "Enter a valid email.";
   if (f.date_of_birth && f.date_of_birth >= today) errors.date_of_birth = "Pick a day in the past.";
+  if (f.date_hired && f.date_hired > today) errors.date_hired = "Pick today or an earlier day.";
   if (f.shift_start && f.shift_end && f.shift_end <= f.shift_start) errors.shift_end = "End after it starts.";
   if (f.salary_type && !f.basic_salary) errors.basic_salary = "Enter the salary.";
   return !Object.keys(errors).length;
@@ -798,6 +810,38 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* "Use store address" under Work location */
+.pf-use-store {
+  align-self: flex-start;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-top: 2px;
+  padding: 4px 10px;
+  border: 1px dashed var(--v-border-strong);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bc-accent-deep, var(--bc-accent));
+  cursor: pointer;
+}
+.pf-use-store:hover {
+  border-style: solid;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+}
+.pf-use-store:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.pf-use-store :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
 .pf-note {
   margin-bottom: 16px;
 }

@@ -182,6 +182,8 @@ class StaffController extends Controller
                 })->values(),
                 'limit' => $limit,
                 'hr_available' => $subscription->canAccess($vendor, 'employees'),
+                // The HR profile form offers it as a work location
+                'store_address' => \App\Models\VendorApplication::findApprovedForVendorUser($vendor)?->full_store_address ?: null,
             ],
         ]);
     }

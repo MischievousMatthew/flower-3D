@@ -443,9 +443,13 @@
                 <select v-else-if="f.options" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
                   <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
                 </select>
-                <input v-else v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
+                <input v-else v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :max="f.notFuture ? today : undefined" :placeholder="f.placeholder" />
                 <small v-if="perrors[f.key]" class="sp-error">{{ perrors[f.key] }}</small>
                 <small v-else-if="f.key === 'employment_status'" class="sp-hint">{{ employmentStatusHint(!pform.id) }}</small>
+                <button v-if="f.key === 'work_location' && storeAddress && pform.work_location !== storeAddress" type="button" class="em-use-store" :title="storeAddress" @click.prevent="useStoreAddress">
+                  <span v-html="ICONS.store"></span>Use store address
+                </button>
+                <small v-else-if="f.key === 'work_location' && storeAddress" class="sp-hint">Your store address</small>
               </label>
             </div>
 
@@ -704,6 +708,12 @@ function closeProfile() {
 // A photo chosen while adding someone; it uploads once the profile exists
 const pendingPhoto = ref(null);
 const profileStatusAtOpen = ref(null);
+// The shop's address, offered as a work location
+const storeAddress = computed(() => data.value?.store_address || "");
+function useStoreAddress() {
+  pform.value.work_location = storeAddress.value.slice(0, 200);
+  delete perrors.work_location;
+}
 
 /** Keeps the list and the open profile in step after a photo change */
 function photoChanged(id, url) {
@@ -751,6 +761,7 @@ function validateProfile() {
   for (const k of ["mobile_number", "emergency_contact_number"]) if (f[k] && !isPhone(f[k])) perrors[k] = PHONE_MESSAGE;
   for (const k of ["work_email", "personal_email"]) if (f[k] && !/^\S+@\S+\.\S+$/.test(f[k].trim())) perrors[k] = "Enter a valid email.";
   if (f.date_of_birth && f.date_of_birth >= today) perrors.date_of_birth = "Pick a day in the past.";
+  if (f.date_hired && f.date_hired > today) perrors.date_hired = "Pick today or an earlier day.";
   if (f.shift_start && f.shift_end && f.shift_end <= f.shift_start) perrors.shift_end = "End after it starts.";
   if (f.salary_type && !f.basic_salary) perrors.basic_salary = "Enter the salary.";
   return !Object.keys(perrors).length;
@@ -800,6 +811,38 @@ onMounted(load);
 </script>
 
 <style scoped>
+/* "Use store address" under Work location */
+.em-use-store {
+  align-self: flex-start;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-top: 2px;
+  padding: 4px 10px;
+  border: 1px dashed var(--v-border-strong);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bc-accent-deep, var(--bc-accent));
+  cursor: pointer;
+}
+.em-use-store:hover {
+  border-style: solid;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+}
+.em-use-store:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.em-use-store :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
 .em-photo-row {
   display: flex;
   align-items: center;

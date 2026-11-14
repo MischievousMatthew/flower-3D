@@ -69,7 +69,8 @@ export const JOB_FIELDS = [
   { key: "department", label: "Department", max: 150, placeholder: "e.g. Production" },
   { key: "employment_status", label: "Employment status", options: EMPLOYMENT_STATUSES },
   { key: "employment_type", label: "Type", options: ["Full-time", "Part-time"] },
-  { key: "date_hired", label: "Hired on", type: "date" },
+  // notFuture: today or earlier (the server checks it too)
+  { key: "date_hired", label: "Hired on", type: "date", notFuture: true },
   { key: "work_location", label: "Work location", max: 200, placeholder: "e.g. Main shop" },
   { key: "reporting_manager", label: "Reports to", max: 150 },
 ];
