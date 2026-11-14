@@ -2,7 +2,7 @@
   <HrPage title="Refunds" subtitle="Refund requests from customers, what was decided, the money sent back, and whether it all matches the books.">
     <template #actions>
       <RangePicker @change="load(1)" />
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="refresh()">Refresh</button>
+      <button type="button" class="sp-icon-btn" :disabled="loading" aria-label="Refresh" title="Refresh" @click="refresh()"><span v-html="ICONS.restore"></span></button>
     </template>
 
     <div v-if="error" class="sp-banner error">

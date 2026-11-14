@@ -113,6 +113,12 @@
   border-color: var(--bc-accent-border);
   color: var(--bc-accent-strong);
 }
+.sp-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  border-color: var(--v-border-strong);
+  color: var(--v-text-2);
+}
 .sp-icon-btn.on {
   background: var(--bc-accent-soft);
   border-color: var(--bc-accent-border);

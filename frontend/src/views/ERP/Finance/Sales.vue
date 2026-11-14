@@ -2,7 +2,7 @@
   <HrPage title="Sales & revenue" subtitle="What the shop sold, with discounts, refunds and how customers paid kept apart.">
     <template #actions>
       <RangePicker @change="reloadAll" />
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="reloadAll">Refresh</button>
+      <button type="button" class="sp-icon-btn" :disabled="loading" aria-label="Refresh" title="Refresh" @click="reloadAll"><span v-html="ICONS.restore"></span></button>
     </template>
 
     <div v-if="error" class="sp-banner error">

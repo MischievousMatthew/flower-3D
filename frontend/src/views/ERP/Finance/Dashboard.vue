@@ -2,7 +2,7 @@
   <HrPage title="Finance dashboard" subtitle="Sales, spending and profit for the shop, and money still on its way in or out.">
     <template #actions>
       <RangePicker @change="load" />
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="load">Refresh</button>
+      <button type="button" class="sp-icon-btn" :disabled="loading" aria-label="Refresh" title="Refresh" @click="load"><span v-html="ICONS.restore"></span></button>
     </template>
 
     <div v-if="error" class="sp-banner error">
