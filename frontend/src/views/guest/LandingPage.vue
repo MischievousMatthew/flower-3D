@@ -59,9 +59,8 @@
           >How It Works</a
         >
         <a href="#plans" @click.prevent="navigateTo('plans')">For Vendors</a>
-        <a href="#blog" @click.prevent="navigateTo('blog')">Blog</a>
+        <a href="#journal" @click.prevent="navigateTo('journal')">Journal</a>
         <a href="#about" @click.prevent="navigateTo('about')">About</a>
-        <router-link to="/journal" @click="closeMobileMenu">Journal</router-link>
         <router-link
           v-if="!isAuthenticated"
           to="/guest/login"
@@ -365,8 +364,8 @@
 
       <!-- Journal -->
       <section
-        id="blog"
-        ref="blogSection"
+        id="journal"
+        ref="journalSection"
         class="journal"
         aria-labelledby="journal-heading"
       >
@@ -409,6 +408,7 @@
               </a>
             </li>
           </ul>
+          <router-link v-if="site.loaded && blogPosts.length" to="/journal" class="bc-link journal-all">See all articles</router-link>
         </div>
       </section>
 
@@ -614,7 +614,7 @@ const plansSection = ref(null);
 const plansViewport = ref(null);
 const plansTrack = ref(null);
 const plansProgressFill = ref(null);
-const blogSection = ref(null);
+const journalSection = ref(null);
 const aboutSection = ref(null);
 
 // BloomCraft's Vision and Mission, verbatim.
@@ -2529,6 +2529,11 @@ onBeforeUnmount(() => {
 .journal-skel-title {
   width: min(520px, 100%);
   height: 34px;
+}
+
+.journal-all {
+  display: inline-block;
+  margin-top: 32px;
 }
 
 .journal-empty {

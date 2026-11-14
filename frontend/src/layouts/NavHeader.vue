@@ -25,7 +25,6 @@
       <template v-if="!isAuthenticated">
         <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
         <router-link v-for="s in LANDING_SECTIONS" :key="s.id" :to="{ name: 'Home', hash: `#${s.id}` }" @click="closeMobileMenu">{{ s.label }}</router-link>
-        <router-link to="/journal" @click="closeMobileMenu">Journal</router-link>
         <router-link to="/guest/login" class="bc-nav-menu-only" @click="closeMobileMenu">Sign in</router-link>
       </template>
       <!-- Signed in: the shop's own navbar -->
@@ -354,7 +353,7 @@ const LANDING_SECTIONS = [
   { id: "features", label: "Features" },
   { id: "how-it-works", label: "How It Works" },
   { id: "plans", label: "For Vendors" },
-  { id: "blog", label: "Blog" },
+  { id: "journal", label: "Journal" },
   { id: "about", label: "About" },
 ];
 const { unreadChatCount, chatRoute } = useChatNotifications();
