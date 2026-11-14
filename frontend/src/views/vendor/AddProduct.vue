@@ -1,6 +1,8 @@
 <template>
-  <ShopLayout title="Add product" subtitle="Fill in the steps on the left; the preview shows how customers will see it.">
+  <!-- The vendor portal's page, or the ERP's (Inventory & Stock > Add product > Flower or bouquet) -->
+  <component :is="erp ? HrPage : ShopLayout" title="Add product" subtitle="Fill in the steps on the left; the preview shows how customers will see it.">
     <template #actions>
+      <router-link v-if="erp" :to="{ name: 'InventoryAddProduct' }" class="sp-btn sp-btn-ghost"><span v-html="ICONS.arrowLeft"></span>Back</router-link>
       <button type="button" class="sp-btn sp-btn-primary" :disabled="submitting" @click="submit('active')">
         <span v-html="ICONS.check"></span>{{ submitting === "active" ? "Publishing…" : "Publish" }}
       </button>
@@ -298,7 +300,7 @@
           </div>
           <p v-if="errors.model_file" class="sp-error">{{ errors.model_file }}</p>
           <!-- New tab, so this unsaved form stays as it is -->
-          <p v-else-if="!modelFile && canPhotoTo3D" class="sp-hint">
+          <p v-else-if="!modelFile && canPhotoTo3D && !erp" class="sp-hint">
             No 3D file? <router-link :to="{ name: 'VendorPhotoTo3D' }" target="_blank" rel="noopener">Make one from a photo</router-link>, download it, then upload it here.
           </p>
 
@@ -357,11 +359,11 @@
           <button type="button" class="sp-btn sp-btn-ghost ap-publish" :disabled="submitting" @click="submit('draft')">
             {{ submitting === "draft" ? "Saving…" : "Save as draft" }}
           </button>
-          <p class="sp-hint">Drafts stay hidden from customers until you publish them from Products.</p>
+          <p class="sp-hint">Drafts stay hidden from customers until you publish them from {{ erp ? "the vendor portal's Products page" : "Products" }}.</p>
         </div>
       </aside>
     </div>
-  </ShopLayout>
+  </component>
 </template>
 
 <script setup>
@@ -370,6 +372,7 @@ import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
+import HrPage from "../../components/hr/HrPage.vue";
 import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
 import { apiMessage, money, useVendorCatalog } from "../../components/vendor/shop/useVendorCatalog";
 import { useProductTaxonomies } from "../../composables/useProductTaxonomies";
@@ -384,6 +387,14 @@ import BouquetFlowersInput from "../../components/vendor/shop/BouquetFlowersInpu
 import PrepTimeField from "../../components/vendor/shop/PrepTimeField.vue";
 import SupplierPicker from "../../components/vendor/shop/SupplierPicker.vue";
 import { compositionField, compositionProblem, stockFromLinks } from "../../utils/bouquetComposition.js";
+
+/*
+ * erp: shown in the ERP (Inventory & Stock > Add product > Flower or bouquet).
+ * It saves through the ERP's own routes, so staff with Inventory & Stock
+ * access can add products, and goes back to Stock & replenishment after.
+ */
+const props = defineProps({ erp: { type: Boolean, default: false } });
+const API = props.erp ? "procurement/inventory/products" : "vendor/products";
 
 const route = useRoute();
 const router = useRouter();
@@ -525,7 +536,7 @@ const multiColor = computed(() => countsPerColor(form.colors));
 // what those flowers make, so colour counts and the In stock box don't apply
 const linkableFlowers = ref([]);
 api
-  .get("vendor/products/linkable-flowers")
+  .get(`${API}/linkable-flowers`)
   .then(({ data }) => (linkableFlowers.value = data.data ?? []))
   .catch(() => {}); // linking just isn't offered then
 const fromLinks = computed(() =>
@@ -713,11 +724,15 @@ async function submit(status) {
     images.value.forEach((img) => fd.append("images[]", img.file, img.file.name));
     if (modelFile.value) fd.append("model_file", modelFile.value, modelFile.value.name);
 
-    const { data } = await api.post("vendor/products", fd);
+    const { data } = await api.post(API, fd);
     saved.value = true;
     toast.success(status === "draft" ? "Saved as a draft." : `${form.product_name} is live in your shop.`);
-    reloadCatalog();
-    router.push({ name: "VendorProducts" });
+    if (props.erp) {
+      router.push({ name: "InventoryStock" });
+    } else {
+      reloadCatalog();
+      router.push({ name: "VendorProducts" });
+    }
     return data;
   } catch (err) {
     const serverErrors = err?.response?.data?.errors;

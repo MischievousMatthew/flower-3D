@@ -572,10 +572,10 @@ const routes = [
               {
                 path: "add-product",
                 name: "AddProduct",
-                meta: { requiresInventoryManager: true },
-                props: () => ({ context: "inventory" }),
-                component: () =>
-                  import("../views/ERP/Procurement/Inventory/AddProduct.vue"),
+                // The vendor portal's Add product form, in the ERP page look
+                meta: { requiresInventoryManager: true, erpLegacy: false },
+                props: () => ({ erp: true }),
+                component: () => import("../views/vendor/AddProduct.vue"),
               },
             ],
           },
