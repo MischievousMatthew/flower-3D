@@ -12,21 +12,47 @@
     </div>
 
     <!-- Summary -->
-    <section class="dv-stats" aria-label="Delivery summary">
+    <!-- Summary: each tile filters the list below; pressing it again shows everything -->
+    <section class="dv-stats" aria-label="Delivery summary, choose one to filter the list">
       <template v-if="!data">
         <div v-for="n in 5" :key="n" class="dv-tile"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton dv-sk-num"></div><div class="bc-skeleton sp-sk-line w70"></div></div>
       </template>
       <template v-else>
-        <div v-for="s in STATS" :key="s.key" class="dv-tile" :class="[`tone-${s.tone}`, { alert: s.key === 'overdue' && data.stats.overdue, zero: !data.stats[s.key] }]">
+        <button
+          v-for="s in STATS"
+          :key="s.key"
+          type="button"
+          class="dv-tile"
+          :class="[`tone-${s.tone}`, { alert: s.key === 'overdue' && data.stats.overdue, zero: !data.stats[s.key], on: filter === s.key }]"
+          :aria-pressed="filter === s.key"
+          @click="toggleFilter(s.key)"
+        >
           <span class="dv-tile-label"><span class="dv-tile-icon" v-html="ICONS[s.icon]"></span>{{ s.label }}</span>
           <strong>{{ data.stats[s.key] }}</strong>
-          <span class="dv-tile-hint">{{ s.hint }}</span>
-        </div>
+          <span class="dv-tile-hint">{{ filter === s.key ? "Showing these · tap to show all" : s.hint }}</span>
+        </button>
       </template>
     </section>
 
     <div class="dv-layout">
       <div class="dv-main">
+        <!-- One tile picked: just those orders -->
+        <section v-if="data && activeStat" class="sp-card dv-day" :class="{ overdue: filter === 'overdue' }" :aria-label="activeStat.label">
+          <header class="dv-day-head">
+            <span class="dv-date" :class="[`tone-${activeStat.tone}`, 'dv-filter-icon']" aria-hidden="true"><span v-html="ICONS[activeStat.icon]"></span></span>
+            <div class="dv-day-title">
+              <h2>{{ activeStat.label }}</h2>
+              <p>{{ filtered.length ? `${filtered.length} ${filtered.length === 1 ? "order" : "orders"} · ${activeStat.hint.toLowerCase()}` : activeStat.empty }}</p>
+            </div>
+            <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="filter = null">Show all</button>
+          </header>
+          <p v-if="!filtered.length" class="dv-none">No orders here right now. Pick another tile, or show all to see every day.</p>
+          <ul v-else class="dv-list">
+            <DeliveryRow v-for="o in filtered" :key="o.id" :order="o" show-date @open="open" @act="act" />
+          </ul>
+        </section>
+
+        <template v-if="!activeStat">
         <!-- Overdue -->
         <section v-if="data?.overdue.length" class="sp-card dv-day overdue" aria-label="Overdue">
           <header class="dv-day-head">
@@ -67,6 +93,7 @@
             </ul>
           </section>
           <p v-if="hiddenEmpty" class="sp-hint quiet">{{ hiddenEmpty }} other {{ hiddenEmpty === 1 ? "day has" : "days have" }} no deliveries.</p>
+        </template>
         </template>
       </div>
 
@@ -119,12 +146,14 @@ import "../../../components/vendor/shop/shop.css";
 
 const router = useRouter();
 const RANGES = [7, 14, 30];
+const DONE = ["completed", "cancelled", "returned", "refunded"];
+// Each tile's test matches how the server counts it (VendorFulfillmentController::schedule)
 const STATS = [
-  { key: "today", label: "Due today", icon: "calendar", tone: "green", hint: "Going out today" },
-  { key: "prepare_now", label: "Start preparing", icon: "clock", tone: "amber", hint: "Needs work now" },
-  { key: "ready", label: "Ready to send", icon: "box", tone: "violet", hint: "Photo, then send out" },
-  { key: "out", label: "Out for delivery", icon: "truck", tone: "teal", hint: "Waiting for the customer" },
-  { key: "overdue", label: "Overdue", icon: "alert", tone: "red", hint: "Past their date" },
+  { key: "today", label: "Due today", icon: "calendar", tone: "green", hint: "Going out today", empty: "Nothing due today", test: (o, today) => o.delivery_date === today && !DONE.includes(o.status) },
+  { key: "prepare_now", label: "Start preparing", icon: "clock", tone: "amber", hint: "Needs work now", empty: "Nothing to start preparing", test: (o, today) => ["pending", "to_processed"].includes(o.status) && !!o.prepare_by && o.prepare_by <= today },
+  { key: "ready", label: "Ready to send", icon: "box", tone: "violet", hint: "Photo, then send out", empty: "Nothing ready to send", test: (o) => o.status === "to_ship" },
+  { key: "out", label: "Out for delivery", icon: "truck", tone: "teal", hint: "Waiting for the customer", empty: "Nothing out for delivery", test: (o) => o.status === "to_received" },
+  { key: "overdue", label: "Overdue", icon: "alert", tone: "red", hint: "Past their date", empty: "Nothing overdue", test: (o, today) => o.delivery_date < today && !DONE.includes(o.status) },
 ];
 const weekday = (ymd) => new Date(`${ymd}T00:00:00`).toLocaleDateString("en-PH", { weekday: "short" });
 const dayNum = (ymd) => new Date(`${ymd}T00:00:00`).getDate();
@@ -138,6 +167,20 @@ const acting = ref(null);
 // Today and tomorrow always show; other empty days are summed up in one line
 const visibleDays = computed(() => (data.value?.days ?? []).filter((d, i) => i < 2 || d.orders.length));
 const hiddenEmpty = computed(() => (data.value?.days ?? []).length - visibleDays.value.length);
+
+// The tile picked above the list (null: every day, as usual)
+const filter = ref(null);
+const activeStat = computed(() => STATS.find((s) => s.key === filter.value) ?? null);
+const toggleFilter = (key) => (filter.value = filter.value === key ? null : key);
+// Every order on the page, overdue first, then by delivery date
+const filtered = computed(() => {
+  if (!data.value || !activeStat.value) return [];
+  const all = [...data.value.overdue, ...data.value.days.flatMap((d) => d.orders)];
+  const seen = new Set();
+  return all
+    .filter((o) => !seen.has(o.id) && seen.add(o.id) && activeStat.value.test(o, data.value.today))
+    .sort((a, b) => a.delivery_date.localeCompare(b.delivery_date));
+});
 
 async function load() {
   error.value = "";
@@ -177,7 +220,11 @@ const DeliveryRow = defineComponent({
             ]),
             h("span", { class: "dv-items" }, `${o.items_count} × ${o.item_names}`),
             h("span", { class: "dv-meta" }, [
-              props.showDate ? h("span", { class: "dv-late" }, `${dayLabel(o.delivery_date)} · ${Math.abs(daysFromToday(o.delivery_date))} d late`) : null,
+              props.showDate
+                ? daysFromToday(o.delivery_date) < 0 && !DONE.includes(o.status)
+                  ? h("span", { class: "dv-late" }, `${dayLabel(o.delivery_date)} · ${Math.abs(daysFromToday(o.delivery_date))} d late`)
+                  : h("span", { class: "dv-when" }, `Delivery ${dayLabel(o.delivery_date)}`)
+                : null,
               o.address ? h("span", { class: "dv-addr" }, o.address) : null,
               prepNote ? h("span", { class: ["dv-prep", { now: shouldPrepare(o) }] }, prepNote) : null,
               o.status === "to_ship" && !o.photo_url ? h("span", { class: "sp-chip amber" }, "Needs a photo") : null,
@@ -222,6 +269,42 @@ onMounted(load);
   border: 1px solid var(--v-border);
   border-radius: 16px;
   background: var(--v-surface);
+  font-family: inherit;
+  text-align: left;
+}
+button.dv-tile {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+button.dv-tile:hover {
+  border-color: var(--tone);
+}
+button.dv-tile:focus-visible {
+  outline: 2px solid var(--tone);
+  outline-offset: 2px;
+}
+button.dv-tile.on {
+  border-color: var(--tone);
+  box-shadow: 0 0 0 2px var(--tone), 0 0 0 5px color-mix(in srgb, var(--tone) 18%, transparent);
+}
+.dv-filter-icon {
+  border-color: transparent;
+  background: var(--tone-soft);
+  color: var(--tone-ink);
+}
+.dv-filter-icon :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+:deep(.dv-when) {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--v-text-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  button.dv-tile {
+    transition: none;
+  }
 }
 .tone-green { --tone: #68d391; --tone-soft: var(--v-green-soft); --tone-ink: var(--v-green-text); }
 .tone-amber { --tone: #f6ad55; --tone-soft: var(--v-amber-soft); --tone-ink: var(--v-amber-text); }
