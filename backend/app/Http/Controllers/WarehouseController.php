@@ -60,7 +60,7 @@ class WarehouseController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        Warehouse::findOrFail($id)->delete();
+        Warehouse::where("owner_id", $this->getOwnerId())->findOrFail($id)->delete();
 
         return response()->json(['success' => true, 'message' => 'Warehouse deleted.']);
     }
@@ -73,7 +73,7 @@ class WarehouseController extends Controller
     public function items(Request $request, int $warehouseId): JsonResponse
     {
         // Confirm the warehouse exists
-        Warehouse::findOrFail($warehouseId);
+        Warehouse::where("owner_id", $this->getOwnerId())->findOrFail($warehouseId);
 
         $request->validate([
             'search'   => ['nullable', 'string', 'max:100'],
@@ -131,7 +131,7 @@ class WarehouseController extends Controller
 
     public function addItem(Request $request, int $warehouseId): JsonResponse
     {
-        Warehouse::findOrFail($warehouseId);
+        Warehouse::where("owner_id", $this->getOwnerId())->findOrFail($warehouseId);
 
         $data = $request->validate([
             'product_id'            => ['required', 'integer', 'exists:products,id'],

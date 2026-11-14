@@ -676,6 +676,14 @@ Route::middleware('token.auth')->group(function () {
         });
     });
 
+    // ==========================================================
+    // ERP (6f–6k): only a shop owner or one of its employees.
+    // employee.module checks employees' permissions but lets every
+    // other account through, and the per-shop filter on the models
+    // doesn't apply to customers or admins (EnsureErpActor).
+    // ==========================================================
+    Route::middleware('erp.actor')->group(function () {
+
     // ----------------------------------------------------------
     // 6f. SC Coordinator portal
     // ----------------------------------------------------------
@@ -1204,6 +1212,8 @@ Route::middleware('token.auth')->group(function () {
         Route::post('funding-requests/{id}/supplier-credit', [AccountingFundingRequestController::class, 'settleSupplierCredit'])->whereNumber('id')->middleware('employee.module:funding_requests,approve');
         Route::post('funding-requests/{id}/paymongo', [AccountingFundingRequestController::class, 'payWithPayMongo'])->whereNumber('id')->middleware('employee.module:funding_requests,approve');
     });
+
+    }); // end ERP (erp.actor)
 
     // ── Admin panel ───────────────────────────────────────────────────────
     // Every route needs a permission from the admin's role (AdminRole::PERMISSIONS)

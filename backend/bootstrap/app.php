@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.can'         => \App\Http\Middleware\EnsureAdminPermission::class,
             'admin.audit'       => \App\Http\Middleware\AuditAdminAction::class,
             'product.code'      => \App\Http\Middleware\DecodeProductCode::class,
+            'erp.actor'         => \App\Http\Middleware\EnsureErpActor::class,
         ]);
 
         // Keep a record of server errors the API returns (Security → API errors)
