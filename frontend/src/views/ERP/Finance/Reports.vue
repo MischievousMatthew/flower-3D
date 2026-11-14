@@ -12,9 +12,7 @@
     <section class="sp-card rp-bar" aria-label="Report options">
       <div class="rp-options">
         <RangePicker @change="load" />
-        <div v-if="current.units" class="sp-seg" role="radiogroup" aria-label="Rows">
-          <button v-for="u in UNITS" :key="u.key" type="button" role="radio" :aria-checked="unit === u.key" :class="{ on: unit === u.key }" @click="setOption('unit', u.key)">{{ u.label }}</button>
-        </div>
+        <CapsuleSlider v-if="current.units" :model-value="unit" :options="UNITS" label="Rows" :min-width="76" @update:model-value="(u) => u !== unit && setOption('unit', u)" />
         <div v-if="type === 'profit_loss'" class="sp-seg" role="radiogroup" aria-label="Count flower costs">
           <button type="button" role="radio" :aria-checked="basis === 'sold'" :class="{ on: basis === 'sold' }" @click="setOption('basis', 'sold')">Flowers when sold</button>
           <button type="button" role="radio" :aria-checked="basis === 'bought'" :class="{ on: basis === 'bought' }" @click="setOption('basis', 'bought')">When bought</button>
@@ -89,6 +87,7 @@ import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
+import CapsuleSlider from "../../../components/vendor/finance/CapsuleSlider.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { exportTitle, financeRange, money } from "../../../components/vendor/finance/financeUi";

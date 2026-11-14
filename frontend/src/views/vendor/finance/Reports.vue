@@ -10,9 +10,7 @@
     </template>
 
     <div class="sp-toolbar">
-      <div class="sp-seg" role="tablist" aria-label="Group by">
-        <button v-for="u in UNITS" :key="u.key" type="button" role="tab" :aria-selected="unit === u.key" :class="{ on: unit === u.key }" @click="setUnit(u.key)">{{ u.label }}</button>
-      </div>
+      <CapsuleSlider :model-value="unit" :options="UNITS" label="Group by" :min-width="76" @update:model-value="setUnit" />
       <RangePicker @change="notice = ''; load()" />
     </div>
 
@@ -110,6 +108,7 @@ import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
+import CapsuleSlider from "../../../components/vendor/finance/CapsuleSlider.vue";
 import BarChart from "../../../components/vendor/finance/BarChart.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
@@ -184,6 +183,7 @@ async function load() {
   }
 }
 function setUnit(u) {
+  if (u === unit.value) return;
   notice.value = "";
   unit.value = u;
   try {
