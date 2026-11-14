@@ -304,6 +304,9 @@
 
           <details class="ap-more">
             <summary>Supplier &amp; notes</summary>
+            <div class="ap-gap">
+              <SupplierPicker :name="form.supplier_name" @pick="pickSupplier" />
+            </div>
             <div class="sp-grid-3 ap-gap">
               <label data-change="supplier_name" class="sp-field"><span>Supplier</span><input v-model="form.supplier_name" class="sp-input" maxlength="255" placeholder="e.g. Dangwa Wholesale" /></label>
               <label data-change="supplier_contact" class="sp-field"><span>Supplier contact</span><input v-model="form.supplier_contact" class="sp-input" maxlength="100" placeholder="Phone or email" /></label>
@@ -379,6 +382,7 @@ import ColorStockInputs from "../../components/vendor/shop/ColorStockInputs.vue"
 import { colorFields, colorProblem, countsPerColor, totalOf } from "../../utils/flowerColors.js";
 import BouquetFlowersInput from "../../components/vendor/shop/BouquetFlowersInput.vue";
 import PrepTimeField from "../../components/vendor/shop/PrepTimeField.vue";
+import SupplierPicker from "../../components/vendor/shop/SupplierPicker.vue";
 import { compositionField, compositionProblem, stockFromLinks } from "../../utils/bouquetComposition.js";
 
 const route = useRoute();
@@ -439,6 +443,13 @@ const blank = () => ({
 });
 
 const form = reactive(blank());
+
+// A saved supplier (Procurement → Supply chain) fills the name and contact; both stay editable
+function pickSupplier(s) {
+  form.supplier_name = (s.company_name || "").slice(0, 255);
+  const both = [s.phone, s.email].filter(Boolean).join(" · ");
+  form.supplier_contact = (both.length <= 100 ? both : s.phone || s.email || "").slice(0, 100);
+}
 const images = ref([]);
 const modelFile = ref(null);
 // "Make one from a photo" is a Business-and-up feature
