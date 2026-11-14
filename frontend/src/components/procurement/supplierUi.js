@@ -31,7 +31,7 @@ export const unitLabel = (u) => UNITS.find((x) => x.value === u)?.label ?? `per 
 
 export const CATALOG_CATEGORIES = [
   { value: "flowers", label: "Flowers" },
-  { value: "greenery", label: "Greenery" },
+  { value: "greenery", label: "Fillers" },
   { value: "packaging", label: "Packaging" },
   { value: "supplies", label: "Supplies" },
 ];

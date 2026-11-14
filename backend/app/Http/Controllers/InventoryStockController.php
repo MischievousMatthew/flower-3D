@@ -106,7 +106,7 @@ class InventoryStockController extends Controller
             'supplier_lead_time' => ['nullable', 'integer', 'min:0', 'max:180'],
             'notes'              => ['nullable', 'string', 'max:1000'],
         ], [
-            'stock_kind.in'          => 'Flowers are added as products. Materials are wrapping, ribbons, vases, greenery or other supplies.',
+            'stock_kind.in'          => 'Flowers are added as products. Materials are wrapping, fillers, ribbons, vases or other supplies.',
             'sku.unique'             => 'Another product already uses that SKU.',
             'max_stock_level.gte'    => 'The target has to be at least the minimum.',
             'pack_size.required_with' => 'Enter how many pieces are in one pack.',

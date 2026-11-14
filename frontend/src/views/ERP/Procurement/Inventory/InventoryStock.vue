@@ -399,7 +399,7 @@ import "../../../../components/vendor/finance/finance.css";
 
 const STOCK_KINDS = [
   { value: "flowers", label: "Flowers", icon: "flower", tone: "pink" },
-  { value: "greenery", label: "Greenery", icon: "sparkle", tone: "green" },
+  { value: "greenery", label: "Fillers", icon: "sparkle", tone: "green" },
   { value: "wrapping", label: "Wrapping", icon: "note", tone: "amber" },
   { value: "ribbons", label: "Ribbons", icon: "tag", tone: "violet" },
   { value: "vases", label: "Vases", icon: "box", tone: "blue" },
