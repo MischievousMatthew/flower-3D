@@ -6,9 +6,9 @@ const pad = (n) => String(n).padStart(2, "0");
 export const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 export const PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "this_week", label: "This week" },
   { key: "this_month", label: "This month" },
-  { key: "last_month", label: "Last month" },
-  { key: "last_30", label: "Last 30 days" },
   { key: "this_quarter", label: "This quarter" },
   { key: "this_year", label: "This year" },
   { key: "custom", label: "Custom" },
@@ -19,11 +19,12 @@ export function presetRange(key) {
   const y = now.getFullYear();
   const m = now.getMonth();
   switch (key) {
-    case "last_month":
-      return { from: ymd(new Date(y, m - 1, 1)), to: ymd(new Date(y, m, 0)) };
-    case "last_30": {
+    case "today":
+      return { from: ymd(now), to: ymd(now) };
+    case "this_week": {
+      // Weeks start on Monday, like the server's weekly totals
       const start = new Date(now);
-      start.setDate(start.getDate() - 29);
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
       return { from: ymd(start), to: ymd(now) };
     }
     case "this_quarter":
@@ -39,7 +40,8 @@ const STORE = "bc.vendor.finance.range";
 function initial() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORE) || "null");
-    if (saved?.preset && saved.from && saved.to) {
+    // A preset that no longer exists (e.g. the old "Last 30 days") falls back to This month
+    if (saved?.preset && saved.from && saved.to && PRESETS.some((p) => p.key === saved.preset)) {
       return saved.preset === "custom" ? saved : { preset: saved.preset, ...presetRange(saved.preset) };
     }
   } catch {
@@ -57,6 +59,30 @@ export function setRange(next) {
   } catch {
     /* private mode */
   }
+}
+
+/** "Nov 14, 2026" for one day, else "Nov 10 – Nov 14, 2026" */
+export function rangeLabel(range = financeRange) {
+  const f = new Date(`${range.from}T00:00:00`);
+  const t = new Date(`${range.to}T00:00:00`);
+  const opts = { month: "short", day: "numeric" };
+  const end = t.toLocaleDateString("en-PH", { ...opts, year: "numeric" });
+  if (range.from === range.to) return end;
+  return `${f.toLocaleDateString("en-PH", f.getFullYear() === t.getFullYear() ? opts : { ...opts, year: "numeric" })} – ${end}`;
+}
+
+/** What the CSV / PDF buttons will download, e.g. "This week (Nov 10 – Nov 14, 2026)" */
+export function exportTitle(format, range = financeRange) {
+  const preset = PRESETS.find((p) => p.key === range.preset);
+  const name = preset && preset.key !== "custom" ? `${preset.label} (${rangeLabel(range)})` : rangeLabel(range);
+  return `Download ${format.toUpperCase()}: ${name} only`;
+}
+
+/** A download name that says which period it covers */
+export function exportFileName(prefix, format, range = financeRange) {
+  const span = range.from === range.to ? range.from : `${range.from}-to-${range.to}`;
+  const tag = range.preset && range.preset !== "custom" ? `${range.preset.replace(/_/g, "-")}-` : "";
+  return `${prefix}-${tag}${span}.${format}`;
 }
 
 const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });

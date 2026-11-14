@@ -14,18 +14,12 @@
 
 <script setup>
 import { computed } from "vue";
-import { PRESETS, financeRange, presetRange, setRange, ymd } from "./financeUi";
+import { PRESETS, financeRange, presetRange, rangeLabel, setRange, ymd } from "./financeUi";
 
 const emit = defineEmits(["change"]);
 const today = ymd(new Date());
 
-const label = computed(() => {
-  const f = new Date(`${financeRange.from}T00:00:00`);
-  const t = new Date(`${financeRange.to}T00:00:00`);
-  const sameYear = f.getFullYear() === t.getFullYear();
-  const opts = { month: "short", day: "numeric" };
-  return `${f.toLocaleDateString("en-PH", sameYear ? opts : { ...opts, year: "numeric" })} – ${t.toLocaleDateString("en-PH", { ...opts, year: "numeric" })}`;
-});
+const label = computed(() => rangeLabel(financeRange));
 
 function pick(key) {
   setRange(key === "custom" ? { preset: "custom" } : { preset: key, ...presetRange(key) });

@@ -26,8 +26,8 @@
         </select>
       </div>
       <div v-if="canExport" class="rp-downloads">
-        <button type="button" class="sp-btn sp-btn-ghost" :disabled="!!downloading || !report" @click="download('csv')"><span v-html="ICONS.download"></span>{{ downloading === "csv" ? "Preparing…" : "CSV" }}</button>
-        <button type="button" class="sp-btn sp-btn-primary" :disabled="!!downloading || !report" @click="download('pdf')"><span v-html="ICONS.download"></span>{{ downloading === "pdf" ? "Preparing…" : "PDF" }}</button>
+        <button type="button" class="sp-btn sp-btn-ghost" :disabled="!!downloading || !report" :title="exportTitle('csv')" :aria-label="exportTitle('csv')" @click="download('csv')"><span v-html="ICONS.download"></span>{{ downloading === "csv" ? "Preparing…" : "CSV" }}</button>
+        <button type="button" class="sp-btn sp-btn-primary" :disabled="!!downloading || !report" :title="exportTitle('pdf')" :aria-label="exportTitle('pdf')" @click="download('pdf')"><span v-html="ICONS.download"></span>{{ downloading === "pdf" ? "Preparing…" : "PDF" }}</button>
       </div>
     </section>
 
@@ -91,7 +91,7 @@ import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
-import { financeRange, money } from "../../../components/vendor/finance/financeUi";
+import { exportTitle, financeRange, money } from "../../../components/vendor/finance/financeUi";
 import { useAuth } from "../../../composables/useAuth";
 import { useAssignment } from "../../../composables/useAssignment";
 import "../../../components/vendor/finance/finance.css";

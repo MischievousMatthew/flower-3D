@@ -1,10 +1,10 @@
 <template>
   <ShopLayout section="finance" title="Financial Reports" subtitle="Daily, weekly, monthly and yearly totals you can export.">
     <template #actions>
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="!!exporting || !data" @click="exportAs('csv')">
+      <button type="button" class="sp-btn sp-btn-ghost" :disabled="!!exporting || !data" :title="exportTitle('csv')" :aria-label="exportTitle('csv')" @click="exportAs('csv')">
         <span v-html="ICONS.download"></span>{{ exporting === "csv" ? "Preparing…" : "CSV" }}
       </button>
-      <button type="button" class="sp-btn sp-btn-dark" :disabled="!!exporting || !data" @click="exportAs('pdf')">
+      <button type="button" class="sp-btn sp-btn-dark" :disabled="!!exporting || !data" :title="exportTitle('pdf')" :aria-label="exportTitle('pdf')" @click="exportAs('pdf')">
         <span v-html="ICONS.print"></span>{{ exporting === "pdf" ? "Preparing…" : "PDF" }}
       </button>
     </template>
@@ -113,7 +113,7 @@ import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
 import BarChart from "../../../components/vendor/finance/BarChart.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
-import { financeRange, money } from "../../../components/vendor/finance/financeUi";
+import { exportFileName, exportTitle, financeRange, money } from "../../../components/vendor/finance/financeUi";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/finance/finance.css";
 
@@ -205,7 +205,7 @@ async function exportAs(format) {
     const url = URL.createObjectURL(res.data);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `bloomcraft-report-${financeRange.from}-to-${financeRange.to}.${format}`;
+    a.download = exportFileName("bloomcraft-report", format);
     document.body.appendChild(a);
     a.click();
     a.remove();
