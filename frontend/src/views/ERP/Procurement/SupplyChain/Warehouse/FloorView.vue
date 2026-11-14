@@ -1,250 +1,139 @@
 <template>
-  <div class="floor-page">
-    <!-- ── Header ── -->
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Warehouse Floor</h1>
-        <p class="page-sub">Live freshness overview of all active batches</p>
-      </div>
-      <div class="header-actions"></div>
+  <HrPage title="Warehouse floor" subtitle="Every batch on the floor, how fresh it is, and what to use or clear first.">
+    <template #actions>
+      <router-link :to="{ name: 'BatchesToReceive' }" class="sp-btn sp-btn-primary"><span v-html="ICONS.plus"></span>Receive batch</router-link>
+      <button type="button" class="sp-icon-btn sp-refresh" :disabled="loading" aria-label="Refresh" title="Refresh" @click="fetchFloor"><span v-html="ICONS.restore"></span></button>
+    </template>
+
+    <div v-if="error" class="sp-banner error">
+      <span v-html="ICONS.alert"></span>{{ error }}
+      <button type="button" @click="fetchFloor">Try again</button>
     </div>
 
-    <!-- ── Summary Strip ───────────────────────────────────────────────── -->
-    <div class="summary-strip">
-      <button
-        v-for="s in summaryCards"
-        :key="s.key"
-        class="sum-card"
-        :class="{ active: conditionFilter === s.key }"
-        @click="toggleConditionFilter(s.key)"
-      >
-        <div class="sum-dot" :style="{ background: s.dotColor }"></div>
-        <div>
-          <div
-            class="sum-val"
-            :style="{
-              color: conditionFilter === s.key ? s.dotColor : '#111827',
-            }"
-          >
-            {{ summary[s.key] ?? 0 }}
+    <!-- Summary: tap a condition to show only those batches -->
+    <section class="sp-stats fl-stats" aria-label="Freshness summary">
+      <template v-if="!loaded">
+        <div v-for="n in 5" :key="n" class="sp-stat"><div class="bc-skeleton sp-stat-icon"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
+      </template>
+      <template v-else>
+        <component
+          :is="s.filter ? 'button' : 'div'"
+          v-for="s in SUMMARY"
+          :key="s.key"
+          :type="s.filter ? 'button' : undefined"
+          class="sp-stat fl-stat"
+          :class="{ on: s.filter && conditionFilter === s.key, alert: s.key === 'expiring_today' && summary.expiring_today > 0 }"
+          :aria-pressed="s.filter ? conditionFilter === s.key : undefined"
+          @click="s.filter && toggleConditionFilter(s.key)"
+        >
+          <span class="sp-stat-icon" :class="`tone-${s.tone}`" v-html="ICONS[s.icon]"></span>
+          <div>
+            <strong>{{ (summary[s.key] ?? 0).toLocaleString("en-PH") }}</strong>
+            <span>{{ s.label }}</span>
           </div>
-          <div class="sum-lbl">{{ s.label }}</div>
+        </component>
+      </template>
+    </section>
+
+    <section class="sp-card fl-panel">
+      <div class="sp-toolbar fl-toolbar">
+        <label class="sp-search fl-search">
+          <span v-html="ICONS.search"></span>
+          <input v-model="search" class="sp-input" type="search" placeholder="Product, SKU or batch number" aria-label="Search batches" @input="debouncedFetch" />
+        </label>
+        <select v-model="locationFilter" class="sp-select" aria-label="Zone" @change="fetchFloor">
+          <option value="">All zones</option>
+          <option v-for="l in locations" :key="l.id" :value="String(l.id)">{{ l.name }}</option>
+        </select>
+        <select v-model="conditionFilter" class="sp-select" aria-label="Condition" @change="fetchFloor">
+          <option value="">Any condition</option>
+          <option v-for="c in CONDITIONS" :key="c" :value="c">{{ conditionMeta(c).label }}</option>
+        </select>
+        <button v-if="hasFilters" type="button" class="sp-btn sp-btn-ghost" @click="clearFilters"><span v-html="ICONS.close"></span>Clear</button>
+        <span v-if="loaded && batches.length" class="fl-count">{{ batches.length }} {{ batches.length === 1 ? "batch" : "batches" }}</span>
+      </div>
+
+      <!-- Loading -->
+      <div v-if="!loaded" class="fl-grid" aria-hidden="true">
+        <div v-for="n in 6" :key="n" class="fl-card sk">
+          <div class="bc-skeleton fl-media"></div>
+          <div class="fl-body"><div class="bc-skeleton sp-sk-line w70"></div><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line"></div></div>
         </div>
-        <div
-          v-if="s.key === 'expiring_today' && (summary.expiring_today ?? 0) > 0"
-          class="pulse-dot"
-        ></div>
-      </button>
-    </div>
-
-    <!-- ── Filters ─────────────────────────────────────────────────────── -->
-    <div class="filter-bar">
-      <div class="search-box">
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          width="14"
-        >
-          <circle cx="9" cy="9" r="6" />
-          <path d="m14 14 3 3" />
-        </svg>
-        <input
-          v-model="search"
-          placeholder="Search product, SKU, batch…"
-          @input="debouncedFetch"
-        />
       </div>
-      <select
-        v-model="locationFilter"
-        class="filter-select"
-        @change="fetchFloor"
-      >
-        <option value="">All Locations</option>
-        <option v-for="l in locations" :key="l.id" :value="l.id">
-          {{ l.name }}
-        </option>
-      </select>
-      <select
-        v-model="conditionFilter"
-        class="filter-select"
-        @change="fetchFloor"
-      >
-        <option value="">All Conditions</option>
-        <option value="fresh">Fresh</option>
-        <option value="aging">Aging</option>
-        <option value="wilting">Wilting</option>
-        <option value="spoiled">Spoiled</option>
-      </select>
-      <button v-if="hasFilters" class="clear-btn" @click="clearFilters">
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          width="13"
+
+      <!-- Empty -->
+      <div v-else-if="!batches.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.box"></span>
+        <h3>{{ hasFilters ? "No batches match" : "The floor is empty" }}</h3>
+        <p>{{ hasFilters ? "Try another search, zone or condition." : "Batches show up here once a supplier delivery is received." }}</p>
+        <button v-if="hasFilters" type="button" class="sp-btn sp-btn-ghost" @click="clearFilters">Clear filters</button>
+        <router-link v-else :to="{ name: 'BatchesToReceive' }" class="sp-btn sp-btn-primary"><span v-html="ICONS.plus"></span>Receive a batch</router-link>
+      </div>
+
+      <!-- Batches -->
+      <div v-else class="fl-grid" :class="{ dim: loading }">
+        <article
+          v-for="batch in batches"
+          :key="batch.id"
+          class="fl-card"
+          :class="`c-${toneOf(batch.computed_condition)}`"
+          role="button"
+          tabindex="0"
+          :aria-label="`${batch.product?.product_name ?? 'Batch'} ${batch.batch_number}, ${conditionMeta(batch.computed_condition).label}, ${daysRemainingLabel(batch.days_remaining)}`"
+          @click="openDetail(batch)"
+          @keydown.enter.prevent="openDetail(batch)"
+          @keydown.space.prevent="openDetail(batch)"
         >
-          <path d="M6 6l8 8M14 6l-8 8" />
-        </svg>
-        Clear
-      </button>
-    </div>
-
-    <!-- ── Batch Grid ──────────────────────────────────────────────────── -->
-    <div v-if="loading" class="loading-state">
-      <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
-      <span>Loading batches…</span>
-    </div>
-
-    <div v-else-if="!batches.length" class="empty-state">
-      <svg
-        viewBox="0 0 48 48"
-        fill="none"
-        stroke="#d1d5db"
-        stroke-width="1.5"
-        width="52"
-      >
-        <rect x="8" y="16" width="32" height="26" rx="3" />
-        <path d="M16 16V12a8 8 0 0116 0v4" />
-        <path d="M24 28v4M24 24v1" />
-      </svg>
-      <p>No batches found</p>
-      <router-link :to="{ name: 'BatchesToReceive' }" class="btn-primary"
-        >Receive First Batch</router-link
-      >
-    </div>
-
-    <div v-else class="batch-grid">
-      <div
-        v-for="batch in batches"
-        :key="batch.id"
-        class="batch-card"
-        :class="batch.computed_condition"
-        @click="openDetail(batch)"
-      >
-        <!-- Condition stripe -->
-        <div
-          class="condition-stripe"
-          :style="{ background: conditionMeta(batch.computed_condition).dot }"
-        ></div>
-
-        <!-- Card header -->
-        <div class="card-top">
-          <div class="product-thumb">
-            <img
-              v-if="batch.product?.image_url"
-              :src="batch.product.image_url"
-              :alt="batch.product?.product_name"
-            />
-            <span v-else>{{ batch.product?.product_name?.[0] ?? "?" }}</span>
+          <div class="fl-media">
+            <img v-if="batch.product?.image_url" :src="batch.product.image_url" :alt="batch.product?.product_name ?? ''" loading="lazy" decoding="async" />
+            <span v-else class="fl-media-blank" v-html="ICONS.flower"></span>
+            <span class="sp-chip fl-cond" :class="toneOf(batch.computed_condition)"><i></i>{{ conditionMeta(batch.computed_condition).label }}</span>
+            <span class="fl-qty"><b>{{ Number(batch.qty_remaining ?? 0).toLocaleString("en-PH") }}</b> left</span>
           </div>
-          <div class="card-title-group">
-            <div class="card-product">
-              {{ batch.product?.product_name ?? "—" }}
+
+          <div class="fl-body">
+            <div class="fl-title">
+              <h3>{{ batch.product?.product_name ?? "Unnamed product" }}</h3>
+              <code>{{ batch.batch_number }}</code>
             </div>
-            <code class="card-batch">{{ batch.batch_number }}</code>
-          </div>
-          <span
-            class="condition-pill"
-            :style="{
-              background: conditionMeta(batch.computed_condition).bg,
-              color: conditionMeta(batch.computed_condition).text,
-              border: `1px solid ${conditionMeta(batch.computed_condition).border}`,
-            }"
-          >
-            <span
-              class="pill-dot"
-              :style="{
-                background: conditionMeta(batch.computed_condition).dot,
-              }"
-            ></span>
-            {{ conditionMeta(batch.computed_condition).label }}
-          </span>
-        </div>
 
-        <!-- Stats row -->
-        <div class="card-stats">
-          <div class="stat">
-            <span class="stat-val">{{ batch.qty_remaining }}</span>
-            <span class="stat-lbl">Units</span>
-          </div>
-          <div class="stat-sep"></div>
-          <div class="stat">
-            <span class="stat-val" :class="daysClass(batch.days_remaining)">
-              {{ daysLabel(batch.days_remaining) }}
-            </span>
-            <span class="stat-lbl">Freshness</span>
-          </div>
-          <div class="stat-sep"></div>
-          <div class="stat">
-            <span class="stat-val">{{ batch.location?.name ?? "—" }}</span>
-            <span class="stat-lbl">Location</span>
-          </div>
-        </div>
+            <div class="fl-fresh">
+              <div class="fl-fresh-row">
+                <span class="fl-days" :class="daysRemainingClass(batch.days_remaining)"><span v-html="ICONS.clock"></span>{{ daysRemainingLabel(batch.days_remaining) }}</span>
+                <span v-if="hasMeter(batch)" class="fl-pct">{{ freshnessPercent(batch) }}%</span>
+              </div>
+              <div v-if="hasMeter(batch)" class="fl-meter" role="img" :aria-label="`${freshnessPercent(batch)}% of its fresh life left`">
+                <span :style="{ width: `${freshnessPercent(batch)}%` }"></span>
+              </div>
+            </div>
 
-        <!-- Freshness bar -->
-        <div
-          v-if="batch.days_remaining !== null && batch.freshness_days"
-          class="freshness-bar-wrap"
-        >
-          <div class="freshness-bar">
-            <div
-              class="freshness-fill"
-              :style="{
-                width: freshnessPercent(batch) + '%',
-                background: conditionMeta(batch.computed_condition).dot,
-              }"
-            ></div>
+            <dl class="fl-facts">
+              <div><dt>Zone</dt><dd>{{ batch.location?.name ?? "—" }}</dd></div>
+              <div><dt>Spot</dt><dd>{{ batch.storage_location || "Not set" }}</dd></div>
+              <div><dt>Received</dt><dd>{{ formatDate(batch.received_date) }}</dd></div>
+            </dl>
           </div>
-          <span class="freshness-pct">{{ freshnessPercent(batch) }}%</span>
-        </div>
-
-        <!-- Card footer -->
-        <div class="card-footer">
-          <span class="footer-loc">
-            <svg
-              viewBox="0 0 12 16"
-              fill="currentColor"
-              width="9"
-              style="color: #9ca3af"
-            >
-              <path
-                d="M6 0C3.24 0 1 2.24 1 5c0 3.75 5 11 5 11s5-7.25 5-11c0-2.76-2.24-5-5-5zm0 7.5A2.5 2.5 0 113.5 5 2.5 2.5 0 016 7.5z"
-              />
-            </svg>
-            {{ batch.storage_location ?? "No location" }}
-          </span>
-          <span class="footer-date"
-            >Rec. {{ formatDate(batch.received_date) }}</span
-          >
-        </div>
+        </article>
       </div>
-    </div>
+    </section>
 
-    <!-- ── Batch Detail Drawer ─────────────────────────────────────────── -->
-    <transition name="drawer-slide">
-      <div
-        v-if="activeDrawer"
-        class="drawer-overlay"
-        @click.self="activeDrawer = null"
-      >
-        <div class="drawer">
-          <BatchDetailDrawer
-            :batch="activeDrawer"
-            :locations="locations"
-            @close="activeDrawer = null"
-            @updated="onBatchUpdated"
-          />
-        </div>
-      </div>
-    </transition>
-  </div>
+    <!-- Batch details -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="activeDrawer" class="sp-backdrop" @click="activeDrawer = null"></div></Transition>
+      <Transition name="fl-slide">
+        <aside v-if="activeDrawer" class="fl-drawer" role="dialog" aria-modal="true" aria-label="Batch details">
+          <BatchDetailDrawer :batch="activeDrawer" :locations="locations" @close="activeDrawer = null" @updated="onBatchUpdated" />
+        </aside>
+      </Transition>
+    </Teleport>
+  </HrPage>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
+import HrPage from "../../../../../components/hr/HrPage.vue";
+import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import {
   warehouseBatchService,
   warehouseLocationService,
@@ -254,30 +143,33 @@ import {
 } from "../../../../../services/warehouseBatchService";
 import BatchDetailDrawer from "./BatchDetailDrawer.vue";
 
+const CONDITIONS = ["fresh", "aging", "wilting", "spoiled"];
+// The colour of each condition, from the theme tokens (light and dark)
+const TONES = { fresh: "green", aging: "amber", wilting: "pink", spoiled: "red" };
+const toneOf = (c) => TONES[c] ?? "slate";
+const SUMMARY = [
+  { key: "fresh", label: "Fresh", icon: "flower", tone: "green", filter: true },
+  { key: "aging", label: "Aging", icon: "clock", tone: "amber", filter: true },
+  { key: "wilting", label: "Wilting", icon: "activity", tone: "pink", filter: true },
+  { key: "spoiled", label: "Spoiled", icon: "trash", tone: "red", filter: true },
+  { key: "expiring_today", label: "Expire today", icon: "alert", tone: "violet", filter: false },
+];
+
 const route = useRoute();
 const batches = ref([]);
 const summary = ref({});
 const locations = ref([]);
 const loading = ref(false);
+const loaded = ref(false);
+const error = ref("");
 const search = ref("");
 const locationFilter = ref("");
 const conditionFilter = ref("");
 const activeDrawer = ref(null);
 
-const summaryCards = [
-  { key: "fresh", label: "Fresh", dotColor: "#16a34a" },
-  { key: "aging", label: "Aging", dotColor: "#ca8a04" },
-  { key: "wilting", label: "Wilting", dotColor: "#ea580c" },
-  { key: "spoiled", label: "Spoiled", dotColor: "#dc2626" },
-  { key: "expiring_today", label: "Exp. Today", dotColor: "#ef4444" },
-];
-
-const hasFilters = computed(
-  () => search.value || locationFilter.value || conditionFilter.value,
-);
+const hasFilters = computed(() => !!(search.value || locationFilter.value || conditionFilter.value));
 
 function toggleConditionFilter(key) {
-  if (key === "expiring_today") return; // not a filterable condition
   conditionFilter.value = conditionFilter.value === key ? "" : key;
   fetchFloor();
 }
@@ -297,6 +189,7 @@ function debouncedFetch() {
 
 async function fetchFloor() {
   loading.value = true;
+  error.value = "";
   try {
     const params = {};
     if (search.value) params.search = search.value;
@@ -306,9 +199,10 @@ async function fetchFloor() {
     batches.value = res.data?.batches ?? res.batches ?? [];
     summary.value = res.data?.summary ?? res.summary ?? {};
   } catch (e) {
-    console.error(e);
+    error.value = "Couldn't load the warehouse floor. Check your connection and try again.";
   } finally {
     loading.value = false;
+    loaded.value = true;
   }
 }
 
@@ -316,8 +210,8 @@ async function fetchLocations() {
   try {
     const res = await warehouseLocationService.list();
     locations.value = res.data?.data ?? res.data ?? res ?? [];
-  } catch (e) {
-    console.error(e);
+  } catch {
+    locations.value = [];
   }
 }
 
@@ -332,487 +226,299 @@ function onBatchUpdated(updated) {
   fetchFloor();
 }
 
+const hasMeter = (batch) => batch.days_remaining !== null && batch.days_remaining !== undefined && !!batch.freshness_days;
 function freshnessPercent(batch) {
-  if (!batch.freshness_days || batch.days_remaining === null) return 0;
-  return Math.max(
-    0,
-    Math.min(
-      100,
-      Math.round((batch.days_remaining / batch.freshness_days) * 100),
-    ),
-  );
+  if (!hasMeter(batch)) return 0;
+  return Math.max(0, Math.min(100, Math.round((batch.days_remaining / batch.freshness_days) * 100)));
 }
 
-function daysLabel(days) {
-  return daysRemainingLabel(days);
-}
-function daysClass(days) {
-  return daysRemainingClass(days);
-}
 function formatDate(d) {
-  return d
-    ? new Date(d).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      })
-    : "—";
+  return d ? new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—";
 }
-const { conditionMeta: _cm } = { conditionMeta };
 
 onMounted(() => {
-  if (route.query.location_id) {
-    locationFilter.value = String(route.query.location_id);
-  }
-  if (route.query.condition) {
-    conditionFilter.value = String(route.query.condition);
-  }
+  if (route.query.location_id) locationFilter.value = String(route.query.location_id);
+  if (route.query.condition) conditionFilter.value = String(route.query.condition);
   fetchFloor();
   fetchLocations();
 });
 </script>
 
-<script>
-// Re-export so template can use it
-import {
-  conditionMeta,
-  daysRemainingLabel,
-  daysRemainingClass,
-} from "../../../../../services/warehouseBatchService";
-export default {
-  methods: { conditionMeta, daysRemainingLabel, daysRemainingClass },
-};
-</script>
-
 <style scoped>
-.sk-line {
-  height: 12px;
-  margin: 6px auto;
-  border-radius: 6px;
-  width: 60%;
+/* Summary: five tiles */
+.fl-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
-.sk-short {
-  width: 35%;
+.fl-stat.alert {
+  border-color: color-mix(in srgb, var(--v-purple-text) 45%, transparent);
 }
-* {
-  box-sizing: border-box;
-  font-family: "Poppins", sans-serif;
+.fl-stat.alert .sp-stat-icon {
+  animation: fl-pulse 2s ease-in-out infinite;
 }
-
-.floor-page {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+@keyframes fl-pulse {
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--v-purple-text) 15%, transparent); }
 }
 
-/* Header */
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+/* Toolbar */
+.fl-toolbar .sp-select {
+  width: auto;
+  min-width: 140px;
 }
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--v-text);
-  margin: 0;
+.fl-search {
+  flex: 1 1 260px;
 }
-.page-sub {
-  font-size: 13px;
+.fl-count {
+  margin-left: auto;
+  font-size: 12.5px;
   color: var(--v-muted);
-  margin: 2px 0 0;
-}
-.header-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 18px;
-  background: #10b981;
-  color: #fff;
-  border: none;
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  transition: background 0.15s;
-}
-.btn-primary:hover {
-  background: #059669;
-}
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 16px;
-  background: var(--v-surface);
-  color: var(--v-text-2);
-  border: 1.5px solid var(--v-border);
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-.btn-secondary:hover {
-  background: var(--v-subtle);
+  white-space: nowrap;
 }
 
-/* Summary strip */
-.summary-strip {
+/* Batch cards */
+.fl-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-}
-.sum-card {
-  background: var(--v-surface);
-  border: 1.5px solid var(--v-border);
-  border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  position: relative;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-  text-align: left;
-}
-.sum-card.active {
-  border-color: #10b981;
-  box-shadow: 0 0 0 3px #d1fae5;
-}
-.sum-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.sum-val {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
-}
-.sum-lbl {
-  font-size: 11.5px;
-  color: var(--v-muted);
-  margin-top: 2px;
-}
-.pulse-dot {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ef4444;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.4);
-    opacity: 0.6;
-  }
-}
-
-/* Filters */
-.filter-bar {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--v-surface);
-  border: 1.5px solid var(--v-border);
-  border-radius: 9px;
-  flex: 1;
-  min-width: 220px;
-}
-.search-box input {
-  border: none;
-  outline: none;
-  font-size: 13.5px;
-  color: var(--v-text);
-  background: none;
-  width: 100%;
-  font-family: inherit;
-}
-.filter-select {
-  padding: 8px 12px;
-  border: 1.5px solid var(--v-border);
-  border-radius: 9px;
-  font-size: 13px;
-  color: var(--v-text-2);
-  background: var(--v-input);
-  outline: none;
-  cursor: pointer;
-}
-.clear-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 12px;
-  border: 1.5px solid var(--v-border);
-  border-radius: 9px;
-  background: var(--v-surface);
-  color: var(--v-muted);
-  font-size: 13px;
-  cursor: pointer;
-}
-.clear-btn:hover {
-  background: var(--v-subtle);
-  color: var(--v-text-2);
-}
-
-/* States */
-.loading-state,
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 80px 20px;
-  color: var(--v-faint);
-}
-.empty-state p {
-  font-size: 15px;
-  margin: 0;
-}
-.spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid var(--v-border);
-  border-top-color: #10b981;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Batch grid */
-.batch-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 14px;
+  transition: opacity 0.15s;
 }
-.batch-card {
-  background: var(--v-surface);
-  border: 1.5px solid var(--v-border);
-  border-radius: 14px;
-  padding: 16px;
+.fl-grid.dim {
+  opacity: 0.6;
+}
+.fl-card {
+  --fl-tone: var(--v-muted);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  cursor: pointer;
-  transition:
-    box-shadow 0.2s,
-    transform 0.2s;
-  position: relative;
   overflow: hidden;
+  border: 1px solid var(--v-border);
+  border-radius: 16px;
+  background: var(--v-surface);
+  cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
 }
-.batch-card:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.09);
+.fl-card.c-green { --fl-tone: var(--v-green-text); }
+.fl-card.c-amber { --fl-tone: var(--v-amber-text); }
+.fl-card.c-pink { --fl-tone: var(--v-pink-text); }
+.fl-card.c-red { --fl-tone: var(--v-red-text); }
+.fl-card:not(.sk):hover {
+  border-color: color-mix(in srgb, var(--fl-tone) 45%, var(--v-border));
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
   transform: translateY(-2px);
 }
-.batch-card.spoiled {
-  border-color: #fca5a5;
+.fl-card:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
 }
-.batch-card.wilting {
-  border-color: #fdba74;
-}
-
-.condition-stripe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
-  bottom: 0;
-  border-radius: 14px 0 0 14px;
+.fl-card.sk {
+  cursor: default;
 }
 
-.card-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.product-thumb {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+.fl-media {
+  position: relative;
+  height: 132px;
   background: var(--v-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--v-text-2);
-  overflow: hidden;
-  flex-shrink: 0;
 }
-.product-thumb img {
+.fl-media img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.card-title-group {
-  flex: 1;
-  min-width: 0;
+.fl-media::after {
+  /* Keeps the chips readable over any photo */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, transparent 40%, transparent 60%, rgba(0, 0, 0, 0.45) 100%);
+  pointer-events: none;
 }
-.card-product {
+.fl-card.sk .fl-media::after {
+  display: none;
+}
+.fl-media-blank {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--v-faint);
+}
+.fl-media-blank :deep(svg) {
+  width: 34px;
+  height: 34px;
+}
+.fl-cond {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  left: 10px;
+  gap: 6px;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.fl-cond i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.fl-qty {
+  position: absolute;
+  z-index: 1;
+  right: 10px;
+  bottom: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.88);
+}
+.fl-qty b {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.fl-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+.fl-title h3 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--v-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fl-title code {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--v-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fl-fresh {
+  display: grid;
+  gap: 7px;
+}
+.fl-fresh-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fl-days {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--v-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.card-batch {
-  font-family: monospace;
-  font-size: 11px;
-  background: var(--v-subtle);
-  padding: 1px 5px;
-  border-radius: 4px;
+.fl-days :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.fl-days.ok { color: var(--v-green-text); }
+.fl-days.warn { color: var(--v-amber-text); }
+.fl-days.warn-red,
+.fl-days.danger { color: var(--v-red-text); }
+.fl-pct {
+  font-size: 12px;
+  font-weight: 600;
   color: var(--v-muted);
 }
-
-.condition-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.pill-dot {
-  width: 6px;
+.fl-meter {
   height: 6px;
-  border-radius: 50%;
-}
-
-.card-stats {
-  display: flex;
-  align-items: center;
-}
-.stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.stat-val {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--v-text);
-}
-.stat-val.ok {
-  color: var(--v-green-text);
-}
-.stat-val.warn {
-  color: #ca8a04;
-}
-.stat-val.warn-red {
-  color: var(--v-amber-text);
-}
-.stat-val.danger {
-  color: var(--v-red-text);
-}
-.stat-lbl {
-  font-size: 10.5px;
-  color: var(--v-faint);
-}
-.stat-sep {
-  width: 1px;
-  height: 28px;
+  overflow: hidden;
+  border-radius: 99px;
   background: var(--v-subtle-2);
 }
-
-.freshness-bar-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.freshness-bar {
-  flex: 1;
-  height: 4px;
-  background: var(--v-subtle);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.freshness-fill {
+.fl-meter span {
+  display: block;
   height: 100%;
-  border-radius: 4px;
-  transition: width 0.4s;
+  border-radius: inherit;
+  background: var(--fl-tone);
+  transition: width 0.4s ease;
 }
-.freshness-pct {
+
+.fl-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: auto 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--v-border);
+}
+.fl-facts div {
+  min-width: 0;
+}
+.fl-facts dt {
   font-size: 11px;
   color: var(--v-muted);
-  min-width: 30px;
-  text-align: right;
+}
+.fl-facts dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11.5px;
-  color: var(--v-faint);
-  border-top: 1px solid var(--v-border);
-  padding-top: 8px;
-}
-.footer-loc {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Drawer */
-.drawer-overlay {
+/* Details drawer */
+.fl-drawer {
   position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 300;
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-}
-.drawer {
-  width: 480px;
-  background: var(--v-surface);
-  height: 100%;
+  z-index: 1201;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100vw);
   overflow-y: auto;
-  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.15);
+  background: var(--v-surface);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.22);
 }
-
-.drawer-slide-enter-active,
-.drawer-slide-leave-active {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+.fl-slide-enter-active,
+.fl-slide-leave-active {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s;
 }
-.drawer-slide-enter-from,
-.drawer-slide-leave-to {
+.fl-slide-enter-from,
+.fl-slide-leave-to {
   opacity: 0;
   transform: translateX(40px);
+}
+
+@media (max-width: 1100px) {
+  .fl-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .fl-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fl-toolbar .sp-select {
+    flex: 1 1 140px;
+  }
+  .fl-count {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fl-card,
+  .fl-meter span,
+  .fl-slide-enter-active,
+  .fl-slide-leave-active {
+    transition: none;
+  }
+  .fl-card:not(.sk):hover {
+    transform: none;
+  }
+  .fl-stat.alert .sp-stat-icon {
+    animation: none;
+  }
 }
 </style>
