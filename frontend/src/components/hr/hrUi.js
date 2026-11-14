@@ -13,7 +13,36 @@ export const ATTENDANCE_TABS = [
 ];
 
 export const DAYS =["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+// Every value a profile can hold (older profiles may still say Active or Part-time); used by filters
 export const EMPLOYMENT_STATUSES = ["Active", "Inactive", "Probationary", "Regular", "Contractual", "Part-time"];
+
+/*
+ * What the profile form offers. Employment status is the person's contract:
+ * Probationary, Regular or Contractual; all of them mean they work here.
+ * Someone just added always works here, so "Inactive" is only offered when
+ * editing. Full-time / Part-time is the separate Type field.
+ */
+const STATUS_CHOICES = [
+  { value: "Probationary", label: "Probationary (on trial, new hire)" },
+  { value: "Regular", label: "Regular (permanent)" },
+  { value: "Contractual", label: "Contractual (fixed term)" },
+];
+const OLD_STATUS_LABELS = {
+  Active: "Active (older setting: pick their contract instead)",
+  "Part-time": "Part-time (older setting: set Type to Part-time instead)",
+};
+/** [{ value, label }] for the Employment status select */
+export function employmentStatusChoices(current = "", isNew = true) {
+  const list = [...STATUS_CHOICES];
+  if (!isNew) list.push({ value: "Inactive", label: "Inactive (no longer works here)" });
+  // Keep an older value selectable, so opening and saving a profile never changes it by itself
+  if (current && !list.some((c) => c.value === current)) list.unshift({ value: current, label: OLD_STATUS_LABELS[current] ?? current });
+  return list;
+}
+export const employmentStatusHint = (isNew) =>
+  isNew
+    ? "New employees always start as working here. If they leave, edit their profile and set the status to Inactive."
+    : "Set Inactive when they no longer work here: they drop out of attendance, leave and payroll. Full-time or part-time goes in Type.";
 
 // The fields of an HR profile, as the backend validates them (EmployeeInfoController)
 export const PERSONAL_FIELDS = [

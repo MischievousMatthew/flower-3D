@@ -123,8 +123,8 @@ class EmployeeInfoController extends Controller
             'emergency_contact_number' => 'required|string|max:20',
             'emergency_relationship' => 'required|string|max:100',
             
-            // Employment Details
-            'employment_status' => 'required|in:Probationary,Regular,Contractual,Part-time,Active,Inactive',
+            // Employment Details. Someone just added works here, so a new profile can't be Inactive
+            'employment_status' => 'required|in:Probationary,Regular,Contractual,Part-time,Active',
             'position' => 'required|string|max:150',
             'department' => 'required|string|max:150',
             'employment_type' => 'required|in:Full-time,Part-time',

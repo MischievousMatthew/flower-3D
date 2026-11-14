@@ -437,11 +437,15 @@
             <div class="sp-grid-2">
               <label v-for="f in JOB" :key="f.key" class="sp-field">
                 <span>{{ f.label }}</span>
-                <select v-if="f.options" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
+                <select v-if="f.key === 'employment_status'" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
+                  <option v-for="o in employmentStatusChoices(pform.id ? (profileStatusAtOpen ?? '') : '', !pform.id)" :key="o.value" :value="o.value">{{ o.label }}</option>
+                </select>
+                <select v-else-if="f.options" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
                   <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
                 </select>
                 <input v-else v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
                 <small v-if="perrors[f.key]" class="sp-error">{{ perrors[f.key] }}</small>
+                <small v-else-if="f.key === 'employment_status'" class="sp-hint">{{ employmentStatusHint(!pform.id) }}</small>
               </label>
             </div>
 
@@ -554,7 +558,7 @@ import { STATUS_LABEL, STATUS_TONE, personColor, range12, relativeTime, time12 }
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
 import { PHONE_MESSAGE, isPhone } from "../../../utils/phone";
-import { ACCESS_FILTERS, CONTACT_FIELDS as CONTACT, DAYS, EMERGENCY_FIELDS as EMERGENCY, JOB_FIELDS as JOB, PER, PERSONAL_FIELDS as PERSONAL, PROFILE_KEYS, REQUIRED_FIELDS as REQUIRED, day10, hm5, missingSummary } from "../../../components/hr/hrUi";
+import { ACCESS_FILTERS, CONTACT_FIELDS as CONTACT, DAYS, EMERGENCY_FIELDS as EMERGENCY, JOB_FIELDS as JOB, PER, PERSONAL_FIELDS as PERSONAL, PROFILE_KEYS, REQUIRED_FIELDS as REQUIRED, day10, employmentStatusChoices, employmentStatusHint, hm5, missingSummary } from "../../../components/hr/hrUi";
 
 const today = ymd(new Date());
 
@@ -699,6 +703,7 @@ function closeProfile() {
 
 // A photo chosen while adding someone; it uploads once the profile exists
 const pendingPhoto = ref(null);
+const profileStatusAtOpen = ref(null);
 
 /** Keeps the list and the open profile in step after a photo change */
 function photoChanged(id, url) {
@@ -724,6 +729,8 @@ function openProfileForm(source = null, prefill = {}) {
     f.shift_end = hm5(source.shift_end);
     f.rest_days = String(source.rest_days ?? "").split(",").map((d) => d.trim()).filter((d) => DAYS.includes(d));
   }
+  // The status it had when opened, so an older value (Active, Part-time) stays in the list
+  profileStatusAtOpen.value = source ? source.employment_status ?? "" : null;
   pform.value = f;
 }
 function closeProfileForm() {

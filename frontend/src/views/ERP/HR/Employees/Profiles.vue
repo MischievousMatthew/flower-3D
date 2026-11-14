@@ -303,11 +303,15 @@
             <div class="sp-grid-2">
               <label v-for="f in JOB_FIELDS" :key="f.key" class="sp-field">
                 <span class="sp-label">{{ f.label }}</span>
-                <select v-if="f.options" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
+                <select v-if="f.key === 'employment_status'" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
+                  <option v-for="o in employmentStatusChoices(form.id ? form.statusAtOpen : '', !form.id)" :key="o.value" :value="o.value">{{ o.label }}</option>
+                </select>
+                <select v-else-if="f.options" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
                   <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
                 </select>
                 <input v-else v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
                 <small v-if="errors[f.key]" class="sp-error">{{ errors[f.key] }}</small>
+                <small v-else-if="f.key === 'employment_status'" class="sp-hint">{{ employmentStatusHint(!form.id) }}</small>
               </label>
             </div>
 
@@ -459,7 +463,7 @@ import { PHONE_MESSAGE, isPhone } from "../../../../utils/phone";
 import { buildMultipartFormData, getSelectedFile, readImagePreview, validateImageFile } from "../../../../utils/imageUpload";
 import {
   ACCESS_FILTERS, CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
-  REQUIRED_FIELDS, day10, hm5, hourlyRate, initialsOf, restDaysList, statusTone,
+  REQUIRED_FIELDS, day10, employmentStatusChoices, employmentStatusHint, hm5, hourlyRate, initialsOf, restDaysList, statusTone,
 } from "../../../../components/hr/hrUi";
 
 const NO_PERMISSION = {
@@ -651,6 +655,8 @@ function openForm(source = null) {
       shift_end: hm5(source.shift_end),
       rest_days: restDaysList(source.rest_days),
       avatarPreview: source.avatar_url || "",
+      // The status it had when opened, so an older value (Active, Part-time) stays in the list
+      statusAtOpen: source.employment_status ?? "",
     });
   }
   form.value = f;
