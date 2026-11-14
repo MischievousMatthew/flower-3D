@@ -36,13 +36,9 @@
             <option value="">All departments</option>
             <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
           </select>
-          <select v-model="filters.location" class="sp-select" aria-label="Work location">
-            <option value="">All locations</option>
-            <option v-for="l in locations" :key="l" :value="l">{{ l }}</option>
-          </select>
           <select v-model="filters.status" class="sp-select" aria-label="Status">
             <option value="">Every status</option>
-            <option v-for="s in EMPLOYMENT_STATUSES" :key="s" :value="s">{{ s }}</option>
+            <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
           </select>
         </div>
       </div>
@@ -464,7 +460,7 @@ import EmployeePhoto from "../../../../components/hr/EmployeePhoto.vue";
 import { PHONE_MESSAGE, isPhone } from "../../../../utils/phone";
 import { buildMultipartFormData, getSelectedFile, readImagePreview, validateImageFile } from "../../../../utils/imageUpload";
 import {
-  ACCESS_FILTERS, CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
+  ACCESS_FILTERS, CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
   REQUIRED_FIELDS, day10, employmentStatusChoices, employmentStatusHint, hm5, hourlyRate, reportsToChoices, initialsOf, restDaysList, statusTone,
 } from "../../../../components/hr/hrUi";
 
@@ -496,7 +492,7 @@ const loadError = ref("");
 const page = ref({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 });
 const stats = ref(null);
 const search = ref("");
-const filters = reactive({ access: route.query.access || "", status: "", department: "", location: "" });
+const filters = reactive({ access: route.query.access || "", status: "", department: "" });
 const menuId = ref(null);
 const selected = ref(null);
 
@@ -522,9 +518,14 @@ const saving = ref(false);
 const deleting = ref(null);
 const busy = ref(false);
 
-const filtered = computed(() => !!(search.value.trim() || filters.access || filters.status || filters.department || filters.location));
+const filtered = computed(() => !!(search.value.trim() || filters.access || filters.status || filters.department));
 const departments = computed(() => (stats.value?.by_department ?? []).map((d) => d.department).filter(Boolean));
-const locations = computed(() => (stats.value?.by_location ?? []).map((l) => l.work_location).filter(Boolean));
+// Only the statuses employees actually have (the chosen one stays listed until cleared)
+const statuses = computed(() => {
+  const list = [...(stats.value?.statuses ?? [])];
+  if (filters.status && !list.includes(filters.status)) list.push(filters.status);
+  return list;
+});
 const statTiles = computed(() => {
   const a = stats.value?.by_access ?? {};
   return [
@@ -547,7 +548,6 @@ async function fetchPage(p) {
     access: filters.access || undefined,
     status: filters.status || undefined,
     department: filters.department || undefined,
-    location: filters.location || undefined,
   });
   page.value = res.pagination ?? page.value;
   if (res.store_address) storeAddress.value = res.store_address;

@@ -882,6 +882,10 @@ class EmployeeInfoController extends Controller
                     ],
                     'by_department' => $departments,
                     'by_location' => $locations,
+                    // The statuses the shop's employees actually have, for the status filter
+                    'statuses' => EmployeeInfo::forOwner($ownerId)
+                        ->whereNotNull('employment_status')->where('employment_status', '!=', '')
+                        ->distinct()->orderBy('employment_status')->pluck('employment_status')->values(),
                 ]
             ]);
 
