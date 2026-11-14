@@ -315,6 +315,9 @@ class VendorCrmController extends Controller
     public function customer(Request $request, int $id): JsonResponse
     {
         $vendorId = $this->resolveOwnerId($request);
+        // Only people who've ordered, chatted or asked a question at this shop;
+        // otherwise any shop could look up anyone's email and phone by id
+        abort_unless(app(\App\Services\CustomerRecords::class)->isCustomerOf($vendorId, $id), 404, 'This person isn\'t one of your customers.');
         $customer = User::findOrFail($id);
         $orders = Order::withoutGlobalScopes()->where('vendor_id', $vendorId)->where('user_id', $id)
             ->orderByDesc('created_at')->get(['id', 'order_number', 'status', 'payment_status', 'total_amount', 'created_at', 'reservation_date']);

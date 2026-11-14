@@ -450,6 +450,12 @@ class ChatController extends Controller
                 $q->where('customer_id', $participantId)->where('vendor_id', $userId);
             })->first();
 
+            // Contact details only for someone you're actually chatting with;
+            // otherwise any account could look up anyone's email, phone and address
+            if (!$conversation) {
+                return response()->json(['success' => false, 'message' => 'Conversation not found'], 404);
+            }
+
             $sharedFiles = $conversation
                 ? Message::where('conversation_id', $conversation->id)
                     ->whereNotNull('attachments')
