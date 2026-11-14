@@ -43,7 +43,7 @@
           <form v-for="p in plans" v-else :key="p.key" class="plan-card" :class="{ featured: p.form.featured }" novalidate @submit.prevent="save(p)">
             <div class="plan-top">
               <span class="plan-tier">{{ TIER[p.key] }}</span>
-              <span class="subs">{{ p.subscribers }} {{ p.subscribers === 1 ? "shop" : "shops" }}</span>
+              <span class="subs" :title="`${p.subscribers} subscribed`" :aria-label="`${p.subscribers} subscribed`">{{ p.subscribers }}</span>
             </div>
 
             <label class="field">
