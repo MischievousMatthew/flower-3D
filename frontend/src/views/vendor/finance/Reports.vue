@@ -1,5 +1,5 @@
 <template>
-  <ShopLayout section="finance" title="Financial Reports" subtitle="Daily, weekly, monthly and yearly totals you can export.">
+  <ShopLayout section="finance" title="Financial Reports" subtitle="Your totals for any period, broken down and ready to export.">
     <template #actions>
       <button type="button" class="sp-btn sp-btn-ghost" :disabled="!!exporting || !data" :title="exportTitle('csv')" :aria-label="exportTitle('csv')" @click="exportAs('csv')">
         <span v-html="ICONS.download"></span>{{ exporting === "csv" ? "Preparing…" : "CSV" }}
@@ -10,16 +10,14 @@
     </template>
 
     <div class="sp-toolbar">
-      <CapsuleSlider :model-value="unit" :options="UNITS" label="Group by" @update:model-value="setUnit" />
-      <RangePicker @change="notice = ''; load()" />
+      <!-- One control: the period. Its rows (by day, week or month) follow from it. -->
+      <RangePicker @change="data = null; load()" />
+      <span class="rp-rows">Rows by {{ unit }}</span>
     </div>
 
     <div v-if="error" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
       <button type="button" @click="load">Try again</button>
-    </div>
-    <div v-else-if="notice" class="sp-banner info">
-      <span v-html="ICONS.sparkle"></span>{{ notice }}
     </div>
 
     <!-- Totals -->
@@ -108,11 +106,10 @@ import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
-import CapsuleSlider from "../../../components/vendor/finance/CapsuleSlider.vue";
 import BarChart from "../../../components/vendor/finance/BarChart.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
-import { exportFileName, exportTitle, financeRange, money } from "../../../components/vendor/finance/financeUi";
+import { autoUnit, exportFileName, exportTitle, financeRange, money } from "../../../components/vendor/finance/financeUi";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/finance/finance.css";
 
@@ -135,21 +132,12 @@ const SERIES = [
   { key: "spent", label: "Cost of goods + expenses", color: "#f6ad55" },
 ];
 
-const unit = ref(readUnit());
+// Rows follow the period: by day for a day, week or month, by week for a quarter, by month for a year
+const unit = computed(() => autoUnit(financeRange));
 const data = ref(null);
 const error = ref("");
-const notice = ref("");
 const exporting = ref(null);
 const hideEmpty = ref(true);
-
-function readUnit() {
-  try {
-    const u = sessionStorage.getItem("bc.vendor.reports.unit");
-    return UNITS.some((x) => x.key === u) ? u : "day";
-  } catch {
-    return "day";
-  }
-}
 
 const totals = computed(() => data.value?.totals ?? {});
 const unitWord = computed(() => ({ day: "days", week: "weeks", month: "months", year: "years" })[unit.value]);
@@ -171,28 +159,9 @@ async function load() {
     const res = await api.get("vendor/books/reports", { params: { unit: unit.value, from: financeRange.from, to: financeRange.to } });
     data.value = res.data.data;
   } catch (e) {
-    // Range too long for this grouping: step up to the next one by itself
-    const next = { day: "week", week: "month", month: "year" }[unit.value];
-    if (e?.response?.status === 422 && next) {
-      notice.value = `${UNITS.find((u) => u.key === unit.value).label} view covers a shorter range, so this shows ${UNITS.find((u) => u.key === next).label.toLowerCase()} totals.`;
-      unit.value = next;
-      return load();
-    }
     error.value = apiMessage(e, "Couldn't load the report.");
     data.value = { rows: [], totals: {}, range: { label: "" } };
   }
-}
-function setUnit(u) {
-  if (u === unit.value) return;
-  notice.value = "";
-  unit.value = u;
-  try {
-    sessionStorage.setItem("bc.vendor.reports.unit", u);
-  } catch {
-    /* private mode */
-  }
-  data.value = null;
-  load();
 }
 
 async function exportAs(format) {
@@ -227,6 +196,11 @@ onMounted(load);
 </script>
 
 <style scoped>
+.rp-rows {
+  font-size: 12px;
+  color: var(--v-faint);
+  white-space: nowrap;
+}
 .rp-totals {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

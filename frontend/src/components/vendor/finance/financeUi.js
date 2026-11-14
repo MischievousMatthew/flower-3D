@@ -61,6 +61,22 @@ export function setRange(next) {
   }
 }
 
+/**
+ * How a report splits the period into rows, picked from the period itself so
+ * there's one control: Today / This week / This month → by day, This quarter →
+ * by week, This year → by month. Custom goes by its length, within the server's
+ * limits (daily ≤ 3 months, weekly ≤ 2 years, monthly ≤ 5 years).
+ */
+export function autoUnit(range = financeRange) {
+  const fixed = { today: "day", this_week: "day", this_month: "day", this_quarter: "week", this_year: "month" }[range.preset];
+  if (fixed) return fixed;
+  const days = Math.round((new Date(`${range.to}T00:00:00`) - new Date(`${range.from}T00:00:00`)) / 86400000) + 1;
+  if (days <= 31) return "day";
+  if (days <= 183) return "week";
+  if (days <= 5 * 365) return "month";
+  return "year";
+}
+
 /** "Nov 14, 2026" for one day, else "Nov 10 – Nov 14, 2026" */
 export function rangeLabel(range = financeRange) {
   const f = new Date(`${range.from}T00:00:00`);

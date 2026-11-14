@@ -12,7 +12,8 @@
     <section class="sp-card rp-bar" aria-label="Report options">
       <div class="rp-options">
         <RangePicker @change="load" />
-        <CapsuleSlider v-if="current.units" :model-value="unit" :options="UNITS" label="Rows" @update:model-value="(u) => u !== unit && setOption('unit', u)" />
+        <!-- Rows (by day, week or month) follow from the period above -->
+        <span v-if="current.units" class="rp-rows">Rows by {{ unit }}</span>
         <div v-if="type === 'profit_loss'" class="sp-seg" role="radiogroup" aria-label="Count flower costs">
           <button type="button" role="radio" :aria-checked="basis === 'sold'" :class="{ on: basis === 'sold' }" @click="setOption('basis', 'sold')">Flowers when sold</button>
           <button type="button" role="radio" :aria-checked="basis === 'bought'" :class="{ on: basis === 'bought' }" @click="setOption('basis', 'bought')">When bought</button>
@@ -87,10 +88,9 @@ import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
-import CapsuleSlider from "../../../components/vendor/finance/CapsuleSlider.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
-import { exportTitle, financeRange, money } from "../../../components/vendor/finance/financeUi";
+import { autoUnit, exportTitle, financeRange, money } from "../../../components/vendor/finance/financeUi";
 import { useAuth } from "../../../composables/useAuth";
 import { useAssignment } from "../../../composables/useAssignment";
 import "../../../components/vendor/finance/finance.css";
@@ -101,12 +101,6 @@ const TYPES = [
   { key: "profit_loss", label: "Profit & loss", hint: "Statement & trend", icon: "chart", tone: "violet", units: true },
   { key: "payments_refunds", label: "Payments & refunds", hint: "Fees, COD, refunds", icon: "wallet", tone: "blue" },
   { key: "tax", label: "Tax summary", hint: "3%, VAT or 8%", icon: "percent", tone: "pink" },
-];
-const UNITS = [
-  { key: "day", label: "Daily" },
-  { key: "week", label: "Weekly" },
-  { key: "month", label: "Monthly" },
-  { key: "year", label: "Yearly" },
 ];
 const STORE = "bc.finance.reports";
 
@@ -125,7 +119,8 @@ const saved = (() => {
   }
 })();
 const type = ref(TYPES.some((t) => t.key === saved.type) ? saved.type : "sales");
-const unit = ref(saved.unit ?? "day");
+// Rows follow the period: by day for a day, week or month, by week for a quarter, by month for a year
+const unit = computed(() => autoUnit(financeRange));
 const basis = ref(saved.basis ?? "sold");
 const taxMode = ref(saved.taxMode ?? "percentage");
 
@@ -157,7 +152,7 @@ const params = () => ({ from: financeRange.from, to: financeRange.to, unit: unit
 
 function remember() {
   try {
-    sessionStorage.setItem(STORE, JSON.stringify({ type: type.value, unit: unit.value, basis: basis.value, taxMode: taxMode.value }));
+    sessionStorage.setItem(STORE, JSON.stringify({ type: type.value, basis: basis.value, taxMode: taxMode.value }));
   } catch {
     /* private mode */
   }
@@ -185,7 +180,7 @@ function setType(t) {
 }
 
 function setOption(key, value) {
-  ({ unit, basis, taxMode })[key].value = value;
+  ({ basis, taxMode })[key].value = value;
   remember();
   load();
 }
@@ -219,6 +214,11 @@ onMounted(load);
 </script>
 
 <style scoped>
+.rp-rows {
+  font-size: 12px;
+  color: var(--v-faint);
+  white-space: nowrap;
+}
 /* Report types */
 .rp-types {
   display: grid;
