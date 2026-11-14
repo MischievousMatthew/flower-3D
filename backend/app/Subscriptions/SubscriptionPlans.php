@@ -187,6 +187,14 @@ final class SubscriptionPlans
         return self::get($plan)['resource_limits'][$resource] ?? null;
     }
 
+    /** Where a plan sits from cheapest (0) up; -1 when unknown */
+    public static function rank(string $plan): int
+    {
+        $index = array_search($plan, array_keys(self::DEFAULTS), true);
+
+        return $index === false ? -1 : $index;
+    }
+
     public static function nextPlan(string $plan): ?array
     {
         $keys = array_keys(self::DEFAULTS);

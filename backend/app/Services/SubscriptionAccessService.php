@@ -47,6 +47,8 @@ class SubscriptionAccessService
             'trial_ends_at' => $subscription?->trial_ends_at?->toIso8601String(),
             'subscription_ends_at' => $subscription?->subscription_ends_at?->toIso8601String(),
             'modules' => $active ? SubscriptionPlans::get($subscription->plan_key)['included_modules'] : [],
+            // Paid and running: only this plan or a higher one can be bought
+            'downgrade_locked' => VendorSubscriptionCheckoutService::downgradeLocked($subscription),
             'required_plans' => SubscriptionPlans::requiredPlansByModule(),
             'resource_limits' => $vendor ? app(ResourceLimitService::class)->summary($vendor) : [],
             'business_trial_eligible' => $vendor

@@ -121,13 +121,17 @@
           <button v-else-if="trialFor(p)" type="button" class="sp-btn sp-btn-primary" :disabled="!!busy" @click="startTrial">
             {{ busy === "trial" ? "Starting…" : "Start 1-month free trial" }}
           </button>
+          <template v-else-if="isLockedDown(p)">
+            <button type="button" class="sp-btn sp-btn-ghost" disabled :aria-describedby="`dg-why-${p.key}`"><span v-html="ICONS.lock"></span>Can't downgrade</button>
+            <small :id="`dg-why-${p.key}`" class="sp-hint sb-plan-why">You're paying for {{ current.plan_name }}. Plans can only go up; you can upgrade any time.</small>
+          </template>
           <button v-else type="button" class="sp-btn" :class="isUpgrade(p) || isCurrent(p) ? 'sp-btn-primary' : 'sp-btn-ghost'" :disabled="!!busy" @click="choose(p)">
             {{ busy === p.key ? "Opening payment…" : actionLabel(p) }}
           </button>
         </div>
       </article>
     </div>
-    <p class="sp-hint sb-foot">Payments go through PayMongo (GCash or Maya) and cover one month from the day you pay. Switching plans takes effect right away and starts a new month.</p>
+    <p class="sp-hint sb-foot">Payments go through PayMongo (GCash or Maya) and cover one month from the day you pay. Upgrading takes effect right away and starts a new month. A paid plan can't be moved down to a cheaper one.</p>
 
     <!-- Confirm a downgrade -->
     <Transition name="sp-fade"><div v-if="downgrade" class="sp-backdrop" @click="downgrade = null"></div></Transition>
@@ -199,6 +203,9 @@ const canRenew = computed(() => {
 
 const isCurrent = (p) => current.value?.plan_key === p.key && current.value.active;
 const isUpgrade = (p) => !current.value?.active || p.rank > current.value.rank;
+// A paid plan that's still running can only be renewed or upgraded (the server checks this too).
+// A free trial or an ended plan can pick any plan.
+const isLockedDown = (p) => !!current.value?.active && !current.value.trial && p.rank < current.value.rank;
 const currentModules = computed(() => new Set(included.value.map((m) => m.key)));
 const labelOf = (key) => data.value.modules.find((m) => m.key === key)?.label ?? key;
 const gains = (p) => (isCurrent(p) ? [] : p.modules.filter((k) => !currentModules.value.has(k)).map(labelOf));
@@ -221,6 +228,10 @@ async function load() {
 }
 
 function choose(p) {
+  if (isLockedDown(p)) {
+    toast.info(`You're paying for ${current.value.plan_name}, so you can't move down to ${p.name}. You can upgrade any time.`);
+    return;
+  }
   if (losses(p).length) downgrade.value = p;
   else checkout(p.key);
 }
@@ -485,6 +496,11 @@ onMounted(async () => {
 .sb-plan-foot {
   margin-top: auto;
   padding-top: 4px;
+}
+.sb-plan-why {
+  display: block;
+  margin-top: 6px;
+  text-align: center;
 }
 .sb-plan-foot .sp-btn {
   width: 100%;

@@ -14,12 +14,29 @@ use LogicException;
 
 class VendorSubscriptionCheckoutService
 {
+    /**
+     * A paid plan that's still running can't move to a cheaper plan. A free
+     * trial, or a plan that has ended, can pick any plan.
+     */
+    public static function downgradeLocked(?VendorSubscription $subscription): bool
+    {
+        return $subscription !== null
+            && $subscription->status === SubscriptionStatus::Active
+            && $subscription->isActive();
+    }
+
     public function create(User $vendor, string $planKey, ?string $callbackBase = null): VendorSubscriptionCheckout
     {
         if (! $vendor->isVendor()) throw new LogicException('Only vendor owners can purchase subscriptions.');
         if (! SubscriptionPlans::exists($planKey)) throw new LogicException('Unknown subscription plan.');
         $plan = SubscriptionPlans::get($planKey);
         if ($plan['monthly_price'] === null) throw new LogicException('This plan does not have online monthly pricing.');
+        // A paid plan can be renewed or upgraded, never moved down to a cheaper one
+        $current = $vendor->subscription()->first();
+        if (self::downgradeLocked($current) && SubscriptionPlans::rank($planKey) < SubscriptionPlans::rank($current->plan_key)) {
+            $currentName = SubscriptionPlans::get($current->plan_key)['name'];
+            throw new LogicException("You're on the {$currentName} plan. Plans can be upgraded but not downgraded.");
+        }
         $key = config('services.paymongo.secret_key');
         if (! $key) throw new LogicException('Subscription payments are not configured.');
 

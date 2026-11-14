@@ -472,6 +472,51 @@ class VendorSubscriptionTest extends TestCase
         $this->assertSame(SubscriptionPlans::STARTER, $otherVendor->fresh()->subscription->plan_key);
     }
 
+    public function test_a_paid_plan_can_be_upgraded_or_renewed_but_not_downgraded(): void
+    {
+        config()->set('services.paymongo.secret_key', 'test-key');
+        Http::fake([
+            'https://api.paymongo.com/v1/checkout_sessions' => Http::response([
+                'data' => ['id' => 'cs_any', 'attributes' => ['checkout_url' => 'https://paymongo.test/checkout']],
+            ], 200),
+        ]);
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id, 'plan_key' => SubscriptionPlans::BUSINESS,
+            'status' => SubscriptionStatus::Active, 'subscription_started_at' => now(),
+        ]);
+        $service = app(VendorSubscriptionCheckoutService::class);
+
+        $this->assertSame('pending', $service->create($vendor, SubscriptionPlans::BUSINESS)->status);
+        $this->assertSame('pending', $service->create($vendor, SubscriptionPlans::PROFESSIONAL)->status);
+
+        try {
+            $service->create($vendor, SubscriptionPlans::STARTER);
+            $this->fail('A paid plan was moved down to a cheaper one.');
+        } catch (LogicException $e) {
+            $this->assertStringContainsString('not downgraded', $e->getMessage());
+        }
+    }
+
+    public function test_a_free_trial_can_still_choose_a_cheaper_plan(): void
+    {
+        config()->set('services.paymongo.secret_key', 'test-key');
+        Http::fake([
+            'https://api.paymongo.com/v1/checkout_sessions' => Http::response([
+                'data' => ['id' => 'cs_trial', 'attributes' => ['checkout_url' => 'https://paymongo.test/checkout']],
+            ], 200),
+        ]);
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id, 'plan_key' => SubscriptionPlans::BUSINESS,
+            'status' => SubscriptionStatus::Trialing, 'trial_started_at' => now()->subDay(), 'trial_ends_at' => now()->addMonth(),
+        ]);
+
+        $checkout = app(VendorSubscriptionCheckoutService::class)->create($vendor, SubscriptionPlans::STARTER);
+
+        $this->assertSame('pending', $checkout->status);
+    }
+
     public function test_checkout_returns_to_the_api_host_that_created_it(): void
     {
         config()->set('services.paymongo.secret_key', 'test-key');
