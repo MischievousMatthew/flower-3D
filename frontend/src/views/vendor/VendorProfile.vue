@@ -45,8 +45,7 @@
 
         <!-- Completion ring -->
         <div class="vp-ring" role="img" :aria-label="`Profile ${completion}% complete`" :style="{ '--p': completion }">
-          <b>{{ completion }}%</b>
-          <small>complete</small>
+          <span class="vp-ring-text"><b>{{ completion }}%</b><small>complete</small></span>
         </div>
       </div>
 
@@ -65,7 +64,7 @@
     <div class="vp-layout">
       <!-- ══════════ Settings menu ══════════ -->
       <nav class="vp-nav" aria-label="Profile settings">
-        <button v-for="t in TABS" :key="t.key" type="button" class="vp-nav-item" :class="{ on: activeTab === t.key }" :aria-current="activeTab === t.key ? 'page' : undefined" @click="t.to ? router.push(t.to) : (activeTab = t.key)">
+        <button v-for="t in TABS" :key="t.key" type="button" class="vp-nav-item" :class="{ on: activeTab === t.key }" :aria-current="activeTab === t.key ? 'page' : undefined" @click="t.to ? router.push(t.to) : openTab(t.key)">
           <span class="vp-nav-icon" v-html="ICONS[t.icon]"></span>
           <span class="vp-nav-text"><b>{{ t.label }}</b><small>{{ t.hint }}</small></span>
           <span v-if="t.todo && !profileData[t.todo]" class="vp-nav-dot" aria-label="Needs details"></span>
@@ -84,16 +83,11 @@
         </section>
 
         <!-- ── Store profile ── -->
-        <form v-else-if="activeTab === 'general'" class="sp-card vp-card" novalidate @submit.prevent="updateGeneralInfo">
+        <form v-else-if="activeTab === 'general'" class="sp-card vp-card" novalidate @submit.prevent="saveActive">
           <header class="vp-card-head">
             <h2>Store profile</h2>
             <p>What customers see on your shop page.</p>
           </header>
-
-          <div v-if="generalForm.successMsg" class="sp-banner success vp-banner" role="status">
-            <span v-html="ICONS.check"></span>{{ generalForm.successMsg }}
-            <button type="button" aria-label="Dismiss" @click="generalForm.successMsg = ''" v-html="ICONS.close"></button>
-          </div>
           <div v-if="generalForm.errorMsg" class="sp-banner error vp-banner" role="alert">
             <span v-html="ICONS.alert"></span>{{ generalForm.errorMsg }}
             <button type="button" aria-label="Dismiss" @click="generalForm.errorMsg = ''" v-html="ICONS.close"></button>
@@ -102,16 +96,16 @@
           <fieldset class="vp-group">
             <legend><span v-html="ICONS.store"></span>Your shop</legend>
             <div class="sp-grid-2">
-              <label class="sp-field">
+              <label class="sp-field" data-change="store_name">
                 <span>Store name</span>
                 <input v-model="formData.general.store_name" class="sp-input" :class="{ invalid: generalForm.errors.store_name }" placeholder="Your store name" required @input="generalForm.clearError('store_name')" />
                 <small v-if="generalForm.errors.store_name" class="sp-error">{{ generalForm.errors.store_name }}</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="operating_hours">
                 <span>Operating hours</span>
                 <input v-model="formData.general.operating_hours" class="sp-input" placeholder="Mon–Fri, 9 AM – 6 PM" />
               </label>
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="store_description">
                 <span>About your shop <em class="vp-count">{{ (formData.general.store_description || "").length }}</em></span>
                 <textarea v-model="formData.general.store_description" class="sp-textarea" rows="4" placeholder="What you make, what makes it special, who you make it for…"></textarea>
               </label>
@@ -121,17 +115,17 @@
           <fieldset class="vp-group">
             <legend><span v-html="ICONS.pin"></span>Location &amp; contact</legend>
             <div class="sp-grid-2">
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="store_address">
                 <span>Store address</span>
                 <input v-model="formData.general.store_address" class="sp-input" :class="{ invalid: generalForm.errors.store_address }" placeholder="Street, barangay, city" required @input="generalForm.clearError('store_address')" />
                 <small v-if="generalForm.errors.store_address" class="sp-error">{{ generalForm.errors.store_address }}</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="contact_number">
                 <span>Contact number</span>
                 <div class="vp-affix"><i v-html="ICONS.phone"></i><input v-model="formData.general.contact_number" v-phone type="tel" class="sp-input" :class="{ invalid: generalForm.errors.contact_number }" required @input="generalForm.clearError('contact_number')" /></div>
                 <small v-if="generalForm.errors.contact_number" class="sp-error">{{ generalForm.errors.contact_number }}</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="service_areas">
                 <span>Areas you deliver to</span>
                 <input v-model="formData.general.service_areas" class="sp-input" placeholder="e.g. Manila, Quezon City" />
               </label>
@@ -141,12 +135,12 @@
           <fieldset class="vp-group">
             <legend><span v-html="ICONS.user"></span>Owner</legend>
             <div class="sp-grid-2">
-              <label class="sp-field">
+              <label class="sp-field" data-change="owner_name">
                 <span>Owner name</span>
                 <input v-model="formData.general.owner_name" class="sp-input" :class="{ invalid: generalForm.errors.owner_name }" placeholder="Your full name" required @input="generalForm.clearError('owner_name')" />
                 <small v-if="generalForm.errors.owner_name" class="sp-error">{{ generalForm.errors.owner_name }}</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="position">
                 <span>Your role</span>
                 <input v-model="formData.general.position" class="sp-input" placeholder="Owner, manager…" />
               </label>
@@ -156,40 +150,30 @@
           <fieldset class="vp-group">
             <legend><span v-html="ICONS.globe"></span>Social pages <em>optional</em></legend>
             <div class="sp-grid-2">
-              <label class="sp-field">
+              <label class="sp-field" data-change="facebook_page">
                 <span>Facebook</span>
                 <div class="vp-affix"><i class="vp-affix-text">fb</i><input v-model="formData.general.facebook_page" type="url" class="sp-input" placeholder="https://facebook.com/yourpage" /></div>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="instagram_page">
                 <span>Instagram</span>
                 <div class="vp-affix"><i class="vp-affix-text">ig</i><input v-model="formData.general.instagram_page" type="url" class="sp-input" placeholder="https://instagram.com/yourpage" /></div>
               </label>
             </div>
           </fieldset>
-
-          <footer class="vp-save">
-            <p>Changes show on your shop page once saved.</p>
-            <button type="submit" class="sp-btn sp-btn-primary" :disabled="generalForm.isSubmitting">{{ generalForm.isSubmitting ? "Saving…" : "Save changes" }}</button>
-          </footer>
         </form>
 
         <!-- ── Payouts ── -->
-        <form v-else-if="activeTab === 'payment'" class="sp-card vp-card" novalidate @submit.prevent="updatePaymentDetails">
+        <form v-else-if="activeTab === 'payment'" class="sp-card vp-card" novalidate @submit.prevent="saveActive">
           <header class="vp-card-head">
             <h2>Payouts</h2>
             <p>Where we send the money from your sales.</p>
           </header>
-
-          <div v-if="paymentForm.successMsg" class="sp-banner success vp-banner" role="status">
-            <span v-html="ICONS.check"></span>{{ paymentForm.successMsg }}
-            <button type="button" aria-label="Dismiss" @click="paymentForm.successMsg = ''" v-html="ICONS.close"></button>
-          </div>
           <div v-if="paymentForm.errorMsg" class="sp-banner error vp-banner" role="alert">
             <span v-html="ICONS.alert"></span>{{ paymentForm.errorMsg }}
             <button type="button" aria-label="Dismiss" @click="paymentForm.errorMsg = ''" v-html="ICONS.close"></button>
           </div>
 
-          <fieldset class="vp-group">
+          <fieldset class="vp-group" data-change="payout_method">
             <legend><span v-html="ICONS.wallet"></span>Payout method</legend>
             <div class="vp-choices" role="radiogroup" aria-label="Payout method">
               <label v-for="m in PAYOUT_METHODS" :key="m.value" class="vp-choice" :class="{ on: formData.payment.payout_method === m.value }">
@@ -205,22 +189,22 @@
           <fieldset class="vp-group">
             <legend><span v-html="ICONS.card"></span>Account</legend>
             <div class="sp-grid-2">
-              <label class="sp-field">
+              <label class="sp-field" data-change="account_holder_name">
                 <span>Account holder name</span>
                 <input v-model="formData.payment.account_holder_name" class="sp-input" :class="{ invalid: paymentForm.errors.account_holder_name }" placeholder="Full name on the account" required @input="paymentForm.clearError('account_holder_name')" />
                 <small v-if="paymentForm.errors.account_holder_name" class="sp-error">{{ paymentForm.errors.account_holder_name }}</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="bank_name">
                 <span>{{ formData.payment.payout_method === "bank" ? "Bank" : "Provider" }}</span>
                 <input v-model="formData.payment.bank_name" class="sp-input" :class="{ invalid: paymentForm.errors.bank_name }" :placeholder="formData.payment.payout_method === 'bank' ? 'e.g. BDO, BPI, Metrobank' : 'e.g. GCash, Maya'" required @input="paymentForm.clearError('bank_name')" />
                 <small v-if="paymentForm.errors.bank_name" class="sp-error">{{ paymentForm.errors.bank_name }}</small>
               </label>
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="account_number">
                 <span>{{ formData.payment.payout_method === "bank" ? "Account number" : "Account or mobile number" }}</span>
                 <input v-model="formData.payment.account_number" class="sp-input" :class="{ invalid: paymentForm.errors.account_number }" inputmode="numeric" autocomplete="off" required @input="paymentForm.clearError('account_number')" />
                 <small v-if="paymentForm.errors.account_number" class="sp-error">{{ paymentForm.errors.account_number }}</small>
               </label>
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="billing_address">
                 <span>Billing address</span>
                 <textarea v-model="formData.payment.billing_address" class="sp-textarea" rows="3" placeholder="Complete billing address" required></textarea>
                 <small v-if="paymentForm.errors.billing_address" class="sp-error">{{ paymentForm.errors.billing_address }}</small>
@@ -229,30 +213,20 @@
           </fieldset>
 
           <p class="vp-note"><span v-html="ICONS.lock"></span>Stored securely. Only used to send your payouts and to let customers pay you.</p>
-
-          <footer class="vp-save">
-            <p>We'll use these details for your next payout.</p>
-            <button type="submit" class="sp-btn sp-btn-primary" :disabled="paymentForm.isSubmitting">{{ paymentForm.isSubmitting ? "Saving…" : "Save payout details" }}</button>
-          </footer>
         </form>
 
         <!-- ── Products & pricing ── -->
-        <form v-else-if="activeTab === 'product'" class="sp-card vp-card" novalidate @submit.prevent="updateProductDetails">
+        <form v-else-if="activeTab === 'product'" class="sp-card vp-card" novalidate @submit.prevent="saveActive">
           <header class="vp-card-head">
             <h2>Products &amp; pricing</h2>
             <p>What you sell and your usual price range.</p>
           </header>
-
-          <div v-if="productForm.successMsg" class="sp-banner success vp-banner" role="status">
-            <span v-html="ICONS.check"></span>{{ productForm.successMsg }}
-            <button type="button" aria-label="Dismiss" @click="productForm.successMsg = ''" v-html="ICONS.close"></button>
-          </div>
           <div v-if="productForm.errorMsg" class="sp-banner error vp-banner" role="alert">
             <span v-html="ICONS.alert"></span>{{ productForm.errorMsg }}
             <button type="button" aria-label="Dismiss" @click="productForm.errorMsg = ''" v-html="ICONS.close"></button>
           </div>
 
-          <fieldset class="vp-group">
+          <fieldset class="vp-group" data-change="product_types">
             <legend><span v-html="ICONS.flower"></span>What you sell <em>{{ formData.product.product_types.length }} picked</em></legend>
             <div class="vp-chips">
               <label v-for="type in productTypeOptions" :key="type.value" class="vp-chip" :class="{ on: formData.product.product_types.includes(type.value) }">
@@ -266,12 +240,12 @@
           <fieldset class="vp-group">
             <legend><span v-html="ICONS.tag"></span>Price range</legend>
             <div class="sp-grid-2">
-              <label class="sp-field">
+              <label class="sp-field" data-change="price_min">
                 <span>From</span>
                 <div class="vp-affix"><i class="vp-affix-text">₱</i><input v-model.number="formData.product.price_min" type="number" step="0.01" min="0" class="sp-input" :class="{ invalid: productForm.errors.price_min }" placeholder="500.00" required @input="productForm.clearError('price_min')" /></div>
                 <small v-if="productForm.errors.price_min" class="sp-error">{{ productForm.errors.price_min }}</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="price_max">
                 <span>Up to</span>
                 <div class="vp-affix"><i class="vp-affix-text">₱</i><input v-model.number="formData.product.price_max" type="number" step="0.01" :min="formData.product.price_min || 0" class="sp-input" :class="{ invalid: productForm.errors.price_max }" placeholder="5,000.00" required @input="productForm.clearError('price_max')" /></div>
                 <small v-if="productForm.errors.price_max" class="sp-error">{{ productForm.errors.price_max }}</small>
@@ -279,7 +253,7 @@
             </div>
           </fieldset>
 
-          <fieldset class="vp-group">
+          <fieldset class="vp-group" data-change="same_day_delivery">
             <legend><span v-html="ICONS.truck"></span>Same-day delivery</legend>
             <div class="vp-choices two" role="radiogroup" aria-label="Same-day delivery">
               <label class="vp-choice" :class="{ on: formData.product.same_day_delivery === true }">
@@ -297,7 +271,7 @@
             </div>
           </fieldset>
 
-          <fieldset class="vp-group">
+          <fieldset class="vp-group" data-change="cutoff_times">
             <legend><span v-html="ICONS.clock"></span>Order cutoff times <em>optional</em></legend>
             <p class="vp-group-hint">The latest time customers can order on each day.</p>
             <ul v-if="formData.product.cutoff_times.length" class="vp-cutoffs">
@@ -312,11 +286,6 @@
             </ul>
             <button type="button" class="vp-add" @click="addCutoffTime"><span v-html="ICONS.plus"></span>Add a cutoff day</button>
           </fieldset>
-
-          <footer class="vp-save">
-            <p>Shown to customers when they browse and order.</p>
-            <button type="submit" class="sp-btn sp-btn-primary" :disabled="productForm.isSubmitting">{{ productForm.isSubmitting ? "Saving…" : "Save product details" }}</button>
-          </footer>
         </form>
       </div>
     </div>
@@ -360,6 +329,8 @@ import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
 import { toast } from "@/utils/snackbar";
 import { useFormSubmit } from "../../composables/useFormSubmit";
 import { useVendorProfile } from "../../composables/useVendorProfile";
+import { guardUnsaved, useUnsavedChanges } from "../../composables/useUnsavedChanges";
+import { formatPhone } from "../../utils/phone";
 
 const router = useRouter();
 const route = useRoute();
@@ -527,6 +498,92 @@ const onNewPasswordInput = () => {
   passwordForm.clearError("password_confirmation");
 };
 
+// ── Forms ← saved profile ─────────────────────────────────────────────────
+// Copies (never the saved arrays themselves), so editing a form can't change
+// what's saved, and Discard can put the saved values back.
+const FORM_FILLERS = {
+  general: (data) => ({
+    store_name: data.store_name || "",
+    owner_name: data.owner_name || "",
+    store_description: data.store_description || "",
+    store_address: data.store_address || "",
+    // Formatted like the phone field shows it, so loading never looks like an edit
+    contact_number: data.contact_number ? formatPhone(data.contact_number) : "",
+    service_areas: data.service_areas || "",
+    operating_hours: data.operating_hours || "",
+    position: data.position || "",
+    facebook_page: data.facebook_page || "",
+    instagram_page: data.instagram_page || "",
+  }),
+  payment: (data) => ({
+    payout_method: data.payout_method || "",
+    account_holder_name: data.account_holder_name || "",
+    account_number: data.decrypted_account_number || "",
+    bank_name: data.bank_name || "",
+    billing_address: data.billing_address || "",
+  }),
+  product: (data) => ({
+    product_types: Array.isArray(data.product_types) ? [...data.product_types] : [],
+    price_min: data.price_min || null,
+    price_max: data.price_max || null,
+    same_day_delivery: data.same_day_delivery ?? null,
+    cutoff_times: Array.isArray(data.cutoff_times) ? data.cutoff_times.map((c) => ({ day: c?.day || "", time: c?.time || "" })) : [],
+  }),
+};
+function fillForms(data, parts = Object.keys(FORM_FILLERS)) {
+  for (const part of parts) formData[part] = FORM_FILLERS[part](data);
+}
+
+// ── Unsaved changes: the shared bottom bar (View changes · Discard · Save) ──
+// Each field is found on the page by its data-change key, so View changes can jump to it.
+const FIELD_LABELS = {
+  general: {
+    store_name: "Store name", operating_hours: "Operating hours", store_description: "About your shop",
+    store_address: "Store address", contact_number: "Contact number", service_areas: "Delivery areas",
+    owner_name: "Owner name", position: "Your role", facebook_page: "Facebook", instagram_page: "Instagram",
+  },
+  payment: {
+    payout_method: "Payout method", account_holder_name: "Account holder", bank_name: "Bank or provider",
+    account_number: "Account number", billing_address: "Billing address",
+  },
+  product: {
+    product_types: "What you sell", price_min: "Lowest price", price_max: "Highest price",
+    same_day_delivery: "Same-day delivery", cutoff_times: "Order cutoff times",
+  },
+};
+const SAVERS = { general: () => updateGeneralInfo(), payment: () => updatePaymentDetails(), product: () => updateProductDetails() };
+const copy = (v) => JSON.parse(JSON.stringify(v ?? null));
+// What each form held when last loaded or saved; Discard puts it back
+const savedForms = {};
+
+const { markClean } = useUnsavedChanges({
+  fields: () =>
+    Object.entries(FIELD_LABELS).flatMap(([part, labels]) =>
+      Object.entries(labels).map(([key, label]) => ({ key: `${part}.${key}`, label, value: formData[part]?.[key], target: `[data-change~="${key}"]` })),
+    ),
+  save: saveActive,
+  discard: () => {
+    for (const part of Object.keys(FIELD_LABELS)) if (savedForms[part]) formData[part] = copy(savedForms[part]);
+    [generalForm, paymentForm, productForm].forEach((f) => f.reset?.());
+  },
+  saving: () => generalForm.isSubmitting || paymentForm.isSubmitting || productForm.isSubmitting,
+  enabled: () => !isLoading.value,
+});
+
+/** Remember what's on screen as saved, so the bar goes away */
+function settleForms() {
+  for (const part of Object.keys(FIELD_LABELS)) savedForms[part] = copy(formData[part]);
+  markClean();
+}
+/** Save the open section; the bar stays if it didn't go through */
+async function saveActive() {
+  const ok = await SAVERS[activeTab.value]?.();
+  if (ok) settleForms();
+  return ok;
+}
+/** Switching sections first asks to save or discard what's unsaved */
+const openTab = (key) => guardUnsaved(() => (activeTab.value = key));
+
 // ── Fetch profile ─────────────────────────────────────────────────────────
 const fetchProfile = async () => {
   try {
@@ -536,34 +593,8 @@ const fetchProfile = async () => {
       const data = response.data.data;
       Object.assign(profileData, data);
       updateLocalProfile(data);
-      formData.general = {
-        store_name: data.store_name || "",
-        owner_name: data.owner_name || "",
-        store_description: data.store_description || "",
-        store_address: data.store_address || "",
-        contact_number: data.contact_number || "",
-        service_areas: data.service_areas || "",
-        operating_hours: data.operating_hours || "",
-        position: data.position || "",
-        facebook_page: data.facebook_page || "",
-        instagram_page: data.instagram_page || "",
-      };
-      formData.payment = {
-        payout_method: data.payout_method || "",
-        account_holder_name: data.account_holder_name || "",
-        account_number: data.decrypted_account_number || "",
-        bank_name: data.bank_name || "",
-        billing_address: data.billing_address || "",
-      };
-      formData.product = {
-        product_types: Array.isArray(data.product_types)
-          ? data.product_types
-          : [],
-        price_min: data.price_min || null,
-        price_max: data.price_max || null,
-        same_day_delivery: data.same_day_delivery ?? null,
-        cutoff_times: Array.isArray(data.cutoff_times) ? data.cutoff_times : [],
-      };
+      fillForms(data);
+      settleForms();
       formData.delivery = {
         delivery_handled_by: "self",
         max_orders_per_day: data.max_orders_per_day || null,
@@ -660,17 +691,17 @@ const updatePaymentDetails = () =>
 const updateProductDetails = () => {
   if (!formData.product.product_types.length) {
     toast.error("Please select at least one product type");
-    return;
+    return false;
   }
   if (!formData.product.price_min || !formData.product.price_max) {
     toast.error("Please enter both minimum and maximum prices");
-    return;
+    return false;
   }
   if (formData.product.price_max < formData.product.price_min) {
     toast.error("Maximum price must be ≥ minimum price");
-    return;
+    return false;
   }
-  productForm.submit(
+  return productForm.submit(
     () =>
       api.put("/vendor/profile/product-details", {
         product_types: Array.isArray(formData.product.product_types)
@@ -801,8 +832,8 @@ const initials = computed(() => {
 });
 const completion = computed(() => Math.max(0, Math.min(100, Math.round(Number(profileData.profile_completion_percentage) || 0))));
 const steps = computed(() => [
-  { key: "payment", label: "Payouts", icon: "wallet", done: !!profileData.payment_details_completed, go: () => (activeTab.value = "payment") },
-  { key: "product", label: "Products & pricing", icon: "flower", done: !!profileData.product_details_completed, go: () => (activeTab.value = "product") },
+  { key: "payment", label: "Payouts", icon: "wallet", done: !!profileData.payment_details_completed, go: () => openTab("payment") },
+  { key: "product", label: "Products & pricing", icon: "flower", done: !!profileData.product_details_completed, go: () => openTab("product") },
   { key: "delivery", label: "Delivery", icon: "truck", done: !!profileData.delivery_details_completed, go: () => router.push({ name: "VendorShopSettings" }) },
 ]);
 
@@ -1089,11 +1120,10 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   --p: 0;
   flex: none;
   position: relative;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  width: 76px;
-  height: 76px;
+  display: block;
+  align-self: center;
+  width: 78px;
+  height: 78px;
   border-radius: 50%;
   background: conic-gradient(var(--bc-accent) calc(var(--p) * 1%), var(--v-subtle-2) 0);
 }
@@ -1104,12 +1134,25 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   border-radius: 50%;
   background: var(--v-surface);
 }
+/* Text on its own layer filling the ring, centred both ways */
+.vp-ring-text {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  text-align: center;
+}
 .vp-ring b,
 .vp-ring small {
-  position: relative;
+  display: block;
   line-height: 1.1;
 }
 .vp-ring b {
+  font-variant-numeric: tabular-nums;
   font-size: 17px;
   font-weight: 700;
   color: var(--v-text);
@@ -1286,9 +1329,14 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 
 .vp-panel {
   min-width: 0;
+  /* Room for the unsaved-changes bar, so it never covers the last field */
+  padding-bottom: 88px;
 }
 .vp-card {
-  padding: 22px 22px 0;
+  padding: 22px 22px 4px;
+}
+.vp-group:last-of-type {
+  margin-bottom: 18px;
 }
 .vp-card-head {
   margin-bottom: 18px;
@@ -1586,29 +1634,6 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   color: var(--bc-accent-deep);
 }
 
-/* Save bar, stuck to the bottom of the card while scrolling */
-.vp-save {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 -22px;
-  padding: 14px 22px;
-  border-top: 1px solid var(--v-border);
-  border-radius: 0 0 16px 16px;
-  background: color-mix(in srgb, var(--v-surface) 92%, transparent);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-.vp-save p {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--v-muted);
-}
-
 /* Upload modal */
 .vp-upload {
   max-width: 520px;
@@ -1739,16 +1764,7 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
     padding: 12px 16px 16px;
   }
   .vp-card {
-    padding: 18px 16px 0;
-  }
-  .vp-save {
-    margin: 0 -16px;
-    padding: 12px 16px;
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .vp-save .sp-btn {
-    width: 100%;
+    padding: 18px 16px 4px;
   }
   .vp-cutoffs li {
     grid-template-columns: minmax(0, 1fr) 120px auto;
