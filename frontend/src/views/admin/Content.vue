@@ -771,14 +771,18 @@ const settingsForm = ({ url, defaults, noun, savedMessage, onApply }) => {
     onApply?.();
   };
   const reset = () => Object.assign(values, saved.value);
+  // `loaded` goes true before apply(): the unsaved-changes bar only lists
+  // these fields once loaded, so marking them clean any earlier records
+  // nothing and every field then reads as changed on open.
   const load = async () => {
+    let data = {};
     try {
-      apply((await api.get(url)).data.data);
+      data = (await api.get(url)).data.data;
     } catch {
       toast.error(`${noun} settings couldn't be loaded. Try refreshing.`);
-    } finally {
-      loaded.value = true;
     }
+    loaded.value = true;
+    apply(data);
   };
   const save = async () => {
     const seconds = Math.round(Number(values.seconds));
@@ -984,13 +988,15 @@ const applyTagRules = (data) => {
 };
 const resetTagRules = () => Object.assign(tagRules, copyRules(savedTagRules.value));
 async function loadTagRules() {
+  // tagsLoaded first, so markClean() in applyTagRules sees the tag fields
+  let data = {};
   try {
-    applyTagRules((await api.get("/admin/content/product-tags")).data.data);
+    data = (await api.get("/admin/content/product-tags")).data.data;
   } catch {
     toast.error("The tag rules couldn't be loaded. Try refreshing.");
-  } finally {
-    tagsLoaded.value = true;
   }
+  tagsLoaded.value = true;
+  applyTagRules(data);
 }
 // The counts follow the numbers as they change, before saving
 let tagPreviewTimer = 0;
