@@ -154,10 +154,10 @@ class SupplyChainDashboardTest extends TestCase
         $old = DB::table('warehouse_batches')->insertGetId(['owner_id' => $vendor->id, 'product_id' => $rose, 'warehouse_location_id' => $cooler, 'qty_remaining' => 12, 'expiration_date' => '2026-10-18', 'batch_number' => 'B-OLD']);
         DB::table('warehouse_batches')->insert(['owner_id' => $vendor->id, 'product_id' => $rose, 'warehouse_location_id' => $cooler, 'qty_remaining' => 30, 'expiration_date' => '2026-10-21']);
 
-        // Wastage: 8 culled this month, 5 last month
+        // Wastage: 8 culled this month, 5 in the 20 days before it
         DB::table('warehouse_batch_logs')->insert([
             ['warehouse_batch_id' => $old, 'event_type' => 'CULLED', 'qty_change' => -8, 'created_at' => '2026-10-10 12:00:00'],
-            ['warehouse_batch_id' => $old, 'event_type' => 'CULLED', 'qty_change' => -5, 'created_at' => '2026-09-10 12:00:00'],
+            ['warehouse_batch_id' => $old, 'event_type' => 'CULLED', 'qty_change' => -5, 'created_at' => '2026-09-20 12:00:00'],
             ['warehouse_batch_id' => $old, 'event_type' => 'TRANSFERRED', 'qty_change' => 0, 'created_at' => '2026-10-11 12:00:00'],
         ]);
 
@@ -167,7 +167,9 @@ class SupplyChainDashboardTest extends TestCase
         $this->assertSame(3, $d['orders']['open']);
         $this->assertEquals(5000, $d['orders']['open_value']);
         $this->assertSame(1, $d['orders']['on_the_way']);
-        $this->assertCount(30, $d['orders']['per_day']);
+        // This month so far: 1 to 20 October
+        $this->assertSame('month', $d['period']);
+        $this->assertCount(20, $d['orders']['per_day']);
 
         // On the road first, then the one being prepared; the waiting one isn't incoming yet
         $this->assertSame([$road], [$d['incoming'][0]['id']]);
@@ -208,9 +210,10 @@ class SupplyChainDashboardTest extends TestCase
             'owner_id' => $vendor->id, 'employee_id' => $staff->id, 'module' => 'sc_dashboard',
             'permission' => 'view', 'access' => 'granular', 'created_at' => now(), 'updated_at' => now(),
         ]);
-        $this->signIn($staff)->getJson('/api/procurement/supply-chain/analytics/dashboard?days=7')
+        $this->signIn($staff)->getJson('/api/procurement/supply-chain/analytics/dashboard?period=today')
             ->assertOk()
-            ->assertJsonPath('data.period_days', 7)
+            ->assertJsonPath('data.period', 'today')
+            ->assertJsonPath('data.period_days', 1)
             ->assertJsonPath('data.orders.total', 0);
     }
 }

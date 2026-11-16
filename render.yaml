@@ -1,20 +1,19 @@
 services:
   - type: web
     name: flower-3d-backend
-    env: php
+    # Render has no PHP runtime: the site runs from backend/Dockerfile (Apache
+    # on port 10000), which also migrates and seeds the admin on start
+    runtime: docker
+    plan: free
     rootDir: backend
-    buildCommand: >
-      composer install --no-interaction --prefer-dist --optimize-autoloader &&
-      php artisan optimize:clear &&
-      php artisan config:clear &&
-      php artisan route:clear &&
-      php artisan view:clear &&
-      php artisan migrate --force &&
-      php artisan db:seed --class=AdminSeeder --force
-    startCommand: php artisan serve --host=0.0.0.0 --port=$PORT
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     envVars:
       - key: APP_ENV
         value: production
+      # Never show stack traces to visitors
+      - key: APP_DEBUG
+        value: "false"
       # Secret: must be the same base64 key as backend/.env (both use one database;
       # it signs badge/leave QR codes and encrypts leave sessions). Set it in the dashboard.
       - key: APP_KEY

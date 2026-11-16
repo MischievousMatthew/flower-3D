@@ -79,7 +79,7 @@ class AuthSecurityTest extends TestCase
 
         // 20 tries a minute, each one staff sign-in then customer sign-in, spread over many accounts
         foreach (range(1, 20) as $i) {
-            $this->postJson('/api/auth/employee-login', ['username' => "someone{$i}", 'password' => 'guess'])->assertStatus(401);
+            $this->postJson('/api/auth/employee-login', ['username' => "someone{$i}", 'password' => 'guess'])->assertOk()->assertJson(['code' => 'not_staff']);
             $this->postJson('/api/auth/login', ['username' => "someone{$i}", 'password' => 'guess'])->assertStatus(422);
         }
         $this->postJson('/api/auth/login', ['username' => 'ana', 'password' => 'Secret-pass1'])
@@ -244,7 +244,7 @@ class AuthSecurityTest extends TestCase
         \App\Support\PlatformSettings::save(['login_ip_per_minute' => 10]);
 
         foreach (range(1, 10) as $i) {
-            $this->postJson('/api/auth/employee-login', ['username' => "someone{$i}", 'password' => 'guess'])->assertStatus(401);
+            $this->postJson('/api/auth/employee-login', ['username' => "someone{$i}", 'password' => 'guess'])->assertOk()->assertJson(['code' => 'not_staff']);
             $this->postJson('/api/auth/login', ['username' => "someone{$i}", 'password' => 'guess'])->assertStatus(422);
         }
         $this->postJson('/api/auth/login', ['username' => 'someone', 'password' => 'guess'])->assertStatus(429);

@@ -103,7 +103,7 @@ class LoginTroublesTest extends TestCase
     {
         $this->customer();
         // What the login form does: staff sign-in, then customer sign-in
-        $this->postJson('/api/auth/employee-login', ['username' => 'ana', 'password' => 'nope'])->assertStatus(401);
+        $this->postJson('/api/auth/employee-login', ['username' => 'ana', 'password' => 'nope'])->assertOk()->assertJson(['code' => 'not_staff']);
         $this->login('nope')->assertJson(['code' => 'invalid_credentials']);
         $this->assertSame(1, DB::table('login_attempts')->where('reason', 'wrong_password')->count());
     }
@@ -115,7 +115,7 @@ class LoginTroublesTest extends TestCase
         DB::table('employees')->insert(['name' => 'Ana', 'username' => 'ana', 'email' => 'ana.staff@shop.test', 'password' => Hash::make('Staff-pass1'), 'status' => 'Active']);
 
         foreach ([4, 3, 2] as $left) {
-            $this->postJson('/api/auth/employee-login', ['username' => 'ana', 'password' => 'nope'])->assertStatus(401);
+            $this->postJson('/api/auth/employee-login', ['username' => 'ana', 'password' => 'nope'])->assertOk()->assertJson(['code' => 'not_staff']);
             $this->login('nope')->assertJson(['code' => 'invalid_credentials', 'attempts_left' => $left]);
         }
         $this->assertSame(3, DB::table('login_attempts')->where('reason', 'wrong_password')->count());
@@ -125,7 +125,7 @@ class LoginTroublesTest extends TestCase
     {
         DB::table('employees')->insert(['name' => 'Ben', 'username' => 'ben', 'email' => 'ben@shop.test', 'password' => Hash::make('Staff-pass1'), 'status' => 'Active']);
 
-        $this->postJson('/api/auth/employee-login', ['username' => 'ben', 'password' => 'nope'])->assertStatus(401);
+        $this->postJson('/api/auth/employee-login', ['username' => 'ben', 'password' => 'nope'])->assertOk()->assertJson(['code' => 'not_staff']);
         $this->assertSame(1, DB::table('login_attempts')->where('reason', 'wrong_password')->count());
     }
 
@@ -140,7 +140,7 @@ class LoginTroublesTest extends TestCase
     {
         DB::table('employees')->insert(['name' => 'Ben', 'username' => 'ben', 'email' => 'ben@shop.test', 'password' => Hash::make('Staff-pass1'), 'status' => 'Inactive']);
 
-        $this->postJson('/api/auth/employee-login', ['username' => 'ben', 'password' => 'wrong'])->assertStatus(401)->assertJsonMissing(['code' => 'account_inactive']);
+        $this->postJson('/api/auth/employee-login', ['username' => 'ben', 'password' => 'wrong'])->assertOk()->assertJson(['code' => 'not_staff'])->assertJsonMissing(['code' => 'account_inactive']);
         $this->postJson('/api/auth/employee-login', ['username' => 'ben', 'password' => 'Staff-pass1'])
             ->assertStatus(403)->assertJson(['code' => 'account_inactive'])->assertJsonMissingPath('token');
     }

@@ -33,9 +33,20 @@ class InventoryReplenishmentTest extends TestCase
         $this->createPayrollTables();
         $this->createFinanceTables();
         $this->createPurchasingTables();
-        foreach (['warehouse_batch_logs', 'product_stock_adjustments'] as $t) {
+        foreach (['warehouse_batch_logs', 'product_stock_adjustments', 'product_images'] as $t) {
             Schema::dropIfExists($t);
         }
+        // The stock list shows each item's photo
+        Schema::create('product_images', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('owner_id')->nullable();
+            $t->unsignedBigInteger('product_id');
+            $t->string('image_url')->nullable();
+            $t->string('image_path')->nullable();
+            $t->boolean('is_primary')->default(false);
+            $t->integer('display_order')->default(0);
+            $t->timestamps();
+        });
         Schema::table('products', function (Blueprint $t) {
             $t->string('description')->nullable();
             $t->string('category')->nullable();

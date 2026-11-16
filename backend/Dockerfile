@@ -56,9 +56,11 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 # Expose Render's required port
 EXPOSE 10000
 
-# Start: clear cache, migrate, seed, then start Apache
+# Start: clear cache, migrate, seed, then start Apache. The free plan has no
+# pre-deploy step, so migrations run here; if one fails, Apache never starts
+# and Render keeps the previous version live instead of a half-migrated one.
 CMD php artisan config:clear \
-    && APP_DEBUG=true php artisan migrate --force \
+    && php artisan migrate --force \
     && php artisan db:seed --class=AdminSeeder --force \
     && php artisan cache:clear \
     && apache2-foreground
