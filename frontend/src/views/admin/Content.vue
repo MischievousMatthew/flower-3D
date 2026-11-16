@@ -411,6 +411,13 @@
         </header>
 
         <form id="editor-form" class="drawer-body" @submit.prevent="saveEditor">
+          <!-- Announcement / promotion switch: first, so it stays put while
+               the promotion-only image appears and disappears below it -->
+          <div v-if="editor.type === 'announcement' && !editor.reviewing" class="seg wide">
+            <button type="button" class="seg-btn" :class="{ active: form.kind === 'announcement' }" :aria-pressed="form.kind === 'announcement'" @click="form.kind = 'announcement'">Announcement</button>
+            <button type="button" class="seg-btn" :class="{ active: form.kind === 'promotion' }" :aria-pressed="form.kind === 'promotion'" @click="form.kind = 'promotion'">Promotion</button>
+          </div>
+
           <!-- Image -->
           <div v-if="!(editor.type === 'announcement' && (form.kind === 'announcement' || editor.reviewing))" class="image-field" :class="{ required: editor.type === 'banner' }">
             <span class="field-label">{{ editor.type === "article" ? "Cover photo" : editor.type === "banner" ? "Banner image *" : "Image (optional)" }}</span>
@@ -479,10 +486,6 @@
 
           <!-- Announcement / promotion -->
           <template v-else-if="editor.type === 'announcement'">
-            <div class="seg wide">
-              <button type="button" class="seg-btn" :class="{ active: form.kind === 'announcement' }" @click="form.kind = 'announcement'">Announcement</button>
-              <button type="button" class="seg-btn" :class="{ active: form.kind === 'promotion' }" @click="form.kind = 'promotion'">Promotion</button>
-            </div>
             <label class="field"><span>Title *</span><input v-model="form.title" class="input" maxlength="120" required :placeholder="form.kind === 'promotion' ? 'e.g. Mother\'s Day pre-orders' : 'e.g. Free delivery this weekend'" /></label>
             <label class="field"><span>Message</span><textarea v-model="form.message" class="input" rows="2" maxlength="300"></textarea></label>
             <label v-if="form.kind === 'promotion'" class="field">
