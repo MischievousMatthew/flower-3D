@@ -81,6 +81,27 @@ class OrderScannerTest extends TestCase
         $this->assertSame('to_received', DB::table('deliveries')->where('id', $id)->value('status'));
     }
 
+    public function test_the_shop_can_open_an_order_with_a_custom_bouquet(): void
+    {
+        $vendor = $this->shopOwner();
+        $orderId = DB::table('deliveries')->where('id', $this->delivery($vendor))->value('order_id');
+        Schema::table('order_items', function (Blueprint $t) {
+            foreach (['product_image', 'color', 'size', 'notes', 'customizations', 'model_3d_url'] as $column) {
+                $t->text($column)->nullable();
+            }
+        });
+        DB::table('order_items')->insert([
+            'order_id' => $orderId, 'product_id' => null, 'product_name' => 'Custom bouquet', 'quantity' => 1,
+            'unit_price' => 500, 'subtotal' => 500, 'customizations' => json_encode(['type' => 'custom_flower_bouquet']),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->signIn($vendor);
+
+        $this->getJson("/api/vendor/fulfillment/orders/{$orderId}")
+            ->assertOk()
+            ->assertJsonPath('data.items.0.is_custom_bouquet', true);
+    }
+
     public function test_another_shops_order_cant_be_scanned(): void
     {
         $other = $this->shopOwner();

@@ -182,7 +182,7 @@ class VendorFulfillmentController extends Controller
         }
         $application = VendorApplication::findApprovedForVendorUser($order->vendor);
 
-        $items = $order->items->map(function ($item) {
+        $items = $order->items->map(function ($item) use ($order) {
             $custom = is_array($item->customizations) ? $item->customizations : (json_decode($item->customizations ?: '[]', true) ?: []);
             $model = $item->product?->models?->first();
             $modelUrl = $model?->model_path ? CloudinaryHelper::getUrl($model->model_path, 'raw') : ($model?->model_url ?: $item->model_3d_url);
