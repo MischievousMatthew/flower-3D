@@ -209,7 +209,7 @@
             </div>
             <div class="vr-doc">
               <span class="vr-label">Selfie holding the ID</span>
-              <DocDrop field="selfie_with_id" label="selfie" hint="Your face and the ID both clear" accept=".jpg,.jpeg,.png,image/*" :info="fileInfo.selfie_with_id" :over="!!dragOver.selfie_with_id" :error="errors.selfie_with_id" @change="handleFileUpload($event, 'selfie_with_id')" @drop="handleDrop($event, 'selfie_with_id')" @dragenter="handleDragEnter($event, 'selfie_with_id')" @dragover="handleDragOver($event, 'selfie_with_id')" @dragleave="handleDragLeave($event, 'selfie_with_id')" @remove="removeFile('selfie_with_id')" />
+              <DocDrop field="selfie_with_id" label="selfie" hint="Your face and the ID both clear" accept=".jpg,.jpeg,.png,.webp,image/*" :info="fileInfo.selfie_with_id" :over="!!dragOver.selfie_with_id" :error="errors.selfie_with_id" @change="handleFileUpload($event, 'selfie_with_id')" @drop="handleDrop($event, 'selfie_with_id')" @dragenter="handleDragEnter($event, 'selfie_with_id')" @dragover="handleDragOver($event, 'selfie_with_id')" @dragleave="handleDragLeave($event, 'selfie_with_id')" @remove="removeFile('selfie_with_id')" />
             </div>
             <div class="vr-doc">
               <span class="vr-label">Proof of address</span>
@@ -321,7 +321,7 @@
           <div class="vr-docs two">
             <div class="vr-doc">
               <span class="vr-label">Logo</span>
-              <DocDrop field="store_logo" label="your logo" hint="Square works best · up to 12 MB" accept=".jpg,.jpeg,.png,image/*" :info="fileInfo.store_logo" :over="!!dragOver.store_logo" :error="errors.store_logo" @change="handleFileUpload($event, 'store_logo')" @drop="handleDrop($event, 'store_logo')" @dragenter="handleDragEnter($event, 'store_logo')" @dragover="handleDragOver($event, 'store_logo')" @dragleave="handleDragLeave($event, 'store_logo')" @remove="removeFile('store_logo')" />
+              <DocDrop field="store_logo" label="your logo" hint="Square works best · up to 12 MB" accept=".jpg,.jpeg,.png,.webp,image/*" :info="fileInfo.store_logo" :over="!!dragOver.store_logo" :error="errors.store_logo" @change="handleFileUpload($event, 'store_logo')" @drop="handleDrop($event, 'store_logo')" @dragenter="handleDragEnter($event, 'store_logo')" @dragover="handleDragOver($event, 'store_logo')" @dragleave="handleDragLeave($event, 'store_logo')" @remove="removeFile('store_logo')" />
             </div>
             <div class="vr-doc">
               <span class="vr-label">Sample work</span>
@@ -333,7 +333,7 @@
                   </button>
                 </figure>
                 <label class="vr-gallery-add" aria-label="Add sample photos" @dragover.prevent @drop.prevent="handleDrop($event, 'portfolio_photos')">
-                  <input ref="portfolio_photosInput" type="file" multiple accept=".jpg,.jpeg,.png,image/*" @change="handleFileUpload($event, 'portfolio_photos')" />
+                  <input ref="portfolio_photosInput" type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/*" @change="handleFileUpload($event, 'portfolio_photos')" />
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                   <span>Add</span>
                 </label>
@@ -1379,23 +1379,25 @@ const validateFile = (file, fieldName) => {
   const PDF_MAX = 10 * 1024 * 1024;
 
   const allowedTypes = {
-    government_id: ["image/jpeg", "image/jpg", "image/png", "application/pdf"],
-    selfie_with_id: ["image/jpeg", "image/jpg", "image/png"],
+    government_id: ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"],
+    selfie_with_id: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
     proof_of_address: [
       "image/jpeg",
       "image/jpg",
       "image/png",
+      "image/webp",
       "application/pdf",
     ],
     barangay_clearance: [
       "image/jpeg",
       "image/jpg",
       "image/png",
+      "image/webp",
       "application/pdf",
     ],
-    mayor_permit: ["image/jpeg", "image/jpg", "image/png", "application/pdf"],
-    store_logo: ["image/jpeg", "image/jpg", "image/png"],
-    portfolio_photos: ["image/jpeg", "image/jpg", "image/png"],
+    mayor_permit: ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"],
+    store_logo: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+    portfolio_photos: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
   };
 
   const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
@@ -1404,6 +1406,7 @@ const validateFile = (file, fieldName) => {
     "image/jpeg",
     "image/jpg",
     "image/png",
+    "image/webp",
     "application/pdf",
   ];
 
@@ -1429,6 +1432,7 @@ const validateFile = (file, fieldName) => {
       .map((type) => {
         if (type === "image/jpeg" || type === "image/jpg") return "JPG";
         if (type === "image/png") return "PNG";
+        if (type === "image/webp") return "WebP";
         if (type === "application/pdf") return "PDF";
         return type.split("/")[1].toUpperCase();
       })

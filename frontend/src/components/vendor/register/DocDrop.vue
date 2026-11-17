@@ -44,7 +44,7 @@ defineProps({
   over: { type: Boolean, default: false },
   error: { type: String, default: "" },
   hint: { type: String, default: "" },
-  accept: { type: String, default: ".jpg,.jpeg,.png,.pdf,image/*,application/pdf" },
+  accept: { type: String, default: ".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" },
 });
 defineEmits(["change", "drop", "dragenter", "dragover", "dragleave", "remove"]);
 

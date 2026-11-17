@@ -93,7 +93,7 @@ class VendorResubmissionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('store_name', 'Flux Flower Store')
             ->assertJsonPath('items.0.max', 12288)
-            ->assertJsonPath('items.0.mimes', 'jpg,jpeg,png,pdf');
+            ->assertJsonPath('items.0.mimes', 'jpg,jpeg,png,webp,pdf');
     }
 
     public function test_text_correction_is_saved_for_review(): void

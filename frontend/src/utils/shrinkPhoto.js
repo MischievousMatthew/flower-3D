@@ -4,9 +4,9 @@
 const MAX_SIDE = 2400;
 const SHRINK_OVER = 1.5 * 1024 * 1024;
 
-/** A smaller JPEG copy of a large JPG/PNG photo; anything else comes back as it is */
+/** A smaller JPEG copy of a large JPG/PNG/WebP photo; anything else comes back as it is */
 export async function shrinkPhoto(file) {
-  if (!(file instanceof File) || !/^image\/(jpeg|png)$/.test(file.type) || file.size <= SHRINK_OVER) return file;
+  if (!(file instanceof File) || !/^image\/(jpeg|png|webp)$/.test(file.type) || file.size <= SHRINK_OVER) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));

@@ -175,7 +175,7 @@ const submitLabel = computed(() => {
   return progress.value > 0 && progress.value < 100 ? `Uploading… ${progress.value}%` : "Sending…";
 });
 
-const mimesOf = (item) => (item.mimes || "jpg,jpeg,png,pdf").split(",");
+const mimesOf = (item) => (item.mimes || "jpg,jpeg,png,webp,pdf").split(",");
 const fileAccept = (item) => mimesOf(item).map((m) => `.${m}`).join(",");
 const sizeLabel = (kb) => `${Math.round(kb / 1024)} MB`;
 function fileHint(item) {
