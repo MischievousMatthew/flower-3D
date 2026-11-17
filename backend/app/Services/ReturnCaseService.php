@@ -59,6 +59,10 @@ class ReturnCaseService
         }
 
         $resolution = $data['resolution'];
+        // A customer's partial refund request is always half the order total
+        if ($resolution === OrderRequest::PARTIAL_REFUND) {
+            $data['amount'] = self::partialRefundFor($order);
+        }
         $this->assertResolution($order, $resolution, $data['amount'] ?? null);
         $amount = $this->amountFor($order, $resolution, $data['amount'] ?? null);
         [$mediaPath, $mediaType] = $this->storeMedia($media);
@@ -474,6 +478,12 @@ class ReturnCaseService
                 throw new RuntimeException('A partial refund must be more than ₱0 and less than the order total of ₱' . number_format($total, 2) . '.');
             }
         }
+    }
+
+    /** Half the order total: what a customer asks for with a partial refund */
+    public static function partialRefundFor(Order $order): float
+    {
+        return round(((float) $order->total_amount) / 2, 2);
     }
 
     private function amountFor(Order $order, string $resolution, ?float $amount): ?float

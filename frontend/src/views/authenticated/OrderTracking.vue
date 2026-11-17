@@ -512,10 +512,10 @@
                 </label>
               </div>
               <span v-if="!reqModal.paid" class="ot-field__hint">Refunds are available once the order is paid.</span>
-              <div v-if="reqModal.resolution === 'partial_refund'" class="ot-field">
-                <label class="ot-field__lbl" for="ot-amount">Amount (order total ₱{{ fmt(reqModal.total) }})</label>
-                <input id="ot-amount" v-model.number="reqModal.amount" type="number" min="1" step="0.01" :max="reqModal.total" class="ot-input" />
-                <span v-if="reqModal.errors.amount" class="ot-field__err">{{ reqModal.errors.amount }}</span>
+              <div v-if="reqModal.resolution === 'partial_refund'" class="ot-partial" aria-live="polite">
+                <span class="ot-partial__lbl">You'll get back</span>
+                <strong class="ot-partial__amt">₱{{ fmt(partialRefundAmount) }}</strong>
+                <span class="ot-partial__note">Half of the ₱{{ fmt(reqModal.total) }} order total</span>
               </div>
               <span class="ot-field__hint">The shop can accept or suggest something else. You can message each other until you agree.</span>
             </fieldset>
@@ -658,7 +658,7 @@
 </template>
 
 <script setup>
-import { watch, ref, reactive, onMounted, onUnmounted, nextTick } from "vue";
+import { watch, ref, reactive, computed, onMounted, onUnmounted, nextTick } from "vue";
 import PageNumbers from "../../components/common/PageNumbers.vue";
 import { useShowMorePaged } from "../../composables/useShowMore";
 import { useRoute, useRouter } from "vue-router";
@@ -704,6 +704,8 @@ const meta = reactive({
 });
 
 // Return / refund modal
+// A partial refund is always half the order total (the server uses the same rule)
+const partialRefundAmount = computed(() => Math.round((Number(reqModal.total) || 0) * 50) / 100);
 const reqModal = reactive({
   show: false,
   type: "refund",
@@ -1071,14 +1073,6 @@ function validateReqModal() {
   reqModal.errors.media = "";
   reqModal.errors.amount = "";
 
-  if (reqModal.resolution === "partial_refund") {
-    const amount = Number(reqModal.amount);
-    if (!amount || amount <= 0 || amount >= reqModal.total) {
-      reqModal.errors.amount = `Enter an amount above ₱0 and below ₱${fmt(reqModal.total)}.`;
-      ok = false;
-    }
-  }
-
   if (!reqModal.reason.trim() || reqModal.reason.trim().length < 10) {
     reqModal.errors.reason = "Please provide at least 10 characters.";
     ok = false;
@@ -1100,7 +1094,7 @@ async function submitRequest() {
     const fd = new FormData();
     fd.append("type", reqModal.type);
     fd.append("resolution", reqModal.resolution);
-    if (reqModal.resolution === "partial_refund") fd.append("amount", String(reqModal.amount));
+    // (a partial refund is always half the total; the server works it out)
     fd.append("reason_category", reqModal.reasonCategory);
     fd.append("reason", reqModal.reason);
     if (reqModal.mediaFile) fd.append("media", reqModal.mediaFile);
@@ -3129,6 +3123,36 @@ button.ot-pay {
 .ot-choice__opt.on {
   border-color: var(--leaf);
   background: #f1f9f4;
+}
+
+.ot-partial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--leaf);
+  border-radius: 14px;
+  background: #f1f9f4;
+}
+
+.ot-partial__lbl {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.ot-partial__amt {
+  color: var(--leaf-deep);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-partial__note {
+  flex-basis: 100%;
+  color: var(--ink-soft);
+  font-size: 12px;
 }
 
 .ot-choice__opt.off {
