@@ -41,6 +41,7 @@ class OrderScannerTest extends TestCase
             $t->text('notes')->nullable();
             $t->timestamps();
         });
+        (require base_path('database/migrations/2026_11_17_170000_add_actor_name_to_delivery_logs.php'))->up();
     }
 
     private function delivery($vendor, string $status = 'pending', string $code = 'BLM-TEST-1'): int
@@ -178,6 +179,25 @@ class OrderScannerTest extends TestCase
         $row = DB::table('deliveries')->find($id);
         $this->assertSame('https://img.test/delivery-photos/order.jpg', $row->photo_url);
         $this->assertNotNull($row->photo_taken_at);
+    }
+
+    public function test_the_delivery_log_names_the_owner_who_moved_the_order(): void
+    {
+        $vendor = $this->shopOwner();
+        $vendor->forceFill(['name' => 'Aj', 'surname' => 'Test'])->save();
+        $id = $this->delivery($vendor, 'pending');
+        $orderId = (int) DB::table('deliveries')->where('id', $id)->value('order_id');
+        $this->signIn($vendor);
+
+        // From the shop's Orders page, not a staff scan
+        $this->putJson("/api/vendor/orders/{$orderId}/status", ['status' => 'to_processed'])->assertOk();
+        $this->assertSame('Aj Test', DB::table('delivery_logs')->where('delivery_id', $id)->latest('id')->value('actor_name'));
+        $this->getJson("/api/deliveries/{$id}/logs")->assertOk()->assertJsonPath('logs.0.scanned_by', 'Aj Test');
+
+        // Nobody signed in (the scheduled auto-complete): still "System"
+        $this->app['auth']->forgetGuards();
+        \App\Models\DeliveryLog::create(['delivery_id' => $id, 'status' => 'to_ship', 'scanned_at' => now()]);
+        $this->assertNull(DB::table('delivery_logs')->where('status', 'to_ship')->value('actor_name'));
     }
 
     public function test_only_the_customer_completes_an_order(): void

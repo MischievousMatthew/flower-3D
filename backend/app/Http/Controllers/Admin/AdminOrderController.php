@@ -452,7 +452,7 @@ class AdminOrderController extends Controller
                     default => 'Delivery: ' . ucfirst(str_replace('_', ' ', $log->status)),
                 },
                 'detail' => collect([
-                    $log->scanner ? 'by ' . $log->scanner->name : null,
+                    ($by = $log->actorLabel()) ? 'by ' . $by : null,
                     $log->notes,
                 ])->filter()->implode(' · ') ?: null,
             ]);

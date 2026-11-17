@@ -184,7 +184,7 @@ class DeliveryController extends Controller
                 'status'     => $log->status,
                 'label'      => Delivery::STATUS_LABELS[$log->status] ?? $log->status,
                 'scanned_at' => $log->scanned_at?->toIso8601String(),
-                'scanned_by' => $log->scanner?->name,
+                'scanned_by' => $log->actorLabel(),
             ]) ?? [],
         ]);
     }
@@ -243,7 +243,7 @@ class DeliveryController extends Controller
                 'id'         => $log->id,
                 'status'     => $log->status,
                 'label'      => Delivery::STATUS_LABELS[$log->status] ?? $log->status,
-                'scanned_by' => $log->scanner?->name ?? 'System',
+                'scanned_by' => $log->actorLabel() ?? 'System',
                 'scanned_at' => $log->scanned_at?->toIso8601String(),
                 'notes'      => $log->notes,
             ]),
