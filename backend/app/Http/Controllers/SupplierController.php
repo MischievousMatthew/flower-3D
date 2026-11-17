@@ -54,13 +54,14 @@ class SupplierController extends Controller
         $data = $request->validate([
             'company_name'   => ['required', 'string', 'max:255'],
             'contact_person' => ['required', 'string', 'max:255'],
-            'email'          => ['required', 'email', 'unique:suppliers,email'],
+            // Another shop can have the same supplier; only this shop's list must not repeat it
+            'email'          => ['required', 'email', Rule::unique('suppliers', 'email')->where('owner_id', $this->getOwnerId())],
             'phone'          => ['required', 'string', 'max:20'],
             'address'        => ['required', 'string'],
             'status'         => ['nullable', Rule::in(['active', 'inactive', 'blacklisted'])],
             'logo'           => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
             ...$this->profileRules(),
-        ]);
+        ], ['email.unique' => 'This supplier is already in your list. Open it there instead of adding it again.']);
         $data = $this->withContactDefaults($data);
 
         $uploadedLogoId = null;
@@ -101,13 +102,13 @@ class SupplierController extends Controller
         $data = $request->validate([
             'company_name'   => ['sometimes', 'string', 'max:255'],
             'contact_person' => ['sometimes', 'string', 'max:255'],
-            'email'          => ['sometimes', 'email', Rule::unique('suppliers', 'email')->ignore($id)],
+            'email'          => ['sometimes', 'email', Rule::unique('suppliers', 'email')->where('owner_id', $this->getOwnerId())->ignore($id)],
             'phone'          => ['sometimes', 'string', 'max:20'],
             'address'        => ['sometimes', 'string'],
             'status'         => ['sometimes', Rule::in(['active', 'inactive', 'blacklisted'])],
             'logo'           => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
             ...$this->profileRules(),
-        ]);
+        ], ['email.unique' => 'This supplier is already in your list. Open it there instead of adding it again.']);
         $data = $this->withContactDefaults($data);
 
         $uploadedLogoId = null;
@@ -280,11 +281,11 @@ class SupplierController extends Controller
         $data = $request->validate([
             'company_name'   => ['required', 'string', 'max:255'],
             'contact_person' => ['required', 'string', 'max:255'],
-            'email'          => ['required', 'email', 'unique:supplier_contacts,email'],
+            'email'          => ['required', 'email', Rule::unique('supplier_contacts', 'email')->where('supplier_id', $supplierId)],
             'phone'          => ['required', 'string', 'max:20'],
             'address'        => ['required', 'string'],
             'status'         => ['nullable', Rule::in(['active', 'inactive'])],
-        ]);
+        ], ['email.unique' => 'This supplier already has a contact with that email.']);
 
         return response()->json($this->service->addContact($supplierId, $data, $this->getOwnerId()), 201);
     }
@@ -295,11 +296,11 @@ class SupplierController extends Controller
         $data = $request->validate([
             'company_name'   => ['sometimes', 'string', 'max:255'],
             'contact_person' => ['sometimes', 'string', 'max:255'],
-            'email'          => ['sometimes', 'email', Rule::unique('supplier_contacts', 'email')->ignore($id)],
+            'email'          => ['sometimes', 'email', Rule::unique('supplier_contacts', 'email')->where('supplier_id', $supplierId)->ignore($id)],
             'phone'          => ['sometimes', 'string', 'max:20'],
             'address'        => ['sometimes', 'string'],
             'status'         => ['sometimes', Rule::in(['active', 'inactive'])],
-        ]);
+        ], ['email.unique' => 'This supplier already has a contact with that email.']);
 
         return response()->json($this->service->updateContact($id, $data, $this->getOwnerId()));
     }

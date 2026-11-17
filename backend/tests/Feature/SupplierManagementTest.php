@@ -85,6 +85,7 @@ class SupplierManagementTest extends TestCase
         });
         // The new columns and tables come from the real migration
         (require database_path('migrations/2026_10_26_100000_add_supplier_management.php'))->up();
+        (require database_path('migrations/2026_11_17_200000_supplier_email_unique_per_shop.php'))->up();
 
         Carbon::setTestNow(Carbon::parse('2026-10-20 10:00:00'));
     }
@@ -136,6 +137,34 @@ class SupplierManagementTest extends TestCase
         $this->assertSame('Ben', $contact->contact_person);
         $this->assertSame('Bloom Farms', $contact->company_name);
         $this->assertSame('La Trinidad, Benguet', $contact->address);
+    }
+
+    public function test_two_shops_can_have_the_same_supplier_but_one_shop_cannot_add_it_twice(): void
+    {
+        $form = [
+            'company_name' => 'Bloom Farms', 'contact_person' => 'Ana', 'email' => 'farm@example.com',
+            'phone' => '09171234567', 'address' => 'La Trinidad, Benguet',
+            'contacts' => json_encode([['contact_person' => 'Ben', 'email' => 'ben@example.com', 'phone' => '0918']]),
+        ];
+        $first = $this->vendor();
+        $second = $this->vendor();
+
+        $this->signIn($first)->post(self::BASE, $form, ['Accept' => 'application/json'])->assertCreated();
+        $this->app['auth']->forgetGuards();
+        // Another shop, same supplier and same contact
+        $mine = $this->signIn($second)->post(self::BASE, $form, ['Accept' => 'application/json'])->assertCreated()->json('id');
+        $this->assertSame(2, DB::table('suppliers')->where('email', 'farm@example.com')->count());
+        $this->assertSame(2, DB::table('supplier_contacts')->where('email', 'ben@example.com')->count());
+
+        // The same shop adding it again is told it's already there
+        $this->post(self::BASE, $form, ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.email.0', 'This supplier is already in your list. Open it there instead of adding it again.');
+
+        // Editing keeps its own email; taking the other supplier's email in the same shop is refused
+        $other = $this->supplier($second, ['email' => 'wrap@example.com']);
+        $this->post(self::BASE . "/{$mine}", ['_method' => 'PUT', 'email' => 'farm@example.com'], ['Accept' => 'application/json'])->assertOk();
+        $this->post(self::BASE . "/{$other->id}", ['_method' => 'PUT', 'email' => 'farm@example.com'], ['Accept' => 'application/json'])->assertStatus(422);
     }
 
     public function test_clearing_a_field_on_edit_clears_it(): void
