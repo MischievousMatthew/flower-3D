@@ -312,11 +312,28 @@
                           </tr>
                           <tr v-if="b.base > 0 || b.parts.length || b.fillers.length">
                             <th scope="row">
-                              <b>{{ b.preset ? `${presetName(b.preset)} bouquet base` : "Wrapping and fillers" }}</b>
-                              <small>Wrapper, ribbon and fillers are included in this price</small>
+                              <button
+                                v-if="b.parts.length || b.fillers.length"
+                                type="button"
+                                class="ot-bq__toggle"
+                                :aria-expanded="baseOpen(b)"
+                                :aria-controls="`ot-bq-base-${b.key}`"
+                                @click="toggleBase(b)"
+                              >
+                                <span>
+                                  <b>{{ b.preset ? `${presetName(b.preset)} bouquet base` : "Wrapping and fillers" }}</b>
+                                  <small>{{ baseOpen(b) ? "Wrapper, ribbon and fillers are included in this price" : `Includes ${baseSummary(b)}` }}</small>
+                                </span>
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                              </button>
+                              <template v-else>
+                                <b>{{ b.preset ? `${presetName(b.preset)} bouquet base` : "Wrapping and fillers" }}</b>
+                              </template>
                             </th>
                             <td>₱{{ fmt(b.base) }}</td>
                           </tr>
+                        </tbody>
+                        <tbody v-show="baseOpen(b)" :id="`ot-bq-base-${b.key}`">
                           <tr v-for="p in b.parts" :key="p.key" class="ot-bq__sub">
                             <th scope="row">
                               <span class="ot-bq__swatch"><i v-if="p.color" :style="{ background: p.color }"></i>{{ p.label }}<template v-if="p.name"> · {{ p.name }}</template></span>
@@ -328,6 +345,8 @@
                             <th scope="row">Filler · {{ fl.name }}<template v-if="fl.count > 1"> × {{ fl.count }}</template></th>
                             <td>{{ fl.price > 0 ? `₱${fmt(fl.price)}` : "Included" }}</td>
                           </tr>
+                        </tbody>
+                        <tbody>
                           <tr v-if="b.card">
                             <th scope="row">
                               <b>{{ b.card.name }}</b>
@@ -1270,6 +1289,20 @@ const plainItemsOf = (order) => {
 const itemCount = (order) => {
   if (!order.items?.length) return Number(order.items_count || 0);
   return bouquetsOf(order).length + plainItemsOf(order).reduce((n, i) => n + Number(i.quantity || 1), 0);
+};
+// The base price's wrapper, ribbon and fillers stay folded until opened
+const openBases = ref(new Set());
+const baseOpen = (b) => openBases.value.has(b.key);
+const toggleBase = (b) => {
+  const next = new Set(openBases.value);
+  next.has(b.key) ? next.delete(b.key) : next.add(b.key);
+  openBases.value = next;
+};
+const baseSummary = (b) => {
+  const parts = b.parts.map((p) => p.label.toLowerCase());
+  const fillers = b.fillers.reduce((n, f) => n + f.count, 0);
+  if (fillers) parts.push(`${fillers} ${fillers === 1 ? "filler" : "fillers"}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0] || "";
 };
 const presetName = (preset) => preset.label || DEFAULT_PRESETS.find((p) => p.key === preset.key)?.label || preset.key;
 const moreItems = (order) => Math.max(0, itemCount(order) - Math.max(thumbs(order).length, 1));
@@ -2457,6 +2490,58 @@ button.ot-pay {
   object-fit: cover;
   background: var(--ivory-deep);
   font-size: 16px;
+}
+
+.ot-bq__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ot-bq__toggle svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+
+.ot-bq__toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.ot-bq__toggle:hover b {
+  color: var(--leaf-deep);
+}
+
+.ot-bq__toggle:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-bq__toggle svg {
+    transition: none;
+  }
+}
+
+.ot-bq__lines tbody + tbody tr:first-child th,
+.ot-bq__lines tbody + tbody tr:first-child td {
+  border-top: 1px solid var(--line);
 }
 
 .ot-bq__sub th {

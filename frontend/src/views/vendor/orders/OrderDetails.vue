@@ -114,11 +114,26 @@
 
                     <tr v-if="b.base > 0 || b.parts.length || b.fillers.length" class="bq-base">
                       <th scope="row">
-                        <b>{{ b.preset ? `${presetLabel(b.preset)} bouquet base` : "Wrapping and fillers" }}</b>
-                        <small>Wrapper, ribbon and fillers are included in this price</small>
+                        <button
+                          v-if="b.parts.length || b.fillers.length"
+                          type="button"
+                          class="bq-toggle"
+                          :aria-expanded="baseOpen(b)"
+                          :aria-controls="`bq-base-${b.key}`"
+                          @click="toggleBase(b)"
+                        >
+                          <span>
+                            <b>{{ b.preset ? `${presetLabel(b.preset)} bouquet base` : "Wrapping and fillers" }}</b>
+                            <small>{{ baseOpen(b) ? "Wrapper, ribbon and fillers are included in this price" : `Includes ${baseSummary(b)}` }}</small>
+                          </span>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                        </button>
+                        <b v-else>{{ b.preset ? `${presetLabel(b.preset)} bouquet base` : "Wrapping and fillers" }}</b>
                       </th>
                       <td>{{ money(b.base) }}</td>
                     </tr>
+                  </tbody>
+                  <tbody v-show="baseOpen(b)" :id="`bq-base-${b.key}`">
                     <tr v-for="p in b.parts" :key="p.key" class="bq-sub">
                       <th scope="row">
                         <span class="swatch"><i v-if="p.color" :style="{ background: p.color }"></i>{{ p.label }}<template v-if="p.name"> · {{ p.name }}</template></span>
@@ -130,6 +145,8 @@
                       <th scope="row"><span class="detail">Filler · {{ fl.name }}<template v-if="fl.count > 1"> × {{ fl.count }}</template></span></th>
                       <td>{{ fl.price > 0 ? money(fl.price) : "Included" }}</td>
                     </tr>
+                  </tbody>
+                  <tbody>
 
                     <tr v-if="b.card" class="bq-card-row">
                       <th scope="row">
@@ -414,6 +431,20 @@ const plainItems = computed(() => {
   const inBouquet = new Set(bouquets.value.flatMap((b) => b.item_ids));
   return (order.value?.items ?? []).filter((i) => !inBouquet.has(i.id));
 });
+// The base price's wrapper, ribbon and fillers stay folded until opened
+const openBases = ref(new Set());
+const baseOpen = (b) => openBases.value.has(b.key);
+const toggleBase = (b) => {
+  const next = new Set(openBases.value);
+  next.has(b.key) ? next.delete(b.key) : next.add(b.key);
+  openBases.value = next;
+};
+const baseSummary = (b) => {
+  const parts = b.parts.map((p) => p.label.toLowerCase());
+  const fillers = b.fillers.reduce((n, f) => n + f.count, 0);
+  if (fillers) parts.push(`${fillers} ${fillers === 1 ? "filler" : "fillers"}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0] || "";
+};
 // A bouquet counts as one item, however many flowers it has
 const itemsToPrepare = computed(() => bouquets.value.length + plainItems.value.reduce((n, i) => n + Number(i.quantity || 1), 0));
 const presetLabel = (preset) => preset.label || DEFAULT_PRESETS.find((p) => p.key === preset.key)?.label || preset.key;
@@ -751,6 +782,47 @@ onMounted(() => {
 .bq-thumb :deep(svg) {
   width: 18px;
   height: 18px;
+}
+.bq-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bq-toggle svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--v-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+.bq-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.bq-toggle:hover b {
+  color: var(--bc-accent-deep);
+}
+.bq-toggle:focus-visible {
+  outline: 2px solid var(--bc-accent-deep);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bq-toggle svg {
+    transition: none;
+  }
 }
 .bq-sub th {
   padding-left: 16px;
