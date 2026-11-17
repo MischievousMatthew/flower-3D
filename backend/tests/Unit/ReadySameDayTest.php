@@ -55,7 +55,8 @@ class ReadySameDayTest extends TestCase
         $this->assertTrue($ready['same_day_from_products']);
         $this->assertTrue($ready['same_day_available_today']);
         $this->assertSame('18:00', $ready['cutoff_time_today']);
-        $this->assertSame(2, $ready['lead_time_days'], "the shop's preparation time is unchanged");
+        $this->assertSame(0, $ready['lead_time_days'], 'ready the same day: no preparation days, so tomorrow is open too');
+        $this->assertSame(2, $own['lead_time_days'], "other orders keep the shop's preparation time");
 
         // After closing time it's too late for today
         $evening = Carbon::parse('2026-11-16 19:30', VendorApplication::RESERVATION_TIMEZONE);

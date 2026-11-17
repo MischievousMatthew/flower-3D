@@ -522,7 +522,8 @@ class VendorApplication extends Model
         $shopSameDay          = (bool) ($application?->same_day_delivery ?? false);
         $sameDayDelivery      = $shopSameDay || ($readySameDay && $application !== null);
         $forced               = $sameDayDelivery && ! $shopSameDay;
-        $leadTimeDays         = $application?->reservationLeadTimeDays() ?? 0;
+        // Products ready the same day need no preparation, so no day after today waits either
+        $leadTimeDays         = $readySameDay && $application !== null ? 0 : ($application?->reservationLeadTimeDays() ?? 0);
         $maxOrdersPerDay      = max(1, (int) ($application?->max_orders_per_day ?? 10));
         $cutoffTimeToday      = $application?->cutoffTimeForDate($now, $forced);
         $sameDayCutoffReached = $sameDayDelivery

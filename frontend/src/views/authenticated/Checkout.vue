@@ -928,7 +928,11 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
   const isPastDate = cleanDate < today;
   const isToday = cleanDate.getTime() === today.getTime();
 
-  const isWithinLeadTime = Boolean(availability?.is_within_lead_time) || cleanDate < minDate;
+  // Today follows the server's same-day answer (shop setting or "ready the same day"
+  // products), not the shop's preparation days
+  const isWithinLeadTime = isToday
+    ? !vendorReservationSettings.value.sameDayAvailableToday
+    : Boolean(availability?.is_within_lead_time) || cleanDate < minDate;
   const isBeyondLimit = cleanDate > maxDate;
   const isSameDayCutoffBlocked = Boolean(
     availability?.is_same_day_cutoff_blocked,
