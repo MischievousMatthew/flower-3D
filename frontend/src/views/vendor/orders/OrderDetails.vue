@@ -80,11 +80,84 @@
         <div class="od-col">
           <section class="sp-card" aria-label="Items">
             <div class="sp-card-head">
-              <div><h2>Items</h2><p>{{ order.items_count }} {{ order.items_count === 1 ? "item" : "items" }} {{ order.unpaid_checkout ? "in this checkout" : "to prepare" }}</p></div>
+              <div><h2>Items</h2><p>{{ itemsToPrepare }} {{ itemsToPrepare === 1 ? "item" : "items" }} {{ order.unpaid_checkout ? "in this checkout" : "to prepare" }}</p></div>
               <button v-if="bouquet" type="button" class="sp-btn sp-btn-dark sp-btn-sm" @click="show3D(null)"><span v-html="ICONS.cube"></span>View 3D bouquet</button>
             </div>
             <ul class="items">
-              <li v-for="item in order.items" :key="item.id" class="item">
+              <!-- A custom bouquet: one entry, priced part by part -->
+              <li v-for="b in bouquets" :key="b.key" class="item bq">
+                <div class="bq-head">
+                  <div>
+                    <strong>Custom bouquet</strong>
+                    <div class="bq-tags">
+                      <span v-if="b.preset" class="sp-chip blue">{{ presetLabel(b.preset) }} · {{ b.stems }} {{ b.stems === 1 ? "stem" : "stems" }}</span>
+                      <span v-else class="sp-chip violet">{{ b.stems }} {{ b.stems === 1 ? "stem" : "stems" }}</span>
+                      <span v-if="b.design" class="detail">Design: {{ b.design }}</span>
+                    </div>
+                  </div>
+                  <span class="item-sub">{{ money(b.total) }}</span>
+                </div>
+
+                <table class="bq-lines">
+                  <caption class="sr-only">Price breakdown of this bouquet</caption>
+                  <tbody>
+                    <tr v-for="f in b.flowers" :key="f.product_id">
+                      <th scope="row">
+                        <span class="bq-thing">
+                          <img v-if="f.image" :src="f.image" :alt="''" class="bq-thumb" loading="lazy" />
+                          <span v-else class="bq-thumb blank" v-html="ICONS.flower"></span>
+                          <span><b>{{ f.name }}</b><small>{{ f.count }} × {{ money(f.unit_price) }}</small></span>
+                        </span>
+                      </th>
+                      <td>{{ money(f.subtotal) }}</td>
+                    </tr>
+
+                    <tr v-if="b.base > 0 || b.parts.length || b.fillers.length" class="bq-base">
+                      <th scope="row">
+                        <b>{{ b.preset ? `${presetLabel(b.preset)} bouquet base` : "Wrapping and fillers" }}</b>
+                        <small>Wrapper, ribbon and fillers are included in this price</small>
+                      </th>
+                      <td>{{ money(b.base) }}</td>
+                    </tr>
+                    <tr v-for="p in b.parts" :key="p.key" class="bq-sub">
+                      <th scope="row">
+                        <span class="swatch"><i v-if="p.color" :style="{ background: p.color }"></i>{{ p.label }}<template v-if="p.name"> · {{ p.name }}</template></span>
+                        <small v-if="p.pattern">{{ p.pattern }}</small>
+                      </th>
+                      <td>{{ p.price > 0 ? money(p.price) : "Included" }}</td>
+                    </tr>
+                    <tr v-for="fl in b.fillers" :key="fl.name" class="bq-sub">
+                      <th scope="row"><span class="detail">Filler · {{ fl.name }}<template v-if="fl.count > 1"> × {{ fl.count }}</template></span></th>
+                      <td>{{ fl.price > 0 ? money(fl.price) : "Included" }}</td>
+                    </tr>
+
+                    <tr v-if="b.card" class="bq-card-row">
+                      <th scope="row">
+                        <span class="bq-thing">
+                          <span class="bq-thumb card" v-html="ICONS.note"></span>
+                          <span><b>{{ b.card.name }}</b><small>{{ b.card.size ? `${b.card.size} card` : "Message card" }}</small></span>
+                        </span>
+                      </th>
+                      <td>{{ b.card.price > 0 ? money(b.card.price) : "Free" }}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th scope="row">Total</th>
+                      <td>{{ money(b.total) }}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                <figure v-if="b.card" class="bq-message">
+                  <figcaption>Message on the card</figcaption>
+                  <blockquote v-if="b.card.message">{{ b.card.message }}</blockquote>
+                  <p v-else class="bq-empty">The customer left the card blank.</p>
+                </figure>
+                <p v-if="b.notes" class="item-note">“{{ b.notes }}”</p>
+              </li>
+
+              <li v-for="item in plainItems" :key="item.id" class="item">
                 <img v-if="item.image" :src="item.image" :alt="item.name" class="item-img" loading="lazy" />
                 <span v-else class="item-img blank" v-html="ICONS.flower"></span>
                 <div class="item-main">
@@ -242,7 +315,7 @@ import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { linkedId } from "../../../utils/hiddenIds";
 import {
-  PAYMENT_LABEL, STATUS_HINT, STATUS_TONE, bouquetFromItems, dayLabel, daysFromToday, formatDateTime, isLate, money, parseCustomizations, shouldPrepare, wrapperPatternLabel,
+  PAYMENT_LABEL, STATUS_HINT, STATUS_TONE, bouquetBreakdowns, bouquetFromItems, dayLabel, daysFromToday, formatDateTime, isLate, money, parseCustomizations, shouldPrepare, wrapperPatternLabel,
 } from "../../../components/vendor/orders/orderUi";
 import "../../../components/vendor/shop/shop.css";
 import { DEFAULT_PRESETS } from "../../../constants/bouquetPresets";
@@ -335,6 +408,15 @@ const hasDetails = (item) =>
 
 // A custom 3D bouquet: either one item carrying the whole arrangement, or one item per placed flower
 const bouquet = computed(() => bouquetFromItems(order.value?.items ?? []));
+// Each bouquet shown once with its price breakdown; everything else as its own item
+const bouquets = computed(() => bouquetBreakdowns(order.value?.items ?? []));
+const plainItems = computed(() => {
+  const inBouquet = new Set(bouquets.value.flatMap((b) => b.item_ids));
+  return (order.value?.items ?? []).filter((i) => !inBouquet.has(i.id));
+});
+// A bouquet counts as one item, however many flowers it has
+const itemsToPrepare = computed(() => bouquets.value.length + plainItems.value.reduce((n, i) => n + Number(i.quantity || 1), 0));
+const presetLabel = (preset) => preset.label || DEFAULT_PRESETS.find((p) => p.key === preset.key)?.label || preset.key;
 function show3D(item) {
   viewer.value = item
     ? { title: item.name, url: new URL(item.model_3d_url, window.location.origin).href, type: item.model_type || "glb", arrangement: null }
@@ -589,6 +671,133 @@ onMounted(() => {
 .link-btn :deep(svg) {
   width: 15px;
   height: 15px;
+}
+/* Custom bouquet: one entry with its price breakdown */
+.item.bq {
+  flex-direction: column;
+  gap: 12px;
+}
+.bq-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.bq-head strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.bq-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+.bq-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--v-text);
+}
+.bq-lines th,
+.bq-lines td {
+  padding: 8px 0;
+  text-align: left;
+  font-weight: 400;
+  vertical-align: middle;
+  border-bottom: 1px dashed var(--v-border);
+}
+.bq-lines td {
+  text-align: right;
+  white-space: nowrap;
+  padding-left: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.bq-lines b {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.bq-lines small {
+  display: block;
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.bq-thing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bq-thumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--bc-accent-soft);
+}
+.bq-thumb.blank,
+.bq-thumb.card {
+  display: grid;
+  place-items: center;
+  color: var(--bc-accent-deep);
+}
+.bq-thumb.card {
+  background: var(--v-purple-soft);
+  color: var(--v-purple-text);
+}
+.bq-thumb :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.bq-sub th {
+  padding-left: 16px;
+}
+.bq-sub td {
+  color: var(--v-muted);
+  font-size: 12px;
+}
+.bq-lines tfoot th,
+.bq-lines tfoot td {
+  border-bottom: 0;
+  padding-top: 10px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.bq-message {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--v-purple-soft);
+  color: var(--v-purple-text);
+}
+.bq-message figcaption {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.bq-message blockquote {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--v-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bq-empty {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .note-card {
   display: flex;

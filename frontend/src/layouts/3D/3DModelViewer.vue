@@ -1,45 +1,58 @@
 <template>
-  <!-- Template remains the same -->
   <div class="model-viewer-container">
-    <div v-if="isLoading" class="model-loading">
-      <div class="loading-spinner"></div>
-      <p>Loading 3D Model...</p>
+    <div v-if="isLoading" class="model-loading" role="status">
+      <span class="bc-skeleton model-skel" aria-hidden="true"></span>
+      <p>Loading the 3D model…</p>
     </div>
 
-    <div v-if="error" class="model-error">
-      <span class="error-icon">⚠️</span>
+    <div v-if="error" class="model-error" role="alert">
+      <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4M12 17h.01" /></svg>
       <p>{{ error }}</p>
     </div>
 
     <div ref="viewerContainer" class="viewer-canvas"></div>
 
-    <div class="viewer-controls">
-      <button @click="resetCamera" class="control-btn" title="Reset View">
-        🔄
+    <div class="viewer-controls" role="toolbar" aria-label="3D view controls">
+      <button type="button" class="control-btn" title="Reset view" aria-label="Reset view" @click="resetCamera">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
       </button>
       <button
-        @click="toggleRotation"
+        type="button"
         class="control-btn"
         :class="{ active: isRotating }"
-        title="Auto Rotate"
+        :title="isRotating ? 'Stop turning' : 'Turn it slowly'"
+        :aria-label="isRotating ? 'Stop turning' : 'Turn it slowly'"
+        :aria-pressed="isRotating"
+        @click="toggleRotation"
       >
-        {{ isRotating ? "⏸️" : "▶️" }}
+        <svg v-if="isRotating" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+        <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5Z" /></svg>
       </button>
       <button
-        @click="toggleWireframe"
+        type="button"
         class="control-btn"
         :class="{ active: showWireframe }"
-        title="Wireframe"
+        title="Show the wire frame"
+        aria-label="Show the wire frame"
+        :aria-pressed="showWireframe"
+        @click="toggleWireframe"
       >
-        🔲
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5Z" /><path d="m3.3 7 8.7 5 8.7-5M12 22V12" /></svg>
       </button>
-      <button @click="toggleFullscreen" class="control-btn" title="Fullscreen">
-        ⛶
+      <button
+        type="button"
+        class="control-btn"
+        :title="isFullscreen ? 'Exit full screen' : 'Full screen'"
+        :aria-label="isFullscreen ? 'Exit full screen' : 'Full screen'"
+        @click="toggleFullscreen"
+      >
+        <svg v-if="isFullscreen" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v4a2 2 0 0 1-2 2H3M21 9h-4a2 2 0 0 1-2-2V3M15 21v-4a2 2 0 0 1 2-2h4M3 15h4a2 2 0 0 1 2 2v4" /></svg>
+        <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
       </button>
     </div>
 
     <div class="viewer-instructions">
-      <p>🖱️ Drag to rotate • Scroll to zoom</p>
+      <p>Drag to turn · scroll to zoom</p>
     </div>
   </div>
 </template>
@@ -168,6 +181,7 @@ const initViewer = async () => {
 
     // Handle window resize
     window.addEventListener("resize", handleResize);
+    document.addEventListener("fullscreenchange", syncFullscreen);
   } catch (err) {
     console.error("Error initializing viewer:", err);
     error.value = "Failed to initialize 3D viewer";
@@ -814,12 +828,19 @@ const toggleFullscreen = () => {
   setTimeout(handleResize, 100);
 };
 
+// Leaving full screen with Esc doesn't go through toggleFullscreen
+const syncFullscreen = () => {
+  isFullscreen.value = !!document.fullscreenElement;
+  setTimeout(handleResize, 100);
+};
+
 const cleanup = () => {
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
   }
 
   window.removeEventListener("resize", handleResize);
+  document.removeEventListener("fullscreenchange", syncFullscreen);
 
   // Exit fullscreen if active
   if (document.fullscreenElement && document.exitFullscreen) {
@@ -858,23 +879,12 @@ const cleanup = () => {
   outline: none;
 }
 
-.loading-spinner {
-  width: 60px;
-  height: 60px;
-  border: 5px solid rgba(226, 232, 240, 0.3);
-  border-top: 5px solid #48bb78;
-  border-radius: 50%;
-  animation: spin 1s ease-in-out infinite;
-  margin: 0 auto 20px;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+.model-skel {
+  display: block;
+  width: 160px;
+  height: 200px;
+  margin: 0 auto 14px;
+  border-radius: 80px 80px 24px 24px;
 }
 
 .model-loading {
@@ -907,9 +917,15 @@ const cleanup = () => {
 }
 
 .error-icon {
-  font-size: 48px;
   display: block;
-  margin-bottom: 16px;
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 12px;
+  fill: none;
+  stroke: #e53e3e;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .model-error p {
@@ -940,27 +956,34 @@ const cleanup = () => {
   background: white;
   border: 2px solid #e2e8f0;
   border-radius: 10px;
-  font-size: 20px;
+  color: #363f4e;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  padding: 0;
+}
+
+.control-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .control-btn:hover {
   background: #f7fafc;
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
   border-color: #cbd5e0;
 }
 
 .control-btn.active {
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  background: #4db173;
   color: white;
-  border-color: #48bb78;
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+  border-color: #4db173;
 }
 
 .viewer-instructions {
@@ -1051,8 +1074,8 @@ const cleanup = () => {
   }
 
   .control-btn {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     font-size: 16px;
   }
 

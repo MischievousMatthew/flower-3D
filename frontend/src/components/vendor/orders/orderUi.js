@@ -129,6 +129,104 @@ export function bouquetFromItems(items = []) {
   };
 }
 
+const cents = (n) => Math.round(Number(n || 0) * 100) / 100;
+
+/**
+ * The custom bouquets in an order, each as one priced breakdown:
+ * flowers (count × price), the occasion's base price (which covers the wrapper,
+ * ribbon and fillers), the message card with its message, and the total.
+ *
+ * A bouquet is saved either as one order item carrying every flower, or as one
+ * item per flower with the base price and card added to the first flower's price.
+ * Items with the same arrangement belong to the same bouquet.
+ */
+export function bouquetBreakdowns(items = []) {
+  const custom = (i) => parseCustomizations(i?.customizations) ?? {};
+  const groups = new Map();
+  for (const item of items) {
+    const c = custom(item);
+    if (c.type !== "custom_flower_bouquet" || !Array.isArray(c.flowers)) continue;
+    const key = c.flowers.map((f) => f.scene_id ?? `${f.product_id}-${f.placement_order}`).join("|") || `item-${item.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  return [...groups.values()].map((group) => {
+    const c = custom(group[0]);
+    const total = cents(group.reduce((sum, i) => sum + Number(i.subtotal || 0), 0));
+    const card = c.card?.id || c.card?.name ? c.card : null;
+    const cardPrice = cents(card?.price);
+    const extras = cents(c.extras_total ?? 0);
+    const partsPrice = cents(
+      ["wrapper", "inner_wrapper", "ribbon"].reduce((s, k) => s + Number(c[k]?.price || 0), 0) +
+        (c.fillers || []).reduce((s, f) => s + Number(f.price || 0), 0),
+    );
+    const base = Math.max(0, cents(extras - cardPrice - partsPrice));
+    const flowersTotal = cents(total - extras);
+
+    // Flowers by kind, in the order they were placed
+    const kinds = new Map();
+    for (const f of c.flowers) {
+      const id = f.product_id;
+      const kind = kinds.get(id) ?? { product_id: id, name: f.product_name || "Flower", count: 0, listed: 0, image: null };
+      kind.count += Number(f.quantity || 1);
+      kind.listed += Number(f.price || 0) * Number(f.quantity || 1);
+      kinds.set(id, kind);
+    }
+    const flowers = [...kinds.values()];
+    for (const kind of flowers) {
+      kind.image = group.find((i) => i.product_id === kind.product_id && i.image)?.image ?? null;
+      // One item per flower: what was charged for that kind, less the extras on the first item
+      const charged = group.filter((i) => i.product_id === kind.product_id);
+      if (group.length > 1 && charged.length) {
+        const firstHasExtras = group[0].product_id === kind.product_id;
+        kind.subtotal = cents(charged.reduce((s, i) => s + Number(i.subtotal || 0), 0) - (firstHasExtras ? extras : 0));
+      } else {
+        kind.subtotal = cents(kind.listed);
+      }
+    }
+    // A single kind takes whatever the flowers came to, so the lines always add up to the total
+    if (flowers.length === 1) flowers[0].subtotal = flowersTotal;
+    for (const kind of flowers) kind.unit_price = kind.count ? cents(kind.subtotal / kind.count) : 0;
+
+    const part = (key, label) =>
+      c[key] || (key === "wrapper" && c.paper_color) || (key === "inner_wrapper" && c.inner_paper_color) || (key === "ribbon" && c.ribbon_color)
+        ? {
+            key,
+            label,
+            name: c[key]?.name || "",
+            color: c[key]?.color_hex || c[{ wrapper: "paper_color", inner_wrapper: "inner_paper_color", ribbon: "ribbon_color" }[key]] || null,
+            pattern: wrapperPatternLabel(key === "wrapper" ? c.wrapper_pattern : key === "inner_wrapper" ? c.inner_wrapper_pattern : null),
+            price: cents(c[key]?.price),
+          }
+        : null;
+    const fillerKinds = new Map();
+    for (const f of c.fillers || []) {
+      const k = fillerKinds.get(f.id ?? f.name) ?? { name: f.name || "Filler", count: 0, price: 0 };
+      k.count += 1;
+      k.price = cents(k.price + Number(f.price || 0));
+      fillerKinds.set(f.id ?? f.name, k);
+    }
+
+    return {
+      key: group.map((i) => i.id).join("-"),
+      preset: c.preset?.key ? { key: c.preset.key, label: c.preset.label, size: c.preset.size } : null,
+      design: c.design || null,
+      flowers,
+      stems: flowers.reduce((s, f) => s + f.count, 0),
+      base,
+      parts: [part("wrapper", "Wrapper"), part("inner_wrapper", "Inner wrapper"), part("ribbon", "Ribbon")].filter(Boolean),
+      fillers: [...fillerKinds.values()],
+      card: card
+        ? { name: card.name || "Message card", size: card.size || "", price: cardPrice, message: String(card.message || "").trim() }
+        : null,
+      total,
+      notes: group.map((i) => i.notes).find(Boolean) || "",
+      item_ids: group.map((i) => i.id),
+    };
+  });
+}
+
 /** Whether an order item is (part of) a custom 3D bouquet */
 export const isBouquetItem = (item) => parseCustomizations(item?.customizations)?.type === "custom_flower_bouquet";
 
