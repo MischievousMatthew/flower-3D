@@ -29,7 +29,8 @@ class OrderDisplayStatusTest extends TestCase
             'refunded after delivery' => ['refunded', 'completed', 'refunded', 'Refunded'],
             'returned after delivery' => ['returned', 'completed', 'returned', 'Returned'],
             'no delivery yet' => ['pending', null, 'pending', 'Pending'],
-            'no delivery, preparing' => ['processing', null, 'to_processed', 'Preparing'],
+            'paid online, not confirmed yet' => ['processing', null, 'pending', 'Pending'],
+            'no delivery, confirmed' => ['confirmed', null, 'to_processed', 'Preparing'],
             'no delivery, delivered' => ['delivered', null, 'to_received', 'Out for delivery'],
             'payment failed' => ['failed', null, 'cancelled', 'Cancelled'],
         ];

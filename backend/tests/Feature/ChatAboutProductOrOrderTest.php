@@ -161,8 +161,8 @@ class ChatAboutProductOrOrderTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('message.type', 'order_question')
             ->assertJsonPath('message.meta.order_number', 'ORD-0042')
-            // The same status the shop and the customer see ("Preparing")
-            ->assertJsonPath('message.meta.order_status', 'to_processed');
+            // The same status the shop and the customer see (paid, not confirmed yet: "Pending")
+            ->assertJsonPath('message.meta.order_status', 'pending');
     }
 
     public function test_someone_elses_order_or_another_shops_product_is_refused(): void

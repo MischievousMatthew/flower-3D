@@ -229,8 +229,9 @@ class Order extends Model
 
     /** Before there's a delivery, which order statuses mean which step */
     private const STATUS_WITHOUT_DELIVERY = [
-        'pending' => ['pending'],
-        'to_processed' => ['processing', 'confirmed'],
+        // A paid online order is 'processing' before the shop confirms it: still Pending
+        'pending' => ['pending', 'processing'],
+        'to_processed' => ['confirmed'],
         'to_ship' => ['shipped', 'ready'],
         'to_received' => ['delivered', 'out_for_delivery'],
         'completed' => ['completed'],

@@ -744,6 +744,10 @@ class VendorOrdersController extends Controller
 
                 if (! $delivery) {
                     $delivery = $this->deliveryService->createForOrder($order->id);
+                    // Start it at the step the order was already shown at, so the next step is allowed
+                    if ($oldStatus !== 'pending' && $delivery->status === 'pending' && array_key_exists($oldStatus, Order::STATUS_LABELS)) {
+                        $delivery->update(['status' => $oldStatus]);
+                    }
                 }
 
                 if ($delivery->status !== $newStatus) {
@@ -961,19 +965,8 @@ class VendorOrdersController extends Controller
 
     private function resolveDisplayStatus(Order $order): string
     {
-        if (in_array($order->status, ['cancelled', 'refunded', 'returned'], true)) {
-            return $order->status;
-        }
-
-        if ($order->delivery?->status) {
-            return $order->delivery->status;
-        }
-
-        return match ($order->status) {
-            'processing' => 'to_processed',
-            'delivered' => 'to_received',
-            default => $order->status,
-        };
+        // The same status the Orders list shows, so a step offered there is always allowed here
+        return $order->displayStatus();
     }
 
     /** The order's latest return/refund case, in the shared case format */
