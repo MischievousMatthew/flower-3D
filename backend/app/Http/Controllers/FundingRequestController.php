@@ -494,7 +494,12 @@ class FundingRequestController extends Controller
             $fundingRequest->items = DB::table('funding_request_items')
                 ->where('funding_request_id', $fundingRequest->id)
                 ->orderBy('id')
-                ->get(['id', 'product_id', 'product_name', 'sku', 'uom', 'current_stock', 'quantity', 'approved_quantity', 'unit_cost', 'line_total']);
+                ->get(['id', 'product_id', 'product_name', 'sku', 'uom', 'current_stock', 'quantity', 'approved_quantity', 'offered_quantity', 'unit_cost', 'line_total']);
+
+            // Each offer and new ask while Finance and Procurement agree on how much to buy
+            $fundingRequest->rounds = \App\Models\FundingRequestRound::where('funding_request_id', $fundingRequest->id)
+                ->orderBy('id')
+                ->get(['id', 'kind', 'actor_name', 'items', 'amount', 'note', 'created_at']);
 
             // Budget, what's due under the supplier's terms, and what was paid
             $model = \App\Models\FundingRequest::with(['payments', 'linkedOrder.items', 'linkedOrder.supplier'])->find($fundingRequest->id);
@@ -603,6 +608,136 @@ class FundingRequestController extends Controller
         } catch (Exception $e) {
             Log::error('Funding request delete error: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to delete funding request'], 500);
+        }
+    }
+
+    /**
+     * POST …/funding-requests/{id}/respond: Procurement answers Finance's
+     * counter-offer. "accept" takes it and the request is approved for that;
+     * "counter" asks again for what's really needed (between Finance's offer
+     * and the last ask), and the request goes back to Finance.
+     */
+    public function respond(Request $request, $id)
+    {
+        if ($response = $this->requireModuleAccess($request, self::INVENTORY_MODULE, 'create')) {
+            return $response;
+        }
+        $ownerId = $this->getOwnerId($request);
+
+        $data = $request->validate([
+            'action' => 'required|in:accept,counter',
+            'items' => 'required_if:action,counter|array',
+            'items.*.id' => 'required|integer',
+            'items.*.quantity' => 'required|integer|min:0|max:1000000',
+            'note' => 'nullable|string|max:500',
+        ], ['items.required_if' => 'Say how many of each product you need.']);
+
+        try {
+            $result = DB::transaction(function () use ($id, $ownerId, $data, $request) {
+                $funding = \App\Models\FundingRequest::where('owner_id', $ownerId)->lockForUpdate()->find($id);
+                if (!$funding) {
+                    throw new \Symfony\Component\HttpKernel\Exception\HttpException(404, 'Funding request not found');
+                }
+                if ($funding->request_status !== \App\Models\FundingRequest::STATUS_COUNTERED) {
+                    throw new \Symfony\Component\HttpKernel\Exception\HttpException(409, 'Finance isn\'t waiting on an answer for this request any more. Refresh the page.');
+                }
+
+                $lines = $funding->items()->get();
+                $actor = \App\Models\PurchaseOrderEvent::nameOf($request->user());
+                $snapshot = fn (string $field) => $lines->map(fn ($l) => [
+                    'item_id' => $l->id, 'product_name' => $l->product_name, 'uom' => $l->uom, 'quantity' => (int) $l->{$field},
+                ])->values()->all();
+
+                if ($data['action'] === 'accept') {
+                    foreach ($lines as $line) {
+                        $line->update(['approved_quantity' => (int) $line->offered_quantity, 'offered_quantity' => null]);
+                    }
+                    $funding->rounds()->create([
+                        'kind' => \App\Models\FundingRequestRound::ACCEPTED,
+                        'actor_name' => $actor,
+                        'items' => $snapshot('approved_quantity'),
+                        'amount' => $funding->offered_amount,
+                        'note' => $data['note'] ?? null,
+                    ]);
+                    // Approved for what Finance offered; the decision stays Finance's
+                    $funding->update([
+                        'request_status' => \App\Models\FundingRequest::STATUS_APPROVED,
+                        'payment_status' => 'unpaid',
+                        'paid_at' => null,
+                        'accounting_decision_at' => now(),
+                        'approved_quantity' => $lines->sum('approved_quantity'),
+                        'approved_amount' => $funding->offered_amount,
+                        'offered_amount' => null,
+                    ]);
+
+                    return [$funding->fresh(), 'Done. The request is approved for what Finance offered.'];
+                }
+
+                // Asking again: for each product, between Finance's offer and the last ask
+                $given = collect($data['items'])->keyBy(fn ($i) => (int) $i['id']);
+                foreach ($given->keys() as $lineId) {
+                    if (!$lines->contains('id', $lineId)) {
+                        throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, 'One of the products isn\'t on this request.');
+                    }
+                }
+                $changed = false;
+                foreach ($lines as $line) {
+                    $offer = (int) $line->offered_quantity;
+                    $qty = $given->has($line->id) ? (int) $given[$line->id]['quantity'] : (int) $line->quantity;
+                    if ($qty < $offer || $qty > (int) $line->quantity) {
+                        throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, "Ask for {$offer} to {$line->quantity} {$line->product_name}.");
+                    }
+                    $changed = $changed || $qty !== $offer;
+                    $line->quantity = $qty;
+                }
+                if (!$changed) {
+                    throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, 'That\'s what Finance offered. Accept the offer instead.');
+                }
+                if ($lines->sum('quantity') <= 0) {
+                    throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, 'Ask for at least one product.');
+                }
+
+                foreach ($lines as $line) {
+                    $line->update([
+                        'quantity' => $line->quantity,
+                        'line_total' => round($line->quantity * (float) $line->unit_cost, 2),
+                        'offered_quantity' => null,
+                        'approved_quantity' => null,
+                    ]);
+                }
+                $subtotal = $lines->sum(fn ($l) => round($l->quantity * (float) $l->unit_cost, 2));
+                $total = round($subtotal + (float) $funding->logistics_cost + (float) $funding->tax_vat_estimate, 2);
+                $totalQty = (int) $lines->sum('quantity');
+
+                $funding->rounds()->create([
+                    'kind' => \App\Models\FundingRequestRound::PROCUREMENT,
+                    'actor_name' => $actor,
+                    'items' => $snapshot('quantity'),
+                    'amount' => $total,
+                    'note' => $data['note'] ?? null,
+                ]);
+                // Back to Finance with the new ask
+                $funding->update([
+                    'request_status' => \App\Models\FundingRequest::STATUS_PENDING,
+                    'requested_qty' => $totalQty,
+                    'required_quantity' => $totalQty,
+                    'recommended_qty' => $totalQty,
+                    'estimated_unit_cost' => $totalQty ? round($subtotal / $totalQty, 2) : null,
+                    'estimated_total_cost' => $total,
+                    'recommended_budget' => $total,
+                    'offered_amount' => null,
+                    'submitted_to_accounting_at' => now(),
+                ]);
+
+                return [$funding->fresh(), 'Sent back to Finance with what you need.'];
+            });
+
+            return response()->json(['success' => true, 'message' => $result[1], 'data' => $result[0]]);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], $e->getStatusCode());
+        } catch (\Throwable $e) {
+            Log::error('Funding request answer error: ' . $e->getMessage());
+            return response()->json(['message' => 'Couldn\'t send your answer. Please try again.'], 500);
         }
     }
 

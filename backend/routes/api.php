@@ -946,6 +946,8 @@ Route::middleware('token.auth')->group(function () {
         Route::middleware('employee.module:inventory_funding,create')->group(function () {
             Route::post('funding-requests',             [FundingRequestController::class, 'store']);
             Route::post('funding-requests/{id}/submit', [FundingRequestController::class, 'submitToAccounting']);
+            // Take Finance's counter-offer, or ask again
+            Route::post('funding-requests/{id}/respond', [FundingRequestController::class, 'respond'])->whereNumber('id');
         });
         Route::middleware('employee.module:inventory_funding,edit')->group(function () {
             Route::put('funding-requests/{id}',         [FundingRequestController::class, 'update']);

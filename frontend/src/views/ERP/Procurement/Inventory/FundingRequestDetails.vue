@@ -20,8 +20,8 @@
         <span class="fx-icon" :class="`tone-${status.tone}`" v-html="ICONS[status.icon]"></span>
         <div class="grow">
           <div class="fd-status-top">
-            <span class="sp-chip" :class="status.tone">{{ displayRequestStatus(request) }}</span>
-            <strong>{{ peso(request.request_status === "Approved" ? request.approved_amount : request.estimated_total_cost) }}</strong>
+            <span class="sp-chip" :class="status.tone">{{ status.label || displayRequestStatus(request) }}</span>
+            <strong>{{ peso(request.request_status === "Approved" ? request.approved_amount : request.request_status === "Countered" ? request.offered_amount : request.estimated_total_cost) }}</strong>
           </div>
           <p>{{ statusText }}</p>
         </div>
@@ -29,6 +29,72 @@
           <button type="button" class="sp-btn sp-btn-ghost" :disabled="!canEditFunding" @click="editRequest"><span v-html="ICONS.edit"></span>Edit</button>
           <button type="button" class="sp-btn sp-btn-primary" :disabled="!canEditFunding || submitting" @click="submitRequest"><span v-html="ICONS.send"></span>{{ submitting ? "Sending…" : "Send to Finance" }}</button>
         </div>
+      </section>
+
+      <!-- Finance offered less: Procurement takes it or asks again -->
+      <section v-if="request.request_status === 'Countered'" class="sp-card fd-offer" aria-labelledby="fd-offer-title">
+        <div class="sp-card-head">
+          <div>
+            <h2 id="fd-offer-title">{{ answering ? "Finance can fund less than you asked" : "Your offer to Procurement" }}</h2>
+            <p>{{ request.reviewed_by_name || "Finance" }} offered {{ peso(request.offered_amount) }} · {{ formatDateTime(request.accounting_decision_at) }}</p>
+          </div>
+        </div>
+        <p v-if="request.accounting_remarks" class="fd-offer-note"><span v-html="ICONS.chat"></span>“{{ request.accounting_remarks }}”</p>
+
+        <div class="fd-table-wrap">
+          <table class="fd-table">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col" class="num">Asked</th>
+                <th scope="col" class="num">Finance offers</th>
+                <th v-if="answering" scope="col" class="num">You need</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in answer" :key="a.id">
+                <td><b>{{ a.name }}</b><small>{{ peso(a.cost) }} each</small></td>
+                <td class="num">{{ a.asked }} {{ a.uom }}</td>
+                <td class="num" :class="{ mid: a.offered < a.asked }">{{ a.offered }} {{ a.uom }}</td>
+                <td v-if="answering" class="num">
+                  <input
+                    v-model.number="a.need"
+                    class="sp-input fd-qty"
+                    :class="{ bad: needError(a) }"
+                    type="number"
+                    :min="a.offered"
+                    :max="a.asked"
+                    step="1"
+                    inputmode="numeric"
+                    :aria-label="`How many ${a.name} you need, from ${a.offered} to ${a.asked}`"
+                    :aria-invalid="!!needError(a)"
+                  />
+                  <small class="fd-range" :class="{ neg: needError(a) }">{{ needError(a) || `${a.offered} to ${a.asked}` }}</small>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <template v-if="answering">
+          <label class="sp-field fd-offer-field">
+            <span class="sp-label">Note for Finance <small>(optional)</small></span>
+            <textarea v-model="answerNote" class="sp-textarea" rows="2" maxlength="500" placeholder="Why you need more, like 80 for a wedding order on Saturday"></textarea>
+          </label>
+          <div class="fd-offer-foot">
+            <p class="sp-hint">{{ asksAgain ? `Asking for ${peso(askTotal)} sends it back to Finance to review again.` : "Take the offer, or raise a quantity to ask Finance again." }}</p>
+            <div class="fd-offer-btns">
+              <button type="button" class="sp-btn sp-btn-ghost" :disabled="!!answerBusy || !asksAgain || !!answerInvalid" @click="sendAnswer('counter')">
+                <span v-html="ICONS.send"></span>{{ answerBusy === "counter" ? "Sending…" : asksAgain ? `Ask for ${peso(askTotal)}` : "Ask again" }}
+              </button>
+              <button type="button" class="sp-btn sp-btn-primary" :disabled="!!answerBusy" @click="sendAnswer('accept')">
+                <span v-html="ICONS.check"></span>{{ answerBusy === "accept" ? "Saving…" : `Take ${peso(request.offered_amount)}` }}
+              </button>
+            </div>
+          </div>
+        </template>
+        <p v-else-if="isInventoryContext" class="sp-hint">You need permission to send funding requests to answer Finance.</p>
+        <p v-else class="sp-hint">Waiting for Procurement to take your offer or ask again. If they ask again, it comes back to you for review.</p>
       </section>
 
       <!-- Finance's decision -->
@@ -93,6 +159,22 @@
             <button v-if="m.kind === 'payment'" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="receipt = m"><span v-html="ICONS.receipt"></span>Receipt</button>
           </li>
         </ul>
+      </section>
+
+      <!-- How they got to the number -->
+      <section v-if="request.rounds?.length" class="sp-card" aria-labelledby="fd-rounds-title">
+        <div class="sp-card-head"><div><h2 id="fd-rounds-title">Agreeing on how much</h2><p>Every offer and new ask between Finance and Procurement</p></div></div>
+        <ol class="fd-rounds">
+          <li v-for="(rd, i) in request.rounds" :key="rd.id" :class="ROUND[rd.kind]?.tone">
+            <span class="fx-icon" :class="`tone-${ROUND[rd.kind]?.tone ?? 'slate'}`" v-html="ICONS[ROUND[rd.kind]?.icon ?? 'clock']"></span>
+            <div class="grow">
+              <b>{{ ROUND[rd.kind]?.label(rd) ?? rd.kind }}</b>
+              <span class="fd-round-qty">{{ roundItems(rd) }}<template v-if="rd.amount !== null"> · {{ peso(rd.amount) }}</template></span>
+              <small v-if="rd.note">“{{ rd.note }}”</small>
+            </div>
+            <small class="fd-round-when">{{ formatDateTime(rd.created_at) }}</small>
+          </li>
+        </ol>
       </section>
 
       <!-- What's being bought -->
@@ -176,6 +258,7 @@ const props = defineProps({
 const STATUS = {
   Draft: { tone: "slate", icon: "edit" },
   Pending: { tone: "amber", icon: "clock" },
+  Countered: { tone: "violet", icon: "send", label: "Finance offered less" },
   Approved: { tone: "green", icon: "check" },
   Paid: { tone: "teal", icon: "wallet" },
   Rejected: { tone: "red", icon: "close" },
@@ -230,11 +313,71 @@ const statusText = computed(() => {
   if (displayRequestStatus(r) === "Paid") return `Approved by ${by}; the supplier was paid${r.paid_at ? ` on ${formatDate(r.paid_at)}` : ""}.`;
   if (r.request_status === "Approved") return `Approved by ${by} on ${formatDate(r.accounting_decision_at)}.${stage.value ? ` ${stage.value.label}.` : ""}`;
   if (r.request_status === "Rejected") return `Rejected by ${by} on ${formatDate(r.accounting_decision_at)}.`;
+  if (r.request_status === "Countered") {
+    return isInventoryContext.value
+      ? `${by} can fund ${peso(r.offered_amount)} of the ${peso(r.estimated_total_cost)} you asked for. Take the offer, or ask for what you really need.`
+      : `${by} offered ${peso(r.offered_amount)} of ${peso(r.estimated_total_cost)}. Waiting for Procurement to take it or ask again.`;
+  }
+  if (r.request_status === "Pending" && r.rounds?.length) return `Procurement asked again after Finance's offer. Waiting for ${r.approver_name || r.accounting_manager_name || "the Finance approver"} to review it · sent ${formatDateTime(r.submitted_to_accounting_at)}.`;
   if (r.request_status === "Pending") return `Waiting for ${r.approver_name || r.accounting_manager_name || "the Finance approver"} to review it${r.submitted_to_accounting_at ? ` · sent ${formatDateTime(r.submitted_to_accounting_at)}` : ""}.`;
   return canEditFunding.value && isInventoryContext.value ? "A draft. Edit it, then send it to Finance." : "A draft that hasn't been sent to Finance yet.";
 });
 
-const URGENCY_TONE = { Normal: "slate", Urgent: "amber", Critical: "red" };
+// Answering Finance's counter-offer
+const canAnswer = computed(() => can("inventory_funding", "create"));
+const answering = computed(() => isInventoryContext.value && canAnswer.value && request.value?.request_status === "Countered");
+const answer = ref([]);
+const answerNote = ref("");
+const answerBusy = ref("");
+function resetAnswer() {
+  const r = request.value;
+  answerNote.value = "";
+  answer.value = (r?.items ?? []).map((i) => {
+    const offered = Number(i.offered_quantity ?? i.quantity);
+    return { id: i.id, name: i.product_name, uom: String(i.uom || "units").toLowerCase(), cost: Number(i.unit_cost || 0), asked: Number(i.quantity), offered, need: offered };
+  });
+}
+const needError = (a) => {
+  const n = Number(a.need);
+  if (a.need === "" || !Number.isInteger(n)) return "Whole number";
+  if (n < a.offered) return `At least ${a.offered}`;
+  if (n > a.asked) return `At most ${a.asked}`;
+  return "";
+};
+const answerInvalid = computed(() => answer.value.some(needError));
+const asksAgain = computed(() => !answerInvalid.value && answer.value.some((a) => Number(a.need) !== a.offered));
+const askTotal = computed(() => {
+  const r = request.value;
+  const products = answer.value.reduce((s, a) => s + (Number(a.need) || 0) * a.cost, 0);
+  return Math.round((products + Number(r?.logistics_cost || 0) + Number(r?.tax_vat_estimate || 0)) * 100) / 100;
+});
+async function sendAnswer(action) {
+  if (!answering.value || answerBusy.value) return;
+  if (action === "counter" && (answerInvalid.value || !asksAgain.value)) return;
+  answerBusy.value = action;
+  try {
+    const body = action === "accept" ? { action, note: answerNote.value || null } : { action, note: answerNote.value || null, items: answer.value.map((a) => ({ id: a.id, quantity: Number(a.need) })) };
+    const { data } = await api.post(`procurement/inventory/funding-requests/${requestId()}/respond`, body);
+    toast.success(data.message || (action === "accept" ? "Offer taken" : "Sent back to Finance"));
+    await fetchRequest();
+  } catch (e) {
+    toast.error(apiMessage(e, "Couldn't send your answer."));
+    if (e?.response?.status === 409) await fetchRequest();
+  } finally {
+    answerBusy.value = "";
+  }
+}
+
+// One step of the back and forth
+const ROUND = {
+  finance: { tone: "violet", icon: "send", label: (rd) => `${rd.actor_name || "Finance"} offered less` },
+  procurement: { tone: "amber", icon: "restore", label: (rd) => `${rd.actor_name || "Procurement"} asked again` },
+  accepted: { tone: "green", icon: "check", label: (rd) => `${rd.actor_name || "Procurement"} took the offer` },
+  approved: { tone: "green", icon: "check", label: (rd) => `${rd.actor_name || "Finance"} approved it` },
+};
+const roundItems = (rd) => (rd.items ?? []).map((i) => `${i.quantity} ${String(i.uom || "units").toLowerCase()} ${i.product_name}`).join(", ");
+
+const URGENCY_TONE ={ Normal: "slate", Urgent: "amber", Critical: "red" };
 const REASON_LABEL = {
   "New Order": "Customer orders to fill",
   "Seasonal Demand": "Season or holiday demand",
@@ -329,6 +472,7 @@ async function fetchRequest() {
     const base = props.context === "finance" ? "finance/funding-requests" : "procurement/inventory/funding-requests";
     const { data } = await api.get(`${base}/${id}`);
     request.value = data.data;
+    resetAnswer();
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load this funding request.");
   }
@@ -440,6 +584,119 @@ function openLatestReceipt() {
 }
 .fd-decision.bad {
   border-left-color: var(--v-red-text);
+}
+/* Finance's counter-offer */
+.fd-offer {
+  margin-bottom: 16px;
+  border-left: 4px solid var(--v-purple-text);
+}
+.fd-offer-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-purple-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--v-text-2);
+}
+.fd-offer-note :deep(svg) {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--v-purple-text);
+}
+.fd-qty {
+  width: 92px;
+  min-height: 40px;
+  text-align: right;
+}
+.fd-qty.bad {
+  border-color: var(--v-red-text);
+}
+.fd-table td small.fd-range {
+  display: block;
+  margin-top: 4px;
+}
+.fd-offer-field {
+  margin-top: 14px;
+}
+.fd-offer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 14px;
+}
+.fd-offer-foot .sp-hint {
+  margin: 0;
+  flex: 1 1 240px;
+}
+.fd-offer-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fd-offer-btns :deep(svg),
+.fd-rounds :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+/* The back and forth */
+.fd-rounds {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fd-rounds li {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+}
+.fd-rounds li + li {
+  border-top: 1px dashed var(--v-border);
+}
+.fd-rounds .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fd-rounds b {
+  font-size: 13.5px;
+  color: var(--v-text);
+}
+.fd-round-qty {
+  font-size: 13px;
+  color: var(--v-text-2);
+  font-variant-numeric: tabular-nums;
+}
+.fd-rounds small {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.fd-round-when {
+  flex: none;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .fd-rounds li {
+    flex-wrap: wrap;
+  }
+  .fd-round-when {
+    margin-left: 48px;
+  }
+  .fd-offer-btns,
+  .fd-offer-btns .sp-btn {
+    width: 100%;
+  }
 }
 .sp-card + .sp-card,
 .fd-cols {

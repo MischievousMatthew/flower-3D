@@ -19,6 +19,7 @@ class FundingRequestItem extends Model
         'current_stock',
         'quantity',
         'approved_quantity',
+        'offered_quantity',
         'unit_cost',
         'line_total',
     ];
@@ -26,6 +27,7 @@ class FundingRequestItem extends Model
     protected $casts = [
         'quantity'      => 'integer',
         'approved_quantity' => 'integer',
+        'offered_quantity' => 'integer',
         'current_stock' => 'integer',
         'unit_cost'     => 'decimal:2',
         'line_total'    => 'decimal:2',

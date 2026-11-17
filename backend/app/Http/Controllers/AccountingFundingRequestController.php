@@ -343,7 +343,7 @@ class AccountingFundingRequestController extends Controller
                         if ($qty > (int) $line->quantity) {
                             throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, "You can't approve more {$line->product_name} than was asked for.");
                         }
-                        $line->update(['approved_quantity' => $qty]);
+                        $line->approved_quantity = $qty;
                         $approvedQuantity += $qty;
                     }
                     if ($approvedQuantity <= 0) {
@@ -365,9 +365,53 @@ class AccountingFundingRequestController extends Controller
                     throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, sprintf('The budget can be up to ₱%s: the approved products plus the delivery fee.', number_format($ceiling, 2)));
                 }
 
+                $actor = \App\Models\PurchaseOrderEvent::nameOf($employee);
+                $snapshot = fn (string $field) => $lines->map(fn ($l) => [
+                    'item_id' => $l->id, 'product_name' => $l->product_name, 'uom' => $l->uom, 'quantity' => (int) $l->{$field},
+                ])->values()->all();
+
+                // Less than was asked for: not final. It goes back to Procurement,
+                // who takes the offer or asks again for what they really need
+                if ($lines->contains(fn ($l) => (int) $l->approved_quantity < (int) $l->quantity)) {
+                    foreach ($lines as $line) {
+                        $line->update(['offered_quantity' => (int) $line->approved_quantity, 'approved_quantity' => null]);
+                    }
+                    $lockedFundingRequest->update([
+                        'request_status' => FundingRequest::STATUS_COUNTERED,
+                        'reviewed_by_employee_id' => $employee->id,
+                        'accounting_decision_at' => $decisionAt,
+                        'offered_amount' => round($amount, 2),
+                        'accounting_remarks' => $request->finance_remarks,
+                    ]);
+                    $lockedFundingRequest->rounds()->create([
+                        'kind' => \App\Models\FundingRequestRound::FINANCE,
+                        'actor_name' => $actor,
+                        'items' => $snapshot('offered_quantity'),
+                        'amount' => round($amount, 2),
+                        'note' => $request->finance_remarks,
+                    ]);
+
+                    return $lockedFundingRequest->fresh();
+                }
+
+                foreach ($lines as $line) {
+                    $line->update(['approved_quantity' => (int) $line->approved_quantity, 'offered_quantity' => null]);
+                }
+                // After a back and forth, the agreement goes on the record too
+                if ($lockedFundingRequest->rounds()->exists()) {
+                    $lockedFundingRequest->rounds()->create([
+                        'kind' => \App\Models\FundingRequestRound::APPROVED,
+                        'actor_name' => $actor,
+                        'items' => $snapshot('approved_quantity'),
+                        'amount' => round($amount, 2),
+                        'note' => $request->finance_remarks,
+                    ]);
+                }
+
                 // Approving sets the budget. Nothing is paid yet: Finance pays the
                 // supplier later, when their payment terms say (see FundingPaymentService)
                 $lockedFundingRequest->update([
+                    'offered_amount' => null,
                     'request_status' => FundingRequest::STATUS_APPROVED,
                     'payment_status' => 'unpaid',
                     'paid_at' => null,
@@ -385,7 +429,9 @@ class AccountingFundingRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Approved. Pay the supplier once they confirm or deliver, as their terms say.',
+                'message' => $fundingRequest->request_status === FundingRequest::STATUS_COUNTERED
+                    ? 'Your offer went back to Procurement. They can take it or ask again.'
+                    : 'Approved. Pay the supplier once they confirm or deliver, as their terms say.',
                 'data' => $fundingRequest,
             ], 200);
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {

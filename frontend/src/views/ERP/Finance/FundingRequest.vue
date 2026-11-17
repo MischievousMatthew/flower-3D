@@ -74,9 +74,10 @@
           </div>
           <div class="fr-amt">
             <span v-if="paymentStage(r.payment)" class="sp-chip" :class="paymentStage(r.payment).tone" :title="paymentStage(r.payment).text">{{ paymentStage(r.payment).label }}</span>
-            <span v-else class="sp-chip" :class="STATUS[displayRequestStatus(r)]?.tone ?? 'slate'">{{ displayRequestStatus(r) }}</span>
-            <strong>{{ peso(r.request_status === "Approved" ? r.approved_amount : r.estimated_total_cost) }}</strong>
-            <small v-if="r.request_status === 'Approved'">{{ r.payment?.net_paid > 0 && !r.payment?.legacy ? `${peso(r.payment.net_paid)} paid` : "budget" }}<template v-if="r.payment?.overdue"> · overdue</template></small>
+            <span v-else class="sp-chip" :class="STATUS[displayRequestStatus(r)]?.tone ?? 'slate'">{{ STATUS[displayRequestStatus(r)]?.label ?? displayRequestStatus(r) }}</span>
+            <strong>{{ peso(r.request_status === "Approved" ? r.approved_amount : r.request_status === "Countered" ? r.offered_amount : r.estimated_total_cost) }}</strong>
+            <small v-if="r.request_status === 'Countered'">offered · {{ peso(r.estimated_total_cost) }} asked</small>
+            <small v-else-if="r.request_status === 'Approved'">{{ r.payment?.net_paid > 0 && !r.payment?.legacy ? `${peso(r.payment.net_paid)} paid` : "budget" }}<template v-if="r.payment?.overdue"> · overdue</template></small>
           </div>
           <div class="fr-actions" @click.stop>
             <button
@@ -128,6 +129,15 @@
               <div v-if="review.additional_notes"><span class="fr-brief-label">Notes</span><p>{{ review.additional_notes }}</p></div>
             </div>
 
+            <!-- Back again after an offer -->
+            <div v-if="lastAsk" class="fr-again" role="note">
+              <span class="fx-icon tone-violet" v-html="ICONS.send"></span>
+              <div>
+                <b>{{ lastAsk.actor_name || "Procurement" }} asked again after your offer</b>
+                <p>{{ askSummary }}<template v-if="lastAsk.note"> · “{{ lastAsk.note }}”</template></p>
+              </div>
+            </div>
+
             <!-- Products -->
             <div class="fr-table-wrap">
               <div v-if="loadingLines" class="fr-lines-sk"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div>
@@ -143,7 +153,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="l in lines" :key="l.key" :class="{ cut: decision === 'approve' && Number(l.approve) < Number(l.quantity) }">
-                    <td><b>{{ l.product_name }}</b><small v-if="l.current_stock !== null && l.current_stock !== undefined">{{ l.current_stock }} in stock when asked</small></td>
+                    <td><b>{{ l.product_name }}</b><small v-if="l.current_stock !== null && l.current_stock !== undefined">{{ l.current_stock }} in stock when asked</small><small v-if="offeredBefore(l) !== null" class="fr-was">you offered {{ offeredBefore(l) }} before</small></td>
                     <td class="num">{{ l.quantity }} {{ (l.uom || "units").toLowerCase() }}</td>
                     <td class="num">{{ peso(l.unit_cost) }}</td>
                     <td v-if="decision === 'approve'" class="num">
@@ -155,7 +165,7 @@
                 <tfoot>
                   <tr v-if="Number(review.logistics_cost) > 0"><td :colspan="decision === 'approve' ? 4 : 3">Delivery fee</td><td class="num">{{ peso(review.logistics_cost) }}</td></tr>
                   <tr v-if="Number(review.tax_vat_estimate) > 0"><td :colspan="decision === 'approve' ? 4 : 3">Tax or VAT</td><td class="num">{{ peso(review.tax_vat_estimate) }}</td></tr>
-                  <tr class="total"><td :colspan="decision === 'approve' ? 4 : 3">{{ decision === "approve" ? "Approving" : "Total asked" }}</td><td class="num">{{ peso(decision === "approve" ? computedAmount : review.estimated_total_cost) }}</td></tr>
+                  <tr class="total"><td :colspan="decision === 'approve' ? 4 : 3">{{ decision === "approve" ? (isCounter ? "Offering" : "Approving") : "Total asked" }}</td><td class="num">{{ peso(decision === "approve" ? computedAmount : review.estimated_total_cost) }}</td></tr>
                 </tfoot>
               </table>
             </div>
@@ -170,7 +180,8 @@
 
             <div v-if="decision === 'approve'" class="sp-grid-2 fr-decision">
               <p class="fr-budget-note sp-span-all"><span v-html="ICONS.wallet"></span>Approving sets a budget. Nothing is paid now: you pay the supplier once they confirm or deliver, as their payment terms say, and only for what they can supply.</p>
-              <p class="sp-hint sp-span-all">Lower a product's quantity above to approve only part of it. The budget follows.</p>
+              <p v-if="isCounter" class="fr-counter-note sp-span-all" role="status"><span v-html="ICONS.send"></span><span>This is less than Procurement asked for, so it goes back to them as an offer. They can take it, or ask for a number between your offer and their last ask. If they ask again, it comes back to you.</span></p>
+              <p v-else class="sp-hint sp-span-all">Can't fund all of it? Lower a product's quantity above. It goes back to Procurement as an offer, and the budget follows.</p>
               <label class="sp-field">
                 <span class="sp-label">Budget (₱)</span>
                 <input v-model.number="review.approved_amount" class="sp-input" type="number" min="0" step="0.01" inputmode="decimal" @input="amountTouched = true" />
@@ -182,8 +193,8 @@
               </div>
               <small v-if="Number(review.approved_amount) > computedAmount" class="sp-error sp-span-all">The budget can't be more than {{ peso(computedAmount) }}: the approved products plus the delivery fee.</small>
               <label class="sp-field sp-span-all">
-                <span class="sp-label">Remarks <small>(optional)</small></span>
-                <textarea v-model="review.finance_remarks" class="sp-textarea" rows="2" maxlength="500" placeholder="Any conditions, like buying in two batches"></textarea>
+                <span class="sp-label">{{ isCounter ? "Note for Procurement" : "Remarks" }} <small>(optional)</small></span>
+                <textarea v-model="review.finance_remarks" class="sp-textarea" rows="2" maxlength="500" :placeholder="isCounter ? 'Why you can fund less, like cash is tight until the 30th' : 'Any conditions, like buying in two batches'"></textarea>
               </label>
             </div>
             <div v-else-if="decision === 'reject'" class="sp-grid-2 fr-decision">
@@ -209,7 +220,7 @@
                 :disabled="!decision || submitting || !canSubmitDecision"
                 :title="decisionPermissionTooltip"
                 @click="submitDecision"
-              >{{ submitting ? "Saving…" : decision === "reject" ? "Reject request" : `Approve ${peso(review.approved_amount)} budget` }}</button>
+              >{{ submitting ? "Saving…" : decision === "reject" ? "Reject request" : isCounter ? `Offer ${peso(review.approved_amount)} to Procurement` : `Approve ${peso(review.approved_amount)} budget` }}</button>
             </div>
           </div>
         </div>
@@ -237,12 +248,14 @@ import "../../../components/vendor/finance/finance.css";
 const STATUS_TABS = [
   { label: "All", value: "all" },
   { label: "Pending", value: "Pending" },
+  { label: "With Procurement", value: "Countered" },
   { label: "To pay", value: "to_pay" },
   { label: "Approved", value: "Approved" },
   { label: "Rejected", value: "Rejected" },
 ];
 const STATUS = {
   Pending: { tone: "amber", icon: "clock" },
+  Countered: { tone: "violet", icon: "send", label: "With Procurement" },
   Approved: { tone: "green", icon: "check" },
   Paid: { tone: "teal", icon: "wallet" },
   Rejected: { tone: "red", icon: "close" },
@@ -276,6 +289,18 @@ const loadingLines = ref(false);
 const amountTouched = ref(false);
 const decision = ref(null);
 const lines = ref([]);
+// The back and forth with Procurement, for a request that came back with a new ask
+const rounds = ref([]);
+const lastOf = (kind) => [...rounds.value].reverse().find((r) => r.kind === kind) ?? null;
+const lastAsk = computed(() => (review.value.request_status === "Pending" ? lastOf("procurement") : null));
+const offeredBefore = (l) => {
+  const offer = lastAsk.value ? lastOf("finance") : null;
+  const item = offer?.items?.find((i) => Number(i.item_id) === Number(l.id));
+  return item ? Number(item.quantity) : null;
+};
+const askSummary = computed(() =>
+  (lastAsk.value?.items ?? []).map((i) => `${i.quantity} ${String(i.uom || "units").toLowerCase()} of ${i.product_name}`).join(", "),
+);
 
 const emptyReview = () => ({ id: null, approver_id: null, approved_amount: 0, finance_remarks: "", rejection_reason: "", rejection_notes: "" });
 const review = ref(emptyReview());
@@ -386,6 +411,9 @@ async function fetchRequests() {
 
 const viewRequest = (id) => router.push({ name: "FinanceFundingRequestDetails", params: { id } });
 
+// Less than asked for on any product: an offer back to Procurement, not an approval
+const isCounter = computed(() => decision.value === "approve" && lines.value.some((l) => l.id && Number(l.approve) < Number(l.quantity)));
+
 // Products' total at the approved quantities, plus the delivery fee
 const computedAmount = computed(() => {
   const products = lines.value.reduce((s, l) => s + (Number(l.approve) || 0) * Number(l.unit_cost || 0), 0);
@@ -416,11 +444,13 @@ async function openReviewModal(r) {
   decision.value = null;
   amountTouched.value = false;
   lines.value = legacyLine(r);
+  rounds.value = [];
   showReviewModal.value = true;
   if (!Number(r.items_count)) return;
   loadingLines.value = true;
   try {
     const { data } = await api.get(`finance/funding-requests/${r.id}`);
+    if (showReviewModal.value && review.value.id === r.id) rounds.value = data.data?.rounds ?? [];
     if (showReviewModal.value && review.value.id === r.id && data.data?.items?.length) {
       lines.value = data.data.items.map((i) => ({ key: i.id, id: i.id, product_name: i.product_name, uom: i.uom, current_stock: i.current_stock, quantity: Number(i.quantity), approve: Number(i.quantity), unit_cost: Number(i.unit_cost) }));
       syncAmount();
@@ -467,7 +497,7 @@ async function submitDecision() {
           }
         : { rejection_reason: f.rejection_reason, rejection_notes: f.rejection_notes };
     const { data } = await api.post(`finance/funding-requests/${f.id}/${decision.value}`, payload);
-    toast.success(data.message || (decision.value === "approve" ? "Request approved" : "Request rejected"));
+    toast.success(data.message || (decision.value === "approve" ? (isCounter.value ? "Offer sent to Procurement" : "Request approved") : "Request rejected"));
     closeReviewModal();
     await fetchRequests();
   } catch (e) {
@@ -849,6 +879,50 @@ onMounted(async () => {
   height: 16px;
   margin-top: 1px;
   color: var(--bc-accent-deep);
+}
+.fr-again {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--v-border);
+  border-left: 3px solid var(--v-purple-text);
+  border-radius: 0 12px 12px 0;
+  background: var(--v-surface);
+}
+.fr-again b {
+  font-size: 13.5px;
+  color: var(--v-text);
+}
+.fr-again p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--v-text-2);
+}
+.fr-table td small.fr-was {
+  display: block;
+  color: var(--v-purple-text);
+}
+.fr-counter-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-purple-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--v-text-2);
+}
+.fr-counter-note :deep(svg) {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--v-purple-text);
 }
 .fr-link {
   padding: 0;

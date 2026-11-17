@@ -72,6 +72,8 @@ class ErpBadgesController extends Controller
             'payroll_requests' => fn () => Payroll::forOwner($ownerId)->where('status', 'pending')->count(),
             // Funding waiting for Finance's approval
             'funding_requests' => fn () => FundingRequest::forOwner($ownerId)->where('request_status', FundingRequest::STATUS_PENDING)->count(),
+            // Finance offered less: Procurement takes it or asks again
+            'inventory_funding' => fn () => FundingRequest::forOwner($ownerId)->where('request_status', FundingRequest::STATUS_COUNTERED)->count(),
             // Refunds agreed with the customer but not yet sent
             'refunds' => fn () => OrderRequest::query()->whereHas('order', $shopOrder)
                 ->where('status', 'approved')

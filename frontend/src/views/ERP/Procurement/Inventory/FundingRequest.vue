@@ -15,7 +15,7 @@
     <!-- Stages: also the filter -->
     <section class="fr-stages" aria-label="Request stages">
       <template v-if="loading && !requests.length">
-        <div v-for="n in 5" :key="n" class="sp-card fr-stage"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton fr-sk-num"></div></div>
+        <div v-for="n in 6" :key="n" class="sp-card fr-stage"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton fr-sk-num"></div></div>
       </template>
       <template v-else>
         <button
@@ -31,6 +31,7 @@
           <strong>{{ getStatusCount(s.value) }}</strong>
           <small v-if="s.value === 'Approved' && approvedTotal > 0">{{ money(approvedTotal) }} approved</small>
           <small v-else-if="s.value === 'Pending' && pendingTotal > 0">{{ money(pendingTotal) }} waiting</small>
+          <small v-else-if="s.value === 'Countered' && getStatusCount('Countered') > 0">needs your answer</small>
         </button>
       </template>
     </section>
@@ -105,6 +106,7 @@
             <span class="fr-status">
               <span class="sp-chip" :class="statusOf(r.request_status).tone">{{ statusOf(r.request_status).label }}</span>
               <small v-if="r.request_status === 'Approved' && r.payment_status">{{ r.payment_status === "paid" ? "Paid" : "Not paid yet" }}</small>
+              <small v-else-if="r.request_status === 'Countered'">{{ money(r.offered_amount) }} offered</small>
             </span>
 
             <span class="fr-actions" @click.stop>
@@ -119,6 +121,7 @@
                 <span v-html="ICONS.more"></span>
               </button>
               <div v-if="openMenuId === r.id" class="fr-menu" role="menu">
+                <button v-if="r.request_status === 'Countered'" type="button" role="menuitem" @click="viewRequest(r.id)"><span v-html="ICONS.send"></span>Answer Finance's offer</button>
                 <button type="button" role="menuitem" @click="viewRequest(r.id)"><span v-html="ICONS.eye"></span>View details</button>
                 <template v-if="r.request_status === 'Draft'">
                   <button type="button" role="menuitem" :disabled="!canEditFunding" :title="canEditFunding ? '' : permissionMessages.edit" @click="editRequest(r.id)">
@@ -207,6 +210,7 @@ const STAGES = [
   { label: "All requests", value: "all", tone: "slate" },
   { label: "Draft", value: "Draft", tone: "slate" },
   { label: "Waiting for Finance", value: "Pending", tone: "amber" },
+  { label: "Finance offered less", value: "Countered", tone: "violet" },
   { label: "Approved", value: "Approved", tone: "green" },
   { label: "Rejected", value: "Rejected", tone: "red" },
 ];
@@ -214,6 +218,7 @@ const URGENCIES = ["Normal", "Urgent", "Critical"];
 const STATUS = {
   Draft: { label: "Draft", tone: "slate" },
   Pending: { label: "Waiting for Finance", tone: "amber" },
+  Countered: { label: "Finance offered less", tone: "violet" },
   Approved: { label: "Approved", tone: "green" },
   Rejected: { label: "Rejected", tone: "red" },
 };
@@ -374,7 +379,7 @@ onBeforeUnmount(() => {
 /* Stages */
 .fr-stages {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -435,6 +440,7 @@ onBeforeUnmount(() => {
 .t-amber .fr-dot { background: #f59e0b; }
 .t-green .fr-dot { background: #10b981; }
 .t-red .fr-dot { background: #ef4444; }
+.t-violet .fr-dot { background: var(--v-purple-text); }
 
 /* Filters */
 .fr-bar {

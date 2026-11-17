@@ -89,6 +89,7 @@ class FundingRequest extends Model
         'reviewed_by_employee_id',
         'approved_quantity',
         'approved_amount',
+        'offered_amount',
         'accounting_remarks',
         'rejection_reason',
         'rejection_notes',
@@ -126,6 +127,7 @@ class FundingRequest extends Model
         'recommended_budget'     => 'decimal:2',
         'price_ceiling'          => 'decimal:2',
         'approved_amount'        => 'decimal:2',
+        'offered_amount'         => 'decimal:2',
 
         'shelf_life'             => 'float',
         'expected_spoilage'      => 'float',
@@ -135,6 +137,8 @@ class FundingRequest extends Model
 
     const STATUS_DRAFT     = 'Draft';
     const STATUS_PENDING   = 'Pending';
+    // Finance offered less than was asked: back with Procurement to accept or ask again
+    const STATUS_COUNTERED = 'Countered';
     const STATUS_APPROVED  = 'Approved';
     const STATUS_REJECTED  = 'Rejected';
     const STATUS_CANCELLED = 'Cancelled';
@@ -174,6 +178,12 @@ class FundingRequest extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(FundingRequestPayment::class)->orderBy('id');
+    }
+
+    /** The back and forth between Finance and Procurement over how much to buy */
+    public function rounds(): HasMany
+    {
+        return $this->hasMany(FundingRequestRound::class)->orderBy('id');
     }
 
     public function linkedOrder(): BelongsTo

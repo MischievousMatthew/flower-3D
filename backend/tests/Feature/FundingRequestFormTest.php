@@ -23,6 +23,7 @@ class FundingRequestFormTest extends TestCase
     {
         parent::setUp();
         $this->createAttendanceTables();
+        Schema::dropIfExists('funding_request_rounds');
         Schema::dropIfExists('funding_request_payments');
         Schema::dropIfExists('funding_request_items');
         Schema::dropIfExists('funding_requests');
@@ -39,7 +40,7 @@ class FundingRequestFormTest extends TestCase
         });
         foreach (['2026_02_07_085208_create_funding_requests_table', '2026_03_10_065051_add_linked_order_id_to_funding_requests_table',
             '2026_04_02_120100_add_requester_and_approver_to_funding_requests_table', '2026_04_05_110000_add_payment_status_to_funding_requests_table',
-            '2026_11_09_120000_add_items_and_payment_method_to_funding_requests', '2026_11_09_130000_add_approved_quantity_to_funding_request_items', '2026_11_09_140000_funding_request_payments'] as $m) {
+            '2026_11_09_120000_add_items_and_payment_method_to_funding_requests', '2026_11_09_130000_add_approved_quantity_to_funding_request_items', '2026_11_17_100000_funding_request_counter_offers', '2026_11_09_140000_funding_request_payments'] as $m) {
             (require base_path("database/migrations/{$m}.php"))->up();
         }
         // purchase_orders isn't built here; the request's link to it stays empty
@@ -187,11 +188,16 @@ class FundingRequestFormTest extends TestCase
             'items' => [['id' => $lines[0], 'approved_quantity' => 101]],
         ])->assertStatus(422);
 
-        // Half the roses, no tulips
+        // Half the roses, no tulips: an offer that goes back to Procurement
         $this->postJson("/api/finance/funding-requests/{$id}/approve", [
             'approved_quantity' => 50, 'approved_amount' => 1150,
             'items' => [['id' => $lines[0], 'approved_quantity' => 50], ['id' => $lines[1], 'approved_quantity' => 0]],
         ])->assertOk();
+        $this->assertSame('Countered', DB::table('funding_requests')->where('id', $id)->value('request_status'));
+
+        // Procurement takes it
+        $this->app['auth']->forgetGuards();
+        $this->signIn($this->buyer)->postJson("/api/procurement/inventory/funding-requests/{$id}/respond", ['action' => 'accept'])->assertOk();
 
         $this->assertSame([50, 0], DB::table('funding_request_items')->where('funding_request_id', $id)->orderBy('id')->pluck('approved_quantity')->map(fn ($q) => (int) $q)->all());
         $row = DB::table('funding_requests')->find($id);
