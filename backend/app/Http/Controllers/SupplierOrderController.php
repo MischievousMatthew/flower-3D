@@ -227,7 +227,7 @@ class SupplierOrderController extends Controller
         }
         $rules = $this->payoutRules($request);
         unset($rules['use_saved']);
-        // Bank or e-wallet is worked out from the provider when not given
+        // Banks only: supply orders are too large for e-wallet limits
         foreach (['payout_provider', 'payout_account_name', 'payout_account_number'] as $f) {
             $rules[$f][0] = 'required';
         }
@@ -257,10 +257,10 @@ class SupplierOrderController extends Controller
 
         return [
             'use_saved' => ['nullable', 'boolean'],
-            'payout_method' => ['nullable', 'in:bank,ewallet'],
+            'payout_method' => ['nullable', 'in:bank'],
             'payout_provider' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::payoutNames())],
             'payout_account_name' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', 'max:120'],
-            // Digits (spaces or dashes are fine), as many as the bank or e-wallet uses
+            // Digits (spaces or dashes are fine), as many as the bank uses
             'payout_account_number' => [
                 $useSaved ? 'nullable' : 'required_with:payout_provider', 'nullable', 'string', 'max:40', 'regex:/^[0-9 \-]{6,40}$/',
                 function ($attribute, $value, $fail) use ($request) {
@@ -275,8 +275,8 @@ class SupplierOrderController extends Controller
     private function payoutMessages(): array
     {
         return [
-            'payout_provider.required' => 'Choose the bank or e-wallet.',
-            'payout_provider.required_with' => 'Choose the bank or e-wallet.',
+            'payout_provider.required' => 'Choose the bank. Supplies are paid by bank transfer only.',
+            'payout_provider.required_with' => 'Choose the bank. Supplies are paid by bank transfer only.',
             'payout_account_name.required' => 'Enter the name on the account.',
             'payout_account_name.required_with' => 'Enter the name on the account.',
             'payout_account_number.required' => 'Enter the account or mobile number.',
@@ -288,7 +288,7 @@ class SupplierOrderController extends Controller
     /** The account from the form, or the one on file when they chose to keep it */
     private function payoutFrom(array $data, PurchaseOrder $order): ?array
     {
-        if (! empty($data['use_saved']) && SupplierPayout::has($order->supplier)) {
+        if (! empty($data['use_saved']) && SupplierPayout::hasBank($order->supplier)) {
             return collect(SupplierPayout::FIELDS)->mapWithKeys(fn ($f) => [$f => $order->supplier->{$f}])->all();
         }
         if (empty($data['payout_account_number']) || empty($data['payout_provider'])) {
@@ -328,7 +328,7 @@ class SupplierOrderController extends Controller
                 'timing' => SupplierPaymentTerms::timing($terms),
                 'due_days' => SupplierPaymentTerms::dueDays($terms),
                 // The account they gave for this order, or the one they gave before
-                'account' => SupplierPayout::masked($order) ?? SupplierPayout::masked($order->supplier),
+                'account' => SupplierPayout::masked($order) ?? (SupplierPayout::hasBank($order->supplier) ? SupplierPayout::masked($order->supplier) : null),
                 'account_for_order' => SupplierPayout::has($order),
                 'can_change_account' => $payments->where('kind', FundingRequestPayment::KIND_PAYMENT)->isEmpty(),
                 'paid' => round((float) $payments->where('kind', FundingRequestPayment::KIND_PAYMENT)->sum('amount'), 2),

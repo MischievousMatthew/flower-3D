@@ -1,15 +1,18 @@
-// Banks and e-wallets a funding request is paid through: only those PayMongo
-// Checkout offers. Matches App\Support\PayMongoChannels on the server.
+// Banks a funding request is paid through: only those PayMongo Checkout
+// offers. Supplies cost too much for e-wallet limits, so it's banks only.
+// Matches App\Support\PayMongoChannels on the server.
 export const CHANNELS = {
-  // QR Ph: a QR code the payer scans with almost any bank or e-wallet app
+  // QR Ph: a QR code the payer scans with their bank app
   bank: ["QR Ph", "BPI", "UnionBank", "BDO", "Landbank", "Metrobank"],
-  ewallet: ["GCash", "Maya", "GrabPay", "ShopeePay"],
 };
 
-// Accounts a supplier can be paid into (a QR code can't receive money)
-export const PAYOUT_CHANNELS = { bank: CHANNELS.bank.filter((c) => c !== "QR Ph"), ewallet: CHANNELS.ewallet };
+// No longer offered; only so older requests and supplier accounts still read right
+export const OLD_EWALLETS = ["GCash", "Maya", "GrabPay", "ShopeePay"];
 
-export const kindOf = (channel) => (CHANNELS.ewallet.includes(channel) ? "ewallet" : "bank");
+// Accounts a supplier can be paid into (a QR code can't receive money)
+export const PAYOUT_CHANNELS = { bank: CHANNELS.bank.filter((c) => c !== "QR Ph") };
+
+export const kindOf = (channel) => (OLD_EWALLETS.includes(channel) ? "ewallet" : "bank");
 
 // PayMongo's smallest e-wallet and online-banking payment
 export const PAYMONGO_MINIMUM = 20;
@@ -28,7 +31,7 @@ export const ACCOUNT_FORMATS = {
   mobile: { lengths: [11], groups: [4, 3, 4], example: "0917 123 4567", prefix: "09" },
 };
 
-export const accountFormat = (provider) => (CHANNELS.ewallet.includes(provider) ? ACCOUNT_FORMATS.mobile : ACCOUNT_FORMATS[provider]) ?? null;
+export const accountFormat = (provider) => (OLD_EWALLETS.includes(provider) ? ACCOUNT_FORMATS.mobile : ACCOUNT_FORMATS[provider]) ?? null;
 
 /** Digits only, cut to the longest allowed length and spaced into groups */
 export function formatAccount(provider, value) {
@@ -56,7 +59,7 @@ export function accountError(provider, value) {
   if (f.prefix && !digits.startsWith(f.prefix)) return `Mobile numbers start with ${f.prefix}, e.g. ${f.example}.`;
   if (!f.lengths.includes(digits.length)) {
     const want = f.lengths.join(" or ");
-    return `${CHANNELS.ewallet.includes(provider) ? "The mobile number" : `A ${provider} account number`} has ${want} digits, e.g. ${f.example}.`;
+    return `${OLD_EWALLETS.includes(provider) ? "The mobile number" : `A ${provider} account number`} has ${want} digits, e.g. ${f.example}.`;
   }
   return "";
 }

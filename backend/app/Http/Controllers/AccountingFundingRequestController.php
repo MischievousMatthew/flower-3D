@@ -118,7 +118,7 @@ class AccountingFundingRequestController extends Controller
     private function moneyRules(): array
     {
         return [
-            'payment_method' => 'nullable|in:bank,ewallet',
+            'payment_method' => 'nullable|in:bank',
             'payment_channel' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::all())],
             'reference' => 'required|string|max:100',
             'paid_on' => 'required|date|before_or_equal:today',
@@ -147,7 +147,7 @@ class AccountingFundingRequestController extends Controller
             return $response;
         }
         $data = $request->validate(['amount' => 'required|numeric|gt:0|max:100000000'] + $this->moneyRules(), [
-            'reference.required' => 'Enter the reference number from the bank or e-wallet.',
+            'reference.required' => 'Enter the reference number from the bank.',
             'paid_on.before_or_equal' => 'The payment date can\'t be in the future.',
         ]);
 
@@ -174,7 +174,7 @@ class AccountingFundingRequestController extends Controller
             'payment_channel' => ['required', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::all())],
             // The page Finance paid from, so PayMongo brings them back to it: a path on our site only
             'return_to' => ['nullable', 'string', 'max:300', 'regex:#^/[^/\\\\]#'],
-        ], ['payment_channel.in' => 'Choose a bank or e-wallet PayMongo offers.']);
+        ], ['payment_channel.in' => 'Choose a bank PayMongo offers. Supplies are paid by bank only.']);
 
         return $this->moneyResponse(fn () => [
             'checkout_url' => $paymongo->create(

@@ -134,20 +134,12 @@
 
         <!-- Payment -->
         <section class="sp-card" aria-labelledby="fr-pay">
-          <div class="sp-card-head"><div><h2 id="fr-pay">Payment</h2><p>Finance pays the supplier through PayMongo, with this bank or e-wallet</p></div></div>
-          <div class="fr-methods" role="radiogroup" aria-label="Payment method">
-            <label v-for="m in METHODS" :key="m.value" class="fr-method" :class="{ on: form.payment_method === m.value, invalid: err.payment_method }">
-              <input v-model="form.payment_method" type="radio" name="fr-method" :value="m.value" @change="form.payment_channel = ''" />
-              <span class="fx-icon" v-html="ICONS[m.icon]"></span>
-              <span><b>{{ m.label }}</b><small>{{ m.hint }}</small></span>
-            </label>
-          </div>
-          <small v-if="err.payment_method" class="sp-error">{{ err.payment_method }}</small>
+          <div class="sp-card-head"><div><h2 id="fr-pay">Payment</h2><p>Finance pays the supplier by bank transfer through PayMongo. Supplies cost too much for e-wallet limits, so it's banks only.</p></div></div>
 
-          <fieldset v-if="form.payment_method" class="fr-fieldset fr-channels-wrap">
-            <legend class="sp-label">{{ form.payment_method === "bank" ? "Bank" : "E-wallet" }}</legend>
+          <fieldset class="fr-fieldset fr-channels-wrap">
+            <legend class="sp-label">Bank</legend>
             <div class="fr-channels">
-              <label v-for="c in CHANNELS[form.payment_method]" :key="c" class="fr-channel" :class="{ on: form.payment_channel === c }">
+              <label v-for="c in CHANNELS.bank" :key="c" class="fr-channel" :class="{ on: form.payment_channel === c }">
                 <input v-model="form.payment_channel" type="radio" name="fr-channel" :value="c" />{{ c }}
               </label>
             </div>
@@ -185,7 +177,7 @@
             <div v-if="Number(form.logistics_cost) > 0"><dt>Delivery fee</dt><dd>{{ money(form.logistics_cost) }}</dd></div>
             <div class="total"><dt>Total requested</dt><dd>{{ money(total) }}</dd></div>
           </dl>
-          <p v-if="form.payment_channel" class="fr-paynote"><span v-html="ICONS[form.payment_method === 'bank' ? 'card' : 'wallet']"></span>Paid through {{ form.payment_channel }}</p>
+          <p v-if="form.payment_channel" class="fr-paynote"><span v-html="ICONS.card"></span>Paid through {{ form.payment_channel }}</p>
 
           <p v-if="formError" class="sp-error" role="alert">{{ formError }}</p>
           <button type="submit" class="sp-btn sp-btn-primary fr-btn" :disabled="!!busy || !canSave"><span v-html="ICONS.send"></span>{{ busy === "send" ? "Sending…" : "Send to Finance" }}</button>
@@ -226,10 +218,6 @@ const URGENCY = [
   { value: "Normal", hint: "Within the usual time", tone: "slate" },
   { value: "Urgent", hint: "In the next few days", tone: "amber" },
   { value: "Critical", hint: "Orders are at risk now", tone: "red" },
-];
-const METHODS = [
-  { value: "bank", label: "Online banking", hint: "QR Ph (any bank app), BPI, UnionBank, BDO…", icon: "card" },
-  { value: "ewallet", label: "E-wallet", hint: "GCash, Maya, GrabPay, ShopeePay", icon: "wallet" },
 ];
 const BASE = "/procurement/inventory/funding-requests";
 const LIST = "/erp/procurement/inventory/funding-request";
@@ -323,8 +311,7 @@ function validate(send) {
     if (!form.required_delivery_date) err.required_delivery_date = "When do you need it?";
     if (!form.reason_for_shortage) err.reason_for_shortage = "Choose a reason.";
     if (!form.business_justification.trim()) err.business_justification = "Say in a few words why it's needed.";
-    if (!form.payment_method) err.payment_method = "Choose bank transfer or e-wallet.";
-    else if (!form.payment_channel) err.payment_channel = `Choose the ${form.payment_method === "bank" ? "bank" : "e-wallet"}.`;
+    if (!form.payment_channel) err.payment_channel = "Choose the bank.";
     if (total.value <= 0 && form.items.length) formError.value = "The total can't be ₱0. Check the unit costs.";
   }
   return !Object.keys(err).length && !formError.value;
@@ -395,8 +382,9 @@ async function loadDraft() {
     reason_for_shortage: r.reason_for_shortage || "",
     business_justification: r.business_justification || "",
     additional_notes: r.additional_notes || "",
-    payment_method: r.payment_method || "bank",
-    payment_channel: r.payment_channel || "",
+    // Banks only now: a draft that named an e-wallet asks for a bank again
+    payment_method: "bank",
+    payment_channel: CHANNELS.bank.includes(r.payment_channel) ? r.payment_channel : "",
     logistics_cost: Number(r.logistics_cost) || null,
   });
   return true;

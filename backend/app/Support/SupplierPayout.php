@@ -14,6 +14,12 @@ class SupplierPayout
         return $m !== null && filled($m->payout_provider) && filled($m->payout_account_number);
     }
 
+    /** A bank account: the only kind new supply orders are paid into (e-wallet limits are too low) */
+    public static function hasBank(?Model $m): bool
+    {
+        return self::has($m) && \App\Support\PayMongoChannels::kindOf((string) $m->payout_provider) === 'bank';
+    }
+
     /** Last four digits only, for the supplier's own page */
     public static function mask(?string $number): ?string
     {

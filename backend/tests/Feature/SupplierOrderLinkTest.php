@@ -195,26 +195,27 @@ class SupplierOrderLinkTest extends TestCase
 
         $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items])
             ->assertStatus(422)->assertJsonValidationErrors('payout_account_number');
-        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => 'abc'])
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'BDO', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => 'abc'])
             ->assertStatus(422)->assertJsonValidationErrors('payout_account_number');
-        // The right number of digits for the bank or e-wallet
-        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '917 123 4567'])
-            ->assertStatus(422)->assertJsonPath('errors.payout_account_number.0', 'Mobile numbers start with 09, e.g. 0917 123 4567.');
+        // Supplies are paid by bank only: no e-wallets
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '0917 123 4567'])
+            ->assertStatus(422)->assertJsonValidationErrors('payout_provider');
+        // The right number of digits for the bank
         $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'BPI', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '12345678'])
             ->assertStatus(422)->assertJsonPath('errors.payout_account_number.0', 'A BPI account number has 10 digits, e.g. 1234 567 890.');
 
         // Typed any way, saved the way the bank prints it
-        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '0917-1234567'])
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'BDO', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '0012-3456-7890'])
             ->assertOk()
-            ->assertJsonPath('data.payment.account.provider', 'GCash')
-            ->assertJsonPath('data.payment.account.account_number', '•••• 4567');
+            ->assertJsonPath('data.payment.account.provider', 'BDO')
+            ->assertJsonPath('data.payment.account.account_number', '•••• 7890');
 
         // Saved on the order and the supplier, encrypted, and never in the shop's order data
         $order = PurchaseOrder::with('supplier')->findOrFail($this->orderId);
-        $this->assertSame('0917 123 4567', $order->payout_account_number);
-        $this->assertSame('ewallet', $order->payout_method);
-        $this->assertSame('0917 123 4567', $order->supplier->payout_account_number);
-        $this->assertStringNotContainsString('4567', (string) DB::table('purchase_orders')->value('payout_account_number'));
+        $this->assertSame('0012 3456 7890', $order->payout_account_number);
+        $this->assertSame('bank', $order->payout_method);
+        $this->assertSame('0012 3456 7890', $order->supplier->payout_account_number);
+        $this->assertStringNotContainsString('7890', (string) DB::table('purchase_orders')->value('payout_account_number'));
         $this->assertArrayNotHasKey('payout_account_number', $order->toArray());
     }
 

@@ -3,12 +3,14 @@
 namespace App\Support;
 
 /**
- * The banks and e-wallets a funding request can be paid through: only those
- * PayMongo Checkout offers, each with its PayMongo payment method type.
+ * The banks a funding request can be paid through: only those PayMongo
+ * Checkout offers, each with its PayMongo payment method type. Supplies cost
+ * too much for e-wallet limits, so paying suppliers is banks only; the
+ * e-wallets stay listed only so older requests and accounts still read right.
  */
 class PayMongoChannels
 {
-    // QR Ph: PayMongo shows a QR code the payer scans with almost any bank or e-wallet app
+    // QR Ph: PayMongo shows a QR code the payer scans with their bank app
     public const QR = 'QR Ph';
 
     public const BANK = [
@@ -20,6 +22,7 @@ class PayMongoChannels
         'Metrobank' => 'brankas_metrobank',
     ];
 
+    // No longer offered (see above); kept to read older records
     public const EWALLET = [
         'GCash' => 'gcash',
         'Maya' => 'paymaya',
@@ -27,15 +30,16 @@ class PayMongoChannels
         'ShopeePay' => 'shopee_pay',
     ];
 
-    /** ['bank' => [names], 'ewallet' => [names]] */
+    /** ['bank' => [names]] */
     public static function names(): array
     {
-        return ['bank' => array_keys(self::BANK), 'ewallet' => array_keys(self::EWALLET)];
+        return ['bank' => array_keys(self::BANK)];
     }
 
+    /** What can be chosen now: banks only */
     public static function all(): array
     {
-        return array_merge(array_keys(self::BANK), array_keys(self::EWALLET));
+        return array_keys(self::BANK);
     }
 
     /**
@@ -113,7 +117,8 @@ class PayMongoChannels
 
     public static function methodOf(string $channel): ?string
     {
-        return self::BANK[$channel] ?? self::EWALLET[$channel] ?? null;
+        // Only banks can be paid through now
+        return self::BANK[$channel] ?? null;
     }
 
     public static function kindOf(string $channel): string

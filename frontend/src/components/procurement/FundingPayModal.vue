@@ -47,7 +47,7 @@
           <div v-if="isCredit" class="fp-choice" role="radiogroup" aria-label="What happened">
             <label class="fp-opt" :class="{ on: form.outcome === 'refund' }">
               <input v-model="form.outcome" type="radio" value="refund" />
-              <b>They refunded it</b><small>Money came back to our bank or e-wallet</small>
+              <b>They refunded it</b><small>Money came back to our bank account</small>
             </label>
             <label class="fp-opt" :class="{ on: form.outcome === 'credit' }">
               <input v-model="form.outcome" type="radio" value="credit" />
@@ -58,16 +58,15 @@
           <!-- Pay through PayMongo -->
           <div v-if="!isCredit && !manual" class="fp-pm">
             <fieldset class="fp-fieldset">
-              <legend class="sp-label">Pay with</legend>
-              <div v-for="(list, kind) in CHANNELS" :key="kind" class="fp-group">
-                <span class="fp-group-label">{{ kind === "bank" ? "Bank" : "E-wallet" }}</span>
+              <legend class="sp-label">Pay with your bank</legend>
+              <div class="fp-group">
                 <div class="fp-chips">
-                  <label v-for="c in list" :key="c" class="fp-chip" :class="{ on: form.payment_channel === c }">
+                  <label v-for="c in CHANNELS.bank" :key="c" class="fp-chip" :class="{ on: form.payment_channel === c }">
                     <input v-model="form.payment_channel" type="radio" name="fp-channel" :value="c" />{{ c }}
                   </label>
                 </div>
               </div>
-              <small v-if="form.payment_channel === 'QR Ph'" class="sp-hint">PayMongo shows a QR code. Scan it with your bank or e-wallet app (BDO, BPI, Metrobank, GCash, Maya and others).</small>
+              <small v-if="form.payment_channel === 'QR Ph'" class="sp-hint">PayMongo shows a QR code. Scan it with your bank's app (BDO, BPI, Metrobank and others).</small>
               <small v-if="request.payment_channel && form.payment_channel !== request.payment_channel" class="sp-hint">Procurement asked for {{ request.payment_channel }}.</small>
             </fieldset>
             <label class="sp-field fp-amount">
@@ -94,8 +93,7 @@
             <label v-if="!isCredit || form.outcome === 'refund'" class="sp-field">
               <span class="sp-label">{{ isCredit ? "Into" : "Paid through" }}</span>
               <select v-model="form.payment_channel" class="sp-select">
-                <optgroup label="Bank"><option v-for="c in CHANNELS.bank" :key="c" :value="c">{{ c }}</option></optgroup>
-                <optgroup label="E-wallet"><option v-for="c in CHANNELS.ewallet" :key="c" :value="c">{{ c }}</option></optgroup>
+                <option v-for="c in CHANNELS.bank" :key="c" :value="c">{{ c }}</option>
               </select>
               <small v-if="!isCredit && request.payment_channel && form.payment_channel !== request.payment_channel" class="sp-hint">Procurement asked for {{ request.payment_channel }}.</small>
             </label>
@@ -180,7 +178,8 @@ watch(
       outcome: "refund",
       amount: isCredit.value ? p.value.supplier_owes : p.value.to_pay,
       paid_on: today,
-      payment_channel: CHANNELS.bank.includes(props.request.payment_channel) || CHANNELS.ewallet.includes(props.request.payment_channel) ? props.request.payment_channel : "QR Ph",
+      // Banks only; an older request that named an e-wallet starts on QR Ph
+      payment_channel: CHANNELS.bank.includes(props.request.payment_channel) ? props.request.payment_channel : "QR Ph",
       reference: "",
       note: "",
     });
@@ -210,7 +209,7 @@ async function payWithPayMongo() {
   const amount = Number(form.amount);
   if (!(amount >= PAYMONGO_MINIMUM)) err.amount = `PayMongo payments start at ${peso(PAYMONGO_MINIMUM)}.`;
   else if (amount > Number(p.value.to_pay) + 0.001) err.amount = `It can be up to ${peso(p.value.to_pay)}.`;
-  if (!form.payment_channel) formError.value = "Choose a bank or e-wallet.";
+  if (!form.payment_channel) formError.value = "Choose a bank.";
   if (Object.keys(err).length || formError.value) return;
   busy.value = true;
   try {

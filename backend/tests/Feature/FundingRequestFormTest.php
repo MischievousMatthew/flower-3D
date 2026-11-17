@@ -77,8 +77,8 @@ class FundingRequestFormTest extends TestCase
             'required_delivery_date' => now()->addDays(3)->toDateString(),
             'urgency_level' => 'Urgent',
             'reason_for_shortage' => 'Seasonal Demand',
-            'payment_method' => 'ewallet',
-            'payment_channel' => 'GCash',
+            'payment_method' => 'bank',
+            'payment_channel' => 'BDO',
             'logistics_cost' => 150,
             'business_justification' => 'Valentine orders',
         ], $extra);
@@ -101,8 +101,8 @@ class FundingRequestFormTest extends TestCase
         $this->assertEquals(110, $row->requested_qty);
         $this->assertNull($row->uom); // stems and bunches mixed
         $this->assertEquals(3650, $row->estimated_total_cost); // 2000 + 1500 + 150 delivery
-        $this->assertSame('ewallet', $row->payment_method);
-        $this->assertSame('GCash', $row->payment_channel);
+        $this->assertSame('bank', $row->payment_method);
+        $this->assertSame('BDO', $row->payment_channel);
         $this->assertNull($row->tax_vat_estimate);
 
         $this->signIn($this->buyer)->getJson("/api/procurement/inventory/funding-requests/{$id}")
@@ -112,13 +112,16 @@ class FundingRequestFormTest extends TestCase
             ->assertJsonPath('data.items.1.current_stock', 2);
     }
 
-    public function test_payment_must_be_a_listed_bank_or_e_wallet(): void
+    public function test_payment_must_be_a_listed_bank_and_never_an_e_wallet(): void
     {
         $rose = $this->product('Red rose');
         $item = [['product_id' => $rose, 'quantity' => 1, 'unit_cost' => 20]];
 
         $this->signIn($this->buyer)->postJson('/api/procurement/inventory/funding-requests', $this->form($item, ['payment_method' => 'bank', 'payment_channel' => 'GCash']))
             ->assertStatus(422)->assertJsonValidationErrors('payment_channel');
+        // Supplies cost too much for e-wallet limits: banks only
+        $this->postJson('/api/procurement/inventory/funding-requests', $this->form($item, ['payment_method' => 'ewallet', 'payment_channel' => 'GCash']))
+            ->assertStatus(422)->assertJsonValidationErrors(['payment_method', 'payment_channel']);
         $this->postJson('/api/procurement/inventory/funding-requests', $this->form($item, ['payment_method' => 'Cash']))
             ->assertStatus(422)->assertJsonValidationErrors('payment_method');
         $this->postJson('/api/procurement/inventory/funding-requests', $this->form($item, ['payment_method' => 'bank', 'payment_channel' => 'BDO']))

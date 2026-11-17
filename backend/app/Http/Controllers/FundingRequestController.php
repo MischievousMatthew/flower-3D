@@ -236,10 +236,9 @@ class FundingRequestController extends Controller
         }
     }
 
-    /** Banks and e-wallets Finance can pay through: only those PayMongo offers */
+    /** Banks Finance can pay through: only those PayMongo offers. No e-wallets: supplies cost too much for their limits */
     public const PAYMENT_CHANNELS = [
         'bank' => ['QR Ph', 'BPI', 'UnionBank', 'BDO', 'Landbank', 'Metrobank'],
-        'ewallet' => ['GCash', 'Maya', 'GrabPay', 'ShopeePay'],
     ];
 
     private const REASONS = ['New Order', 'Spoilage', 'Forecast Error', 'Seasonal Demand', 'Supplier Delay'];
@@ -269,7 +268,7 @@ class FundingRequestController extends Controller
             'required_delivery_date' => "$req|date",
             'urgency_level' => "$req|in:" . implode(',', self::URGENCY),
             'reason_for_shortage' => "$req|in:" . implode(',', self::REASONS),
-            'payment_method' => "$req|in:bank,ewallet",
+            'payment_method' => "$req|in:bank",
             'payment_channel' => [$req, 'string', 'max:60', \Illuminate\Validation\Rule::in($channels)],
             'logistics_cost' => 'nullable|numeric|min:0|max:10000000',
             'business_justification' => "$req|string|max:150",
@@ -279,12 +278,13 @@ class FundingRequestController extends Controller
             'items.min' => 'Pick at least one product.',
             'items.*.product_id.distinct' => 'Each product can only be added once.',
             'items.*.quantity.min' => 'Ask for at least 1.',
-            'payment_channel.in' => 'Pick a bank or e-wallet from the list.',
+            'payment_channel.in' => 'Pick a bank from the list. Supplies are paid by bank transfer only.',
+            'payment_method.in' => 'Supplies are paid by bank transfer only.',
         ], [
             'approver_id' => 'Finance approver',
             'required_delivery_date' => 'needed-by date',
             'reason_for_shortage' => 'reason',
-            'payment_channel' => 'bank or e-wallet',
+            'payment_channel' => 'bank',
             'business_justification' => 'reason in your words',
         ]);
 

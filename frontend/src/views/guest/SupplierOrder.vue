@@ -73,16 +73,12 @@
           </div>
           <div v-if="editingAccount" class="so-acct-edit">
             <div class="so-acct-fields">
-                <div class="so-seg" role="radiogroup" aria-label="Account type">
-                  <label :class="{ on: acct.method === 'bank' }"><input v-model="acct.method" type="radio" value="bank" @change="acct.provider = ''" />Bank</label>
-                  <label :class="{ on: acct.method === 'ewallet' }"><input v-model="acct.method" type="radio" value="ewallet" @change="acct.provider = ''" />E-wallet</label>
-                </div>
                 <div class="so-grid">
                   <div class="af-field">
-                    <label class="af-label" for="so-edit-provider">{{ acct.method === "ewallet" ? "E-wallet" : "Bank" }}</label>
+                    <label class="af-label" for="so-edit-provider">Bank</label>
                     <select id="so-edit-provider" v-model="acct.provider" class="af-input" :aria-invalid="!!errors.payout_provider" @change="errors.payout_provider = ''">
                       <option value="">Choose one</option>
-                      <option v-for="c in PROVIDERS[acct.method]" :key="c" :value="c">{{ c }}</option>
+                      <option v-for="c in PROVIDERS.bank" :key="c" :value="c">{{ c }}</option>
                     </select>
                     <p v-if="errors.payout_provider" class="af-note bad">{{ errors.payout_provider }}</p>
                   </div>
@@ -92,8 +88,8 @@
                     <p v-if="errors.payout_account_name" class="af-note bad">{{ errors.payout_account_name }}</p>
                   </div>
                   <div class="af-field">
-                    <label class="af-label" for="so-edit-number">{{ acct.method === "ewallet" ? "Mobile number" : "Account number" }}</label>
-                    <input id="so-edit-number" v-model="acct.number" class="af-input so-number" inputmode="numeric" autocomplete="off" :placeholder="accountFormat(acct.provider)?.example || (acct.method === 'ewallet' ? '0917 123 4567' : 'Choose the bank first')" :aria-invalid="!!errors.payout_account_number" :aria-describedby="`so-edit-number-hint`" @input="errors.payout_account_number = ''" />
+                    <label class="af-label" for="so-edit-number">Account number</label>
+                    <input id="so-edit-number" v-model="acct.number" class="af-input so-number" inputmode="numeric" autocomplete="off" :placeholder="accountFormat(acct.provider)?.example || 'Choose the bank first'" :aria-invalid="!!errors.payout_account_number" :aria-describedby="`so-edit-number-hint`" @input="errors.payout_account_number = ''" />
                     <p v-if="!errors.payout_account_number && accountHint(acct.provider)" :id="`so-edit-number-hint`" class="af-note">{{ accountHint(acct.provider) }}</p>
                     <p v-if="errors.payout_account_number" class="af-note bad">{{ errors.payout_account_number }}</p>
                   </div>
@@ -167,16 +163,12 @@
             </div>
             <template v-if="!order.payment?.account || !acct.useSaved">
               <div class="so-acct-fields">
-                <div class="so-seg" role="radiogroup" aria-label="Account type">
-                  <label :class="{ on: acct.method === 'bank' }"><input v-model="acct.method" type="radio" value="bank" @change="acct.provider = ''" />Bank</label>
-                  <label :class="{ on: acct.method === 'ewallet' }"><input v-model="acct.method" type="radio" value="ewallet" @change="acct.provider = ''" />E-wallet</label>
-                </div>
                 <div class="so-grid">
                   <div class="af-field">
-                    <label class="af-label" for="so-conf-provider">{{ acct.method === "ewallet" ? "E-wallet" : "Bank" }}</label>
+                    <label class="af-label" for="so-conf-provider">Bank</label>
                     <select id="so-conf-provider" v-model="acct.provider" class="af-input" :aria-invalid="!!errors.payout_provider" @change="errors.payout_provider = ''">
                       <option value="">Choose one</option>
-                      <option v-for="c in PROVIDERS[acct.method]" :key="c" :value="c">{{ c }}</option>
+                      <option v-for="c in PROVIDERS.bank" :key="c" :value="c">{{ c }}</option>
                     </select>
                     <p v-if="errors.payout_provider" class="af-note bad">{{ errors.payout_provider }}</p>
                   </div>
@@ -186,8 +178,8 @@
                     <p v-if="errors.payout_account_name" class="af-note bad">{{ errors.payout_account_name }}</p>
                   </div>
                   <div class="af-field">
-                    <label class="af-label" for="so-conf-number">{{ acct.method === "ewallet" ? "Mobile number" : "Account number" }}</label>
-                    <input id="so-conf-number" v-model="acct.number" class="af-input so-number" inputmode="numeric" autocomplete="off" :placeholder="accountFormat(acct.provider)?.example || (acct.method === 'ewallet' ? '0917 123 4567' : 'Choose the bank first')" :aria-invalid="!!errors.payout_account_number" :aria-describedby="`so-conf-number-hint`" @input="errors.payout_account_number = ''" />
+                    <label class="af-label" for="so-conf-number">Account number</label>
+                    <input id="so-conf-number" v-model="acct.number" class="af-input so-number" inputmode="numeric" autocomplete="off" :placeholder="accountFormat(acct.provider)?.example || 'Choose the bank first'" :aria-invalid="!!errors.payout_account_number" :aria-describedby="`so-conf-number-hint`" @input="errors.payout_account_number = ''" />
                     <p v-if="!errors.payout_account_number && accountHint(acct.provider)" :id="`so-conf-number-hint`" class="af-note">{{ accountHint(acct.provider) }}</p>
                     <p v-if="errors.payout_account_number" class="af-note bad">{{ errors.payout_account_number }}</p>
                   </div>
@@ -365,7 +357,7 @@ const PROVIDER_ERRORS = { provider: "payout_provider", name: "payout_account_nam
 function checkAccount(required) {
   const any = acct.provider || acct.name.trim() || acct.number.trim();
   if (!required && !any) return true;
-  if (!acct.provider) errors[PROVIDER_ERRORS.provider] = "Choose the bank or e-wallet.";
+  if (!acct.provider) errors[PROVIDER_ERRORS.provider] = "Choose the bank.";
   if (!acct.name.trim()) errors[PROVIDER_ERRORS.name] = "Enter the name on the account.";
   const numberError = accountError(acct.provider, acct.number);
   if (numberError) errors[PROVIDER_ERRORS.number] = numberError;
@@ -376,7 +368,7 @@ const accountBody = () => ({ payout_method: acct.method, payout_provider: acct.p
 function startEditAccount() {
   clearErrors();
   const a = order.value.payment?.account;
-  Object.assign(acct, { useSaved: false, method: a?.method || "bank", provider: a?.provider || "", name: a?.account_name || "", number: "" });
+  Object.assign(acct, { useSaved: false, method: "bank", provider: PROVIDERS.bank.includes(a?.provider) ? a.provider : "", name: a?.account_name || "", number: "" });
   editingAccount.value = true;
 }
 

@@ -32,7 +32,7 @@ class FundingPayMongoService
         }
         $method = PayMongoChannels::methodOf($channel);
         if (!$method) {
-            throw new HttpException(422, 'Choose a bank or e-wallet PayMongo offers.');
+            throw new HttpException(422, 'Choose a bank PayMongo offers. Supplies are paid by bank only.');
         }
 
         $f = FundingRequest::where('owner_id', $ownerId)->with(['linkedOrder.supplier', 'linkedOrder.items', 'payments'])->findOrFail($fundingId);
@@ -100,7 +100,7 @@ class FundingPayMongoService
                 $checkout->update(['status' => 'failed', 'metadata' => array_merge($checkout->metadata ?? [], ['gateway_error' => $detail])]);
                 Log::warning('Funding PayMongo checkout refused', ['checkout_id' => $checkout->id, 'detail' => $detail]);
                 throw new HttpException(422, str_contains(strtolower($detail), 'payment_method')
-                    ? "{$channel} isn't turned on in the PayMongo account yet. Choose another bank or e-wallet, or turn it on in PayMongo."
+                    ? "{$channel} isn't turned on in the PayMongo account yet. Choose another bank, or turn it on in PayMongo."
                     : 'PayMongo couldn\'t start the payment. Please try again.');
             }
             $checkout->update(['paymongo_checkout_session_id' => data_get($data, 'data.id'), 'checkout_url' => $url]);
