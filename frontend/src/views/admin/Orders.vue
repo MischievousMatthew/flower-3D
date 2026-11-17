@@ -33,7 +33,7 @@
         <!-- Status cards double as tabs -->
         <section class="bucket-grid" role="tablist" aria-label="Order status">
           <template v-if="!summary">
-            <div v-for="n in 8" :key="n" class="bucket-card">
+            <div v-for="n in 10" :key="n" class="bucket-card">
               <div class="sk sk-line" style="width: 55%"></div>
               <div class="sk sk-line" style="width: 30%; height: 22px; margin-top: 10px"></div>
             </div>
@@ -193,7 +193,7 @@
                     <span class="sub">{{ METHOD_LABELS[order.payment_method] ?? order.payment_method }}</span>
                   </td>
                   <td>
-                    <span class="pill" :class="`st-${order.status}`">{{ STATUS_LABELS[order.status] ?? order.status }}</span>
+                    <span class="pill" :class="`st-${order.status}`">{{ orderStatusLabel(order) }}</span>
                   </td>
                   <td>
                     <div class="flags">
@@ -247,7 +247,7 @@
             <template v-if="detail">
               <h2>{{ detail.order_number }}</h2>
               <div class="drawer-pills">
-                <span class="pill" :class="`st-${detail.status}`">{{ STATUS_LABELS[detail.status] ?? detail.status }}</span>
+                <span class="pill" :class="`st-${detail.status}`">{{ orderStatusLabel(detail) }}</span>
                 <span class="pill" :class="`pay-${detail.payment_status}`">{{ PAYMENT_LABELS[detail.payment_status] ?? detail.payment_status }}</span>
                 <span class="sub">Placed {{ formatDateTime(detail.created_at) }}</span>
               </div>
@@ -341,7 +341,7 @@
                       <dd>{{ formatDate(detail.delivery.reservation_date) }}</dd>
                     </template>
                     <dt>Delivery status</dt>
-                    <dd>{{ detail.delivery.status ? humanize(detail.delivery.status) : "Not started" }}</dd>
+                    <dd>{{ detail.delivery.status ? orderStatusLabel(detail.delivery.status) : "Not started" }}</dd>
                     <template v-if="detail.delivery.barcode">
                       <dt>Tracking code</dt>
                       <dd class="mono">{{ detail.delivery.barcode }}</dd>
@@ -501,21 +501,14 @@ import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
 import PageNumbers from "../../components/common/PageNumbers.vue";
 import { linkedId } from "../../utils/hiddenIds";
+import { ORDER_STATUS_LABELS, orderStatusLabel } from "../../utils/orderStatus";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
 const router = useRouter();
 
-const STATUS_LABELS = {
-  pending: "Pending",
-  processing: "Processing",
-  out_for_delivery: "Out for delivery",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  failed: "Failed",
-  returned: "Returned",
-  refunded: "Refunded",
-};
+// The same words as the shop's Orders page and the customer's My Orders
+const STATUS_LABELS = ORDER_STATUS_LABELS;
 const PAYMENT_LABELS = { paid: "Paid", unpaid: "Unpaid", refunded: "Refunded", failed: "Failed" };
 const METHOD_LABELS = { cod: "Cash on delivery", ewallet: "E-wallet", bank_transfer: "Bank transfer", gcash: "GCash", maya: "Maya", card: "Card" };
 const ISSUE_SHORT = {
@@ -534,11 +527,14 @@ const buckets = computed(() => {
   if (!s) return [];
   return [
     { key: "", label: "All orders", count: s.total, hint: `${s.today} today`, tone: "slate" },
-    { key: "pending", label: "Pending", count: s.buckets.pending, hint: "Waiting on vendor", tone: "amber" },
-    { key: "processing", label: "Processing", count: s.buckets.processing, hint: "Preparing or on the way", tone: "blue" },
-    { key: "completed", label: "Completed", count: s.buckets.completed, hint: "Delivered", tone: "green" },
+    // The same statuses (and words) as the shop's Orders page and the customer's My Orders
+    { key: "pending", label: "Pending", count: s.buckets.pending, hint: "Waiting on the shop", tone: "amber" },
+    { key: "to_processed", label: "Preparing", count: s.buckets.to_processed, hint: "The shop is making it", tone: "blue" },
+    { key: "to_ship", label: "Ready", count: s.buckets.to_ship, hint: "Packed, waiting for the rider", tone: "pink" },
+    { key: "to_received", label: "Out for delivery", count: s.buckets.to_received, hint: "On its way", tone: "sky" },
+    { key: "completed", label: "Completed", count: s.buckets.completed, hint: "The customer got it", tone: "green" },
     { key: "cancelled", label: "Cancelled", count: s.buckets.cancelled, hint: "Incl. failed payments", tone: "gray" },
-    { key: "refunded", label: "Refunded", count: s.buckets.refunded, hint: "Refunded or returned", tone: "violet" },
+    { key: "returned", label: "Returned / refunded", count: s.buckets.returned, hint: "Returned or refunded", tone: "violet" },
     { key: "disputes", label: "Disputes", count: s.open_disputes, hint: "Open return/refund requests", tone: "rose" },
     { key: "issues", label: "Needs attention", count: s.issues, hint: "Flagged automatically", tone: "red" },
   ];
@@ -909,7 +905,7 @@ onBeforeUnmount(() => {
 /* ── Status cards ───────────────────────────────────── */
 .bucket-grid {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 .bucket-card {
@@ -988,6 +984,8 @@ onBeforeUnmount(() => {
 .tone-green { --tone: #22c55e; --tone-bg: var(--a-green-soft); }
 .tone-gray { --tone: #94a3b8; --tone-bg: var(--a-subtle); }
 .tone-violet { --tone: #8b5cf6; --tone-bg: var(--a-accent-soft); }
+.tone-pink { --tone: #ec4899; --tone-bg: var(--a-pink-soft); }
+.tone-sky { --tone: #0ea5e9; --tone-bg: var(--a-blue-soft); }
 .tone-rose { --tone: #f43f5e; --tone-bg: var(--a-red-soft); }
 .tone-red { --tone: #dc2626; --tone-bg: var(--a-red-soft); }
 
@@ -1206,6 +1204,9 @@ onBeforeUnmount(() => {
 .st-pending { background: var(--a-amber-soft); color: var(--a-amber-text); }
 .st-processing { background: var(--a-blue-soft); color: var(--a-blue-text); }
 .st-out_for_delivery { background: var(--a-blue-soft); color: var(--a-blue-text); }
+.st-to_processed { background: var(--a-blue-soft); color: var(--a-blue-text); }
+.st-to_ship { background: var(--a-pink-soft); color: var(--a-pink-text); }
+.st-to_received { background: var(--a-accent-soft); color: var(--a-accent-text); }
 .st-completed { background: var(--a-green-soft); color: var(--a-green-text); }
 .st-cancelled,
 .st-failed { background: var(--a-subtle-2); color: var(--a-muted); }

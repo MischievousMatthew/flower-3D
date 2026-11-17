@@ -370,8 +370,11 @@ class AdminVendorController extends Controller
 
     private function orders(User $vendor): array
     {
-        $counts = Order::query()->where('vendor_id', $vendor->id)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
-        $recent = Order::query()->where('vendor_id', $vendor->id)->withCount('items')->latest()->limit(15)
+        // By the status everyone sees, in workflow order; only the ones this shop has
+        $counts = collect(Order::STATUS_LABELS)->keys()
+            ->mapWithKeys(fn ($key) => [$key => Order::query()->where('vendor_id', $vendor->id)->whereDisplayStatus([$key])->count()])
+            ->filter();
+        $recent = Order::query()->where('vendor_id', $vendor->id)->with('delivery:id,order_id,status')->withCount('items')->latest()->limit(15)
             ->get(['id', 'order_number', 'user_id', 'status', 'payment_status', 'payment_method', 'total_amount', 'created_at']);
         $customers = User::query()->whereIn('id', $recent->pluck('user_id'))->get(['id', 'name', 'surname'])->keyBy('id');
 
@@ -381,7 +384,8 @@ class AdminVendorController extends Controller
                 'id' => $o->id,
                 'order_number' => $o->order_number,
                 'customer' => PaymentLedger::personName($customers[$o->user_id] ?? null),
-                'status' => $o->status,
+                'status' => $o->displayStatus(),
+                'status_label' => $o->displayStatusLabel(),
                 'payment_status' => $o->payment_status,
                 'method_label' => PaymentLedger::methodLabel($o->payment_method),
                 'total_amount' => (float) $o->total_amount,

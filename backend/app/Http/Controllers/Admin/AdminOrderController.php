@@ -26,13 +26,18 @@ use Illuminate\Http\Request;
  */
 class AdminOrderController extends Controller
 {
-    /** Status tabs and the order statuses each one covers */
+    /**
+     * Status tabs and the statuses each one covers: the status everyone sees
+     * (Order::displayStatus), the same as the shop's Orders page and the customer's.
+     */
     private const BUCKETS = [
         'pending' => ['pending'],
-        'processing' => ['processing', 'out_for_delivery'],
+        'to_processed' => ['to_processed'],
+        'to_ship' => ['to_ship'],
+        'to_received' => ['to_received'],
         'completed' => ['completed'],
-        'cancelled' => ['cancelled', 'failed'],
-        'refunded' => ['refunded', 'returned'],
+        'cancelled' => ['cancelled'],
+        'returned' => ['returned', 'refunded'],
     ];
 
     private const STALE_PROCESSING_DAYS = 7;
@@ -43,7 +48,7 @@ class AdminOrderController extends Controller
     public function summary(): JsonResponse
     {
         $byStatus = Order::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
-        $buckets = collect(self::BUCKETS)->map(fn ($statuses) => (int) collect($statuses)->sum(fn ($s) => $byStatus[$s] ?? 0));
+        $buckets = collect(self::BUCKETS)->map(fn ($statuses) => Order::query()->whereDisplayStatus($statuses)->count());
 
         $paid = Order::query()->where('payment_status', 'paid');
 
@@ -73,6 +78,7 @@ class AdminOrderController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Order::query()
+            ->with('delivery:id,order_id,status')
             ->withCount([
                 'items',
                 'orderRequests as open_requests_count' => fn ($q) => $q->whereIn('status', OrderRequest::OPEN_STATUSES),
@@ -81,7 +87,7 @@ class AdminOrderController extends Controller
 
         $bucket = $request->input('bucket');
         if (isset(self::BUCKETS[$bucket])) {
-            $query->whereIn('status', self::BUCKETS[$bucket]);
+            $query->whereDisplayStatus(self::BUCKETS[$bucket]);
         } elseif ($bucket === 'disputes') {
             $query->whereHas('orderRequests');
         } elseif ($bucket === 'issues') {
@@ -131,7 +137,9 @@ class AdminOrderController extends Controller
             'data' => $orders->map(fn (Order $order) => [
                 'id' => $order->id,
                 'order_number' => $order->order_number,
-                'status' => $order->status,
+                // The status the shop and the customer see, with the same words
+                'status' => $order->displayStatus(),
+                'status_label' => $order->displayStatusLabel(),
                 'payment_status' => $order->payment_status,
                 'payment_method' => $order->payment_method,
                 'total_amount' => (float) $order->total_amount,
@@ -181,7 +189,8 @@ class AdminOrderController extends Controller
             'data' => [
                 'id' => $order->id,
                 'order_number' => $order->order_number,
-                'status' => $order->status,
+                'status' => $order->displayStatus(),
+                'status_label' => $order->displayStatusLabel(),
                 'payment_status' => $order->payment_status,
                 'payment_method' => $order->payment_method,
                 'amounts' => [
@@ -352,8 +361,10 @@ class AdminOrderController extends Controller
             ->orWhereRaw('lower(email) like ?', [$like])
             ->pluck('id');
 
-        $statusMatches = collect(['pending', 'processing', 'out_for_delivery', 'completed', 'cancelled', 'failed', 'returned', 'refunded'])
-            ->filter(fn ($status) => str_contains(str_replace('_', ' ', $status), str_replace('_', ' ', mb_strtolower($search))));
+        // Searching "ready" or "out for delivery" finds orders in that status, by the words everyone sees
+        $statusMatches = collect(Order::STATUS_LABELS)
+            ->filter(fn ($label) => str_contains(mb_strtolower($label), mb_strtolower($search)))
+            ->keys();
 
         $query->where(function (Builder $q) use ($like, $digits, $customerIds, $statusMatches, $search) {
             $q->whereRaw('lower(order_number) like ?', [$like])
@@ -366,7 +377,7 @@ class AdminOrderController extends Controller
                 $q->orWhere('id', (int) $digits);
             }
             if ($statusMatches->isNotEmpty()) {
-                $q->orWhereIn('status', $statusMatches->values());
+                $q->orWhere(fn (Builder $s) => $s->whereDisplayStatus($statusMatches->all()));
             }
         });
     }

@@ -137,9 +137,12 @@ class AdminCustomerController extends Controller
         }
 
         $row = $this->summarize(collect([$customer]))->first();
-        $orders = Order::query()->where('user_id', $customer->id)->withCount('items')->latest()->get();
+        $orders = Order::query()->where('user_id', $customer->id)->with('delivery:id,order_id,status')->withCount('items')->latest()->get();
         $vendors = VendorDirectory::details($orders->pluck('vendor_id'));
-        $finished = $orders->whereIn('status', ['completed', 'cancelled', 'failed', 'returned', 'refunded']);
+        // Counted by the status everyone sees (the shop's Orders page, the customer's My Orders)
+        $shown = $orders->countBy(fn (Order $o) => $o->displayStatus());
+        $cancelled = $shown['cancelled'] ?? 0;
+        $finishedCount = ($shown['completed'] ?? 0) + $cancelled + ($shown['returned'] ?? 0) + ($shown['refunded'] ?? 0);
 
         return response()->json([
             'success' => true,
@@ -151,10 +154,10 @@ class AdminCustomerController extends Controller
                     'has_pinned_location' => $customer->latitude !== null,
                 ],
                 'stats' => [
-                    'completed' => $orders->where('status', 'completed')->count(),
-                    'cancelled' => $orders->whereIn('status', ['cancelled', 'failed'])->count(),
-                    'returned' => $orders->whereIn('status', ['returned', 'refunded'])->count(),
-                    'cancellation_rate' => $finished->count() ? round($orders->whereIn('status', ['cancelled', 'failed'])->count() / $finished->count() * 100, 1) : null,
+                    'completed' => $shown['completed'] ?? 0,
+                    'cancelled' => $cancelled,
+                    'returned' => ($shown['returned'] ?? 0) + ($shown['refunded'] ?? 0),
+                    'cancellation_rate' => $finishedCount ? round($cancelled / $finishedCount * 100, 1) : null,
                     'average_order' => $row['paid_orders'] ? round($row['total_spent'] / $row['paid_orders'], 2) : 0,
                     'reviews' => DB::table('product_reviews')->where('user_id', $customer->id)->count(),
                     'favourite_store' => $this->favouriteStore($orders, $vendors),
@@ -162,7 +165,8 @@ class AdminCustomerController extends Controller
                 'recent_orders' => $orders->take(25)->map(fn (Order $o) => [
                     'id' => $o->id,
                     'order_number' => $o->order_number,
-                    'status' => $o->status,
+                    'status' => $o->displayStatus(),
+                    'status_label' => $o->displayStatusLabel(),
                     'payment_status' => $o->payment_status,
                     'method_label' => PaymentLedger::methodLabel($o->payment_method),
                     'total_amount' => (float) $o->total_amount,

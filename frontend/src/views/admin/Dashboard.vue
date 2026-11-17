@@ -317,7 +317,7 @@
                   </div>
                   <div class="activity-right">
                     <span class="strong">{{ money(o.total_amount) }}</span>
-                    <span class="pill" :class="`st-${o.status}`">{{ STATUS_LABELS[o.status] ?? o.status }}</span>
+                    <span class="pill" :class="`st-${o.status}`">{{ orderStatusLabel(o) }}</span>
                   </div>
                 </li>
               </ul>
@@ -368,6 +368,7 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, orderStatusLabel } from "../../utils/orderStatus";
 
 const { toggleMobile } = useSidebarState();
 const router = useRouter();
@@ -385,26 +386,9 @@ const CHART_METRICS = [
   { value: "orders", label: "Orders" },
   { value: "new_customers", label: "Customers" },
 ];
-const STATUS_LABELS = {
-  pending: "Pending",
-  processing: "Processing",
-  out_for_delivery: "Out for delivery",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  failed: "Failed",
-  returned: "Returned",
-  refunded: "Refunded",
-};
-const STATUS_COLORS = {
-  pending: "#f59e0b",
-  processing: "#3b82f6",
-  out_for_delivery: "#38bdf8",
-  completed: "#22c55e",
-  cancelled: "#cbd5e1",
-  failed: "#f87171",
-  returned: "#a78bfa",
-  refunded: "#8b5cf6",
-};
+// The same words as the shop's Orders page and the customer's My Orders
+const STATUS_LABELS = ORDER_STATUS_LABELS;
+const STATUS_COLORS = ORDER_STATUS_COLORS;
 const STATE_LABELS = { successful: "Paid", pending: "Pending", failed: "Failed", refunded: "Refunded", voided: "Cancelled" };
 
 const range = ref("30d");
@@ -1297,6 +1281,9 @@ a.kpi-card:hover {
 .st-pending { background: var(--a-amber-soft); color: var(--a-amber-text); }
 .st-processing { background: var(--a-blue-soft); color: var(--a-blue-text); }
 .st-out_for_delivery { background: var(--a-blue-soft); color: var(--a-blue-text); }
+.st-to_processed { background: var(--a-blue-soft); color: var(--a-blue-text); }
+.st-to_ship { background: var(--a-pink-soft); color: var(--a-pink-text); }
+.st-to_received { background: var(--a-accent-soft); color: var(--a-accent-text); }
 .st-completed { background: var(--a-green-soft); color: var(--a-green-text); }
 .st-cancelled,
 .st-failed { background: var(--a-subtle-2); color: var(--a-muted); }

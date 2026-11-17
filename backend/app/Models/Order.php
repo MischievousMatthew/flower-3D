@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\VendorFinanceService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -146,26 +147,94 @@ class Order extends Model
     /** One of the STATUS_LABELS keys. Load the delivery relation first when listing orders. */
     public function displayStatus(): string
     {
-        if (in_array($this->status, ['cancelled', 'refunded', 'returned'], true)) {
+        if ($this->status === 'failed') {
+            return 'cancelled';
+        }
+        if (in_array($this->status, self::ENDED_STATUSES, true)) {
             return $this->status;
         }
-        if ($this->delivery?->status) {
-            return $this->delivery->status === 'to_receive' ? 'to_received' : $this->delivery->status;
+        $step = $this->delivery?->status;
+        if ($step) {
+            $step = $step === 'to_receive' ? 'to_received' : $step;
+
+            return array_key_exists($step, self::STATUS_LABELS) ? $step : 'pending';
         }
 
-        return match ($this->status) {
-            'processing' => 'to_processed',
-            'shipped', 'ready' => 'to_ship',
-            'delivered', 'out_for_delivery' => 'to_received',
-            'failed' => 'cancelled',
-            default => array_key_exists((string) $this->status, self::STATUS_LABELS) ? $this->status : 'pending',
-        };
+        foreach (self::STATUS_WITHOUT_DELIVERY as $key => $statuses) {
+            if (in_array($this->status, $statuses, true)) {
+                return $key;
+            }
+        }
+
+        return 'pending';
     }
 
     public function displayStatusLabel(): string
     {
         return self::STATUS_LABELS[$this->displayStatus()];
     }
+
+    /** Orders whose status, as everyone sees it, is one of these STATUS_LABELS keys. Same rules as displayStatus(), in SQL. */
+    public function scopeWhereDisplayStatus(Builder $query, array $keys): Builder
+    {
+        $keys = array_values(array_intersect($keys, array_keys(self::STATUS_LABELS)));
+        if (! $keys) {
+            return $query->whereRaw('1 = 0');
+        }
+        $ended = [...self::ENDED_STATUSES, 'failed'];
+
+        return $query->where(function (Builder $q) use ($keys, $ended) {
+            // Cancelled, returned or refunded: the order itself says so
+            $own = array_values(array_intersect($keys, self::ENDED_STATUSES));
+            if (in_array('cancelled', $keys, true)) {
+                $own[] = 'failed';
+            }
+            if ($own) {
+                $q->orWhereIn('status', $own);
+            }
+
+            // Otherwise the delivery's step...
+            $steps = in_array('to_received', $keys, true) ? [...$keys, 'to_receive'] : $keys;
+            $q->orWhere(fn (Builder $o) => $o->whereNotIn('status', $ended)
+                ->whereHas('delivery', fn ($d) => $d->whereIn('status', $steps)));
+            // (a delivery step that isn't a known one reads as pending)
+            if (in_array('pending', $keys, true)) {
+                $q->orWhere(fn (Builder $o) => $o->whereNotIn('status', $ended)
+                    ->whereHas('delivery', fn ($d) => $d->whereNotNull('status')->where('status', '!=', '')
+                        ->whereNotIn('status', [...array_keys(self::STATUS_LABELS), 'to_receive'])));
+            }
+
+            // ...or, with no delivery yet, the order's own status
+            $known = array_merge(...array_values(self::STATUS_WITHOUT_DELIVERY));
+            $q->orWhere(function (Builder $o) use ($keys, $ended, $known) {
+                $o->whereNotIn('status', $ended)
+                    ->whereDoesntHave('delivery', fn ($d) => $d->whereNotNull('status')->where('status', '!=', ''))
+                    ->where(function (Builder $s) use ($keys, $known) {
+                        $s->whereRaw('1 = 0');
+                        foreach ($keys as $key) {
+                            if (isset(self::STATUS_WITHOUT_DELIVERY[$key])) {
+                                $s->orWhereIn('status', self::STATUS_WITHOUT_DELIVERY[$key]);
+                            }
+                        }
+                        // Anything else reads as pending
+                        if (in_array('pending', $keys, true)) {
+                            $s->orWhereNotIn('status', $known)->orWhereNull('status');
+                        }
+                    });
+            });
+        });
+    }
+
+    private const ENDED_STATUSES = ['cancelled', 'returned', 'refunded'];
+
+    /** Before there's a delivery, which order statuses mean which step */
+    private const STATUS_WITHOUT_DELIVERY = [
+        'pending' => ['pending'],
+        'to_processed' => ['processing', 'confirmed'],
+        'to_ship' => ['shipped', 'ready'],
+        'to_received' => ['delivered', 'out_for_delivery'],
+        'completed' => ['completed'],
+    ];
 
     protected static function boot()
     {

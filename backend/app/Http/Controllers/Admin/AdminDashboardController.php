@@ -95,7 +95,9 @@ class AdminDashboardController extends Controller
 
         $topProducts = $this->topProducts($sales->pluck('id'));
         $topVendors = $this->topVendors($sales);
-        $statusMix = $periodOrders->countBy('status')->map(fn ($count, $status) => ['status' => $status, 'count' => $count])->sortByDesc('count')->values()->all();
+        // By the status everyone sees (the shop's Orders page, the customer's My Orders)
+        $periodOrders->load('delivery:id,order_id,status');
+        $statusMix = $periodOrders->countBy(fn (Order $o) => $o->displayStatus())->map(fn ($count, $status) => ['status' => $status, 'count' => $count])->sortByDesc('count')->values()->all();
         $codShare = $salesTotal ? round($money($sales->where('payment_method', 'cod'), 'total_amount') / $salesTotal * 100) : null;
         $orderSummary = app(AdminOrderController::class)->summary()->getData(true)['data'];
 
@@ -160,7 +162,7 @@ class AdminDashboardController extends Controller
 
     private function recentOrders(): array
     {
-        $orders = Order::query()->withCount('items')->latest()->limit(6)
+        $orders = Order::query()->with('delivery:id,order_id,status')->withCount('items')->latest()->limit(6)
             ->get(['id', 'order_number', 'user_id', 'vendor_id', 'status', 'payment_status', 'payment_method', 'total_amount', 'created_at']);
         $customers = User::query()->whereIn('id', $orders->pluck('user_id'))->get(['id', 'name', 'surname'])->keyBy('id');
         $vendors = VendorDirectory::details($orders->pluck('vendor_id'));
@@ -168,7 +170,8 @@ class AdminDashboardController extends Controller
         return $orders->map(fn ($o) => [
             'id' => $o->id,
             'order_number' => $o->order_number,
-            'status' => $o->status,
+            'status' => $o->displayStatus(),
+            'status_label' => $o->displayStatusLabel(),
             'payment_status' => $o->payment_status,
             'method_label' => PaymentLedger::methodLabel($o->payment_method),
             'total_amount' => (float) $o->total_amount,
