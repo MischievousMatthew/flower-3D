@@ -305,6 +305,8 @@ class CustomerOrderTrackingController extends Controller
                 'color' => $i->color,
                 'size' => $i->size,
                 'notes' => $i->notes,
+                // A custom bouquet's flowers, wrapping, card and message, for its price breakdown
+                'customizations' => data_get($i->customizations, 'type') === 'custom_flower_bouquet' ? $i->customizations : null,
             ])->values(),
             // The latest return/refund case, and whether a new one can be opened
             'return_case' => $latestCase ? app(ReturnCaseService::class)->summary($latestCase) : null,

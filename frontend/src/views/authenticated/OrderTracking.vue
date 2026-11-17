@@ -135,7 +135,7 @@
                   <span aria-hidden="true">·</span>
                   <span>{{ fmtDate(order.created_at) }}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{{ order.items_count }} {{ order.items_count === 1 ? "item" : "items" }}</span>
+                  <span>{{ itemCount(order) }} {{ itemCount(order) === 1 ? "item" : "items" }}</span>
                 </p>
               </div>
 
@@ -287,9 +287,64 @@
                 <div class="ot-detail__grid">
                   <!-- Items and what it cost -->
                   <section class="ot-panel" aria-label="Items">
-                    <h3 class="ot-panel__title">Items <span>{{ order.items_count }}</span></h3>
-                    <ul class="ot-items">
-                      <li v-for="item in order.items" :key="item.id" class="ot-item">
+                    <h3 class="ot-panel__title">Items <span>{{ itemCount(order) }}</span></h3>
+                    <!-- A custom bouquet: one entry, priced part by part (as the shop sees it) -->
+                    <div v-for="b in bouquetsOf(order)" :key="b.key" class="ot-bq">
+                      <div class="ot-bq__head">
+                        <span>
+                          <strong>Custom bouquet</strong>
+                          <small>{{ b.preset ? `${presetName(b.preset)} · ` : "" }}{{ b.stems }} {{ b.stems === 1 ? "stem" : "stems" }}</small>
+                        </span>
+                        <span class="ot-item__price">₱{{ fmt(b.total) }}</span>
+                      </div>
+                      <table class="ot-bq__lines">
+                        <caption class="ot-sr">Price breakdown of your custom bouquet</caption>
+                        <tbody>
+                          <tr v-for="f in b.flowers" :key="f.product_id">
+                            <th scope="row">
+                              <span class="ot-bq__thing">
+                                <img v-if="f.image" :src="f.image" alt="" loading="lazy" />
+                                <span v-else class="ot-item__ph" aria-hidden="true">{{ f.name.charAt(0) }}</span>
+                                <span><b>{{ f.name }}</b><small>{{ f.count }} × ₱{{ fmt(f.unit_price) }}</small></span>
+                              </span>
+                            </th>
+                            <td>₱{{ fmt(f.subtotal) }}</td>
+                          </tr>
+                          <tr v-if="b.base > 0 || b.parts.length || b.fillers.length">
+                            <th scope="row">
+                              <b>{{ b.preset ? `${presetName(b.preset)} bouquet base` : "Wrapping and fillers" }}</b>
+                              <small>Wrapper, ribbon and fillers are included in this price</small>
+                            </th>
+                            <td>₱{{ fmt(b.base) }}</td>
+                          </tr>
+                          <tr v-for="p in b.parts" :key="p.key" class="ot-bq__sub">
+                            <th scope="row">
+                              <span class="ot-bq__swatch"><i v-if="p.color" :style="{ background: p.color }"></i>{{ p.label }}<template v-if="p.name"> · {{ p.name }}</template></span>
+                              <small v-if="p.pattern">{{ p.pattern }}</small>
+                            </th>
+                            <td>{{ p.price > 0 ? `₱${fmt(p.price)}` : "Included" }}</td>
+                          </tr>
+                          <tr v-for="fl in b.fillers" :key="fl.name" class="ot-bq__sub">
+                            <th scope="row">Filler · {{ fl.name }}<template v-if="fl.count > 1"> × {{ fl.count }}</template></th>
+                            <td>{{ fl.price > 0 ? `₱${fmt(fl.price)}` : "Included" }}</td>
+                          </tr>
+                          <tr v-if="b.card">
+                            <th scope="row">
+                              <b>{{ b.card.name }}</b>
+                              <small>{{ b.card.size ? `${b.card.size} card` : "Message card" }}</small>
+                            </th>
+                            <td>{{ b.card.price > 0 ? `₱${fmt(b.card.price)}` : "Free" }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <figure v-if="b.card" class="ot-bq__message">
+                        <figcaption>Your message on the card</figcaption>
+                        <blockquote v-if="b.card.message">{{ b.card.message }}</blockquote>
+                        <p v-else>You left the card blank.</p>
+                      </figure>
+                    </div>
+                    <ul v-if="plainItemsOf(order).length" class="ot-items">
+                      <li v-for="item in plainItemsOf(order)" :key="item.id" class="ot-item">
                         <img v-if="item.product_image" :src="item.product_image" :alt="item.product_name" loading="lazy" />
                         <span v-else class="ot-item__ph" aria-hidden="true">{{ item.product_name?.charAt(0) || "B" }}</span>
                         <span class="ot-item__body">
@@ -595,6 +650,8 @@ import ReviewModal from "../../layouts/components/ReviewModal.vue";
 import PaymentFailedModal from "../../components/customer/PaymentFailedModal.vue";
 import ReturnCasePanel from "../../components/returns/ReturnCasePanel.vue";
 import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
+import { bouquetBreakdowns } from "../../components/vendor/orders/orderUi";
+import { DEFAULT_PRESETS } from "../../constants/bouquetPresets";
 import "../../styles/bloomcraft.css";
 import { toast } from "@/utils/snackbar";
 
@@ -824,7 +881,7 @@ const askShop = (order) =>
         // Shown on the order card above the message box
         image: thumbs(order)[0] || "",
         status: dlvLabel(order),
-        items_count: Number(order.items_count || 0),
+        items_count: itemCount(order),
         total: Number(order.total_amount || 0),
       }),
     },
@@ -1197,7 +1254,25 @@ function payTone(s) {
 }
 // Up to three item photos for the card, and how many more items there are
 const thumbs = (order) => (order.items || []).map((item) => item.product_image).filter(Boolean).slice(0, 3);
-const moreItems = (order) => Math.max(0, Number(order.items_count || 0) - Math.max(thumbs(order).length, 1));
+// A custom bouquet shows once with its price breakdown, the same as on the shop's order page
+const bouquetCache = new WeakMap();
+const bouquetsOf = (order) => {
+  if (!bouquetCache.has(order)) {
+    bouquetCache.set(order, bouquetBreakdowns((order.items || []).map((i) => ({ ...i, image: i.product_image }))));
+  }
+  return bouquetCache.get(order);
+};
+const plainItemsOf = (order) => {
+  const inBouquet = new Set(bouquetsOf(order).flatMap((b) => b.item_ids));
+  return (order.items || []).filter((i) => !inBouquet.has(i.id));
+};
+// A bouquet counts as one item, however many flowers it has
+const itemCount = (order) => {
+  if (!order.items?.length) return Number(order.items_count || 0);
+  return bouquetsOf(order).length + plainItemsOf(order).reduce((n, i) => n + Number(i.quantity || 1), 0);
+};
+const presetName = (preset) => preset.label || DEFAULT_PRESETS.find((p) => p.key === preset.key)?.label || preset.key;
+const moreItems = (order) => Math.max(0, itemCount(order) - Math.max(thumbs(order).length, 1));
 
 // formatters
 const fmt = (v) =>
@@ -2295,6 +2370,151 @@ button.ot-pay {
   font-size: 14px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+/* Custom bouquet: one entry with its price breakdown */
+.ot-bq {
+  display: grid;
+  gap: 10px;
+}
+
+.ot-bq + .ot-bq,
+.ot-bq + .ot-items {
+  margin-top: 14px !important;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
+.ot-bq__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ot-bq__head > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.ot-bq__head strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ot-bq__head small,
+.ot-bq__lines small {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.ot-bq__lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.ot-bq__lines th,
+.ot-bq__lines td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.ot-bq__lines tr:last-child th,
+.ot-bq__lines tr:last-child td {
+  border-bottom: 0;
+}
+
+.ot-bq__lines td {
+  padding-left: 12px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-bq__lines b {
+  display: block;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.ot-bq__thing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ot-bq__thing img,
+.ot-bq__thing .ot-item__ph {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--ivory-deep);
+  font-size: 16px;
+}
+
+.ot-bq__sub th {
+  padding-left: 14px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.ot-bq__sub td {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.ot-bq__swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ot-bq__swatch i {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+
+.ot-bq__message {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--green-bg);
+  color: var(--leaf-deep);
+}
+
+.ot-bq__message figcaption {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ot-bq__message blockquote,
+.ot-bq__message p {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ot-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .ot-totals {
