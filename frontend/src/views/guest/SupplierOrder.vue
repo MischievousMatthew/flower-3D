@@ -58,7 +58,7 @@
         </ul>
 
         <!-- The account on file, once they've answered -->
-        <template v-if="!answering && ['confirmed', 'shipped', 'received'].includes(order.stage)">
+        <template v-if="!answering && ['offered', 'confirmed', 'shipped', 'received'].includes(order.stage)">
           <div v-if="order.payment.account && !editingAccount" class="so-acct">
             <div>
               <span>Paid into</span>
@@ -218,6 +218,13 @@
         </template>
       </form>
 
+      <!-- Shipping waits until the shop accepts what they can supply -->
+      <section v-if="order.stage === 'offered'" class="so-ship so-ship--locked" aria-labelledby="so-wait-title">
+        <h2 id="so-wait-title">Shipping opens once the shop accepts</h2>
+        <p class="af-note">{{ order.shop_name }} is checking the quantities you offered. If they accept, you'll get an email and can mark it shipped here. If they don't, the order is cancelled and you'll be emailed why.</p>
+        <button type="button" class="af-btn" disabled aria-disabled="true">Mark as shipped</button>
+      </section>
+
       <!-- Ship -->
       <section v-if="order.stage === 'confirmed'" class="so-ship" aria-labelledby="so-ship-title">
         <h2 id="so-ship-title">Sent it on its way?</h2>
@@ -252,6 +259,7 @@ import { PAYOUT_CHANNELS, formatAccount, accountFormat, accountHint, accountErro
 /** A supplier answers a purchase order from the private link in its email (no account) */
 const STAGE = {
   awaiting: { title: "Waiting for your answer", text: "Check the items, change any amount you can't fully supply, then confirm." },
+  offered: { title: "Waiting for the shop to accept your numbers", text: "You said you can supply less than they ordered. Please don't ship it yet. We'll email you as soon as they accept or decline." },
   confirmed: { title: "You confirmed this order", text: "Mark it shipped below when it's on the way." },
   shipped: { title: "On its way", text: "The shop has been told it's coming. Thank you!" },
   received: { title: "Received by the shop", text: "The shop has received this order. Nothing more to do." },
@@ -802,6 +810,18 @@ onMounted(load);
   margin: 0;
   font-size: 18px;
   color: var(--ink);
+}
+.so-ship--locked {
+  border-style: dashed;
+  background: #fbf8f1;
+}
+.so-ship--locked .af-note {
+  margin: 0;
+  line-height: 1.55;
+}
+.so-ship--locked .af-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .af-btn.danger {
   background: #b4443c;

@@ -31,9 +31,12 @@ class PurchaseOrderSupplierLink extends Model
     }
 
     /** A new link for the order; older ones stop working. Returns [link, plain token]. */
-    public static function issue(PurchaseOrder $order): array
+    /** @param bool $replaceOlder false keeps earlier links working too (a follow-up email about the same order) */
+    public static function issue(PurchaseOrder $order, bool $replaceOlder = true): array
     {
-        static::where('purchase_order_id', $order->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+        if ($replaceOlder) {
+            static::where('purchase_order_id', $order->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+        }
 
         $token = Str::random(48);
         $link = static::create([

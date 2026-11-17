@@ -26,7 +26,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 class FundingPaymentService
 {
     /** Order statuses where the supplier hasn't confirmed yet */
-    private const NOT_CONFIRMED = ['draft', 'pending_approval', 'pending'];
+    private const NOT_CONFIRMED = ['draft', 'pending_approval', 'pending', 'supplier_offered'];
 
     public function state(FundingRequest $f): ?array
     {

@@ -9,7 +9,11 @@
 @section('content')
     <p style="margin:0 0 6px;font-size:15px;line-height:1.7;">
         Hello {{ $order->supplier?->contact_person ?: 'there' }},<br>
-        {{ $shopName }} has cancelled this order. Please don't prepare or send it.
+        @if (! empty($offerDeclined))
+            {{ $shopName }} couldn't accept the quantities you offered, so they've cancelled this order with you. Please don't prepare or send it.
+        @else
+            {{ $shopName }} has cancelled this order. Please don't prepare or send it.
+        @endif
     </p>
 
     @include('emails.partials.panel', [

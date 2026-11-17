@@ -65,14 +65,17 @@ class PurchaseOrder extends Model
     public const STAGES = [
         'draft'              => ['draft'],
         'pending_approval'   => ['pending_approval'],
-        'ordered'            => ['pending', 'processing', 'shipped', 'received'],
+        'ordered'            => ['pending', 'supplier_offered', 'processing', 'shipped', 'received'],
         'partially_received' => ['partially_received'],
         'completed'          => ['completed'],
         'cancelled'          => ['cancelled'],
     ];
 
+    /** The supplier can supply less than ordered: waiting for the shop to accept or decline */
+    public const SUPPLIER_OFFERED = 'supplier_offered';
+
     /** Can still be cancelled: nothing has arrived yet */
-    public const CANCELLABLE = ['draft', 'pending_approval', 'pending', 'processing', 'shipped'];
+    public const CANCELLABLE = ['draft', 'pending_approval', 'pending', 'supplier_offered', 'processing', 'shipped'];
 
     /** Still being written or waiting for approval: not yet with the supplier */
     public const EDITABLE = ['draft', 'pending_approval'];

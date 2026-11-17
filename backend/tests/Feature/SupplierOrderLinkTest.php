@@ -86,22 +86,80 @@ class SupplierOrderLinkTest extends TestCase
             ->assertJsonPath('data.total', 13200);
     }
 
-    public function test_confirming_part_of_an_order_updates_it_for_the_shop(): void
+    /** The supplier says they can only supply 900 of the 1,100 tulips */
+    private function offerLess(): string
     {
         $token = $this->token();
-
         $this->postJson("/api/supplier-orders/{$token}/confirm", [
             'items' => [['id' => $this->itemId(), 'qty' => 900]],
             'delivery_date' => now()->addDays(5)->toDateString(),
             'note' => 'Short on tulips this week',
-        ])->assertOk()->assertJsonPath('data.stage', 'confirmed');
+        ])->assertOk()->assertJsonPath('data.stage', 'offered');
+
+        return $token;
+    }
+
+    public function test_confirming_part_of_an_order_waits_for_the_shop_to_accept(): void
+    {
+        $this->offerLess();
 
         $order = PurchaseOrder::findOrFail($this->orderId);
-        $this->assertSame('processing', $order->status);
+        $this->assertSame('supplier_offered', $order->status);
         $this->assertEquals(10800, (float) $order->total_amount);
         $this->assertSame(200, (int) DB::table('purchase_order_items')->value('cancelled_qty'));
-        $this->assertDatabaseHas('purchase_order_events', ['event' => 'supplier_confirmed', 'actor_name' => 'Blooms']);
+        $this->assertDatabaseHas('purchase_order_events', ['event' => 'supplier_offered', 'actor_name' => 'Blooms']);
         $this->assertDatabaseHas('user_notifications', ['user_id' => 3]);
+    }
+
+    public function test_confirming_everything_needs_no_answer_from_the_shop(): void
+    {
+        $token = $this->token();
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => [['id' => $this->itemId(), 'qty' => 1100]]])
+            ->assertOk()->assertJsonPath('data.stage', 'confirmed');
+        $this->assertSame('processing', PurchaseOrder::findOrFail($this->orderId)->status);
+    }
+
+    public function test_the_supplier_cannot_ship_until_the_shop_accepts_their_numbers(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(['api.brevo.com/*' => \Illuminate\Support\Facades\Http::response(['messageId' => 'x'], 201)]);
+        $token = $this->offerLess();
+
+        // Not yet: the shop hasn't answered
+        $this->postJson("/api/supplier-orders/{$token}/shipped")->assertStatus(409)->assertJsonPath('code', 'awaiting_shop');
+        $this->assertSame('supplier_offered', PurchaseOrder::findOrFail($this->orderId)->status);
+
+        // The shop accepts: the supplier is emailed, and now they can ship
+        $result = app(OrderService::class)->acceptOffer($this->orderId, 3, 'Fine, 900 works');
+        $this->assertTrue($result['supplier_told']);
+        $this->assertSame('processing', $result['order']->status);
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_contains($r['subject'], 'Accepted') && str_contains((string) $r['htmlContent'], '900'));
+        $this->assertDatabaseHas('purchase_order_events', ['event' => 'offer_accepted', 'note' => 'Fine, 900 works']);
+
+        // The link they already had still works
+        $this->postJson("/api/supplier-orders/{$token}/shipped")->assertOk()->assertJsonPath('data.stage', 'shipped');
+    }
+
+    public function test_declining_the_offer_cancels_it_with_the_supplier_and_frees_it_for_another(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(['api.brevo.com/*' => \Illuminate\Support\Facades\Http::response(['messageId' => 'x'], 201)]);
+        $token = $this->offerLess();
+
+        $result = app(OrderService::class)->declineOffer($this->orderId, 3, 'We need all 1,100 for a wedding');
+
+        $this->assertTrue($result['supplier_told']);
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_contains($r['subject'], 'Cancelled') && str_contains((string) $r['htmlContent'], 'We need all 1,100 for a wedding'));
+        // Back to a draft for the full amount, to send to another supplier
+        $order = PurchaseOrder::findOrFail($this->orderId);
+        $this->assertSame('draft', $order->status);
+        $this->assertEquals(13200, (float) $order->total_amount);
+        $this->assertSame(0, (int) DB::table('purchase_order_items')->value('cancelled_qty'));
+        $this->assertNull($order->supplier_confirmed_at);
+        $this->assertDatabaseHas('purchase_order_events', ['event' => 'offer_declined', 'note' => 'We need all 1,100 for a wedding']);
+        // Their link stops working, so they can't ship it
+        $this->postJson("/api/supplier-orders/{$token}/shipped")->assertStatus(410);
+        // And it can't be answered twice
+        $this->expectException(\RuntimeException::class);
+        app(OrderService::class)->acceptOffer($this->orderId, 3);
     }
 
     public function test_the_page_shows_when_and_how_the_supplier_is_paid(): void

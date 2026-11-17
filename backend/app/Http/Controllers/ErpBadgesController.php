@@ -88,7 +88,7 @@ class ErpBadgesController extends Controller
                 ->where('min_stock_level', '>', 0)->whereColumn('quantity_in_stock', '<=', 'min_stock_level')->count(),
             // Supplier orders to approve, or arriving and still to be received
             'sc_orders' => fn () => PurchaseOrder::withoutGlobalScopes()->where('owner_id', $ownerId)
-                ->whereIn('status', ['pending_approval', 'shipped', 'partially_received'])->count(),
+                ->whereIn('status', ['pending_approval', 'supplier_offered', 'shipped', 'partially_received'])->count(),
             // Customer return requests waiting for the shop's decision
             'deliveries' => fn () => OrderRequest::query()->whereHas('order', $shopOrder)->where('status', 'pending')->count(),
             // Orders still waiting for a scan (to pack, to hand over, to drop off)

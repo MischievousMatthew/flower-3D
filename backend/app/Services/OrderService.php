@@ -361,6 +361,94 @@ class OrderService
         return ['order' => $order->fresh(['supplier', 'items', 'events']), 'supplier_told' => $told];
     }
 
+    /** The order, locked, if the supplier's offer of less is waiting for an answer */
+    private function offeredOrder(int $orderId, int $ownerId): PurchaseOrder
+    {
+        $order = PurchaseOrder::where('owner_id', $ownerId)->with('items', 'supplier')->lockForUpdate()->findOrFail($orderId);
+        if ($order->status !== PurchaseOrder::SUPPLIER_OFFERED) {
+            throw new \RuntimeException('There\'s no offer from the supplier waiting on this order any more. Refresh the page.');
+        }
+
+        return $order;
+    }
+
+    /**
+     * Accept what the supplier can supply. The order goes on as confirmed, the
+     * supplier is emailed that they can ship, and only then can they mark it shipped.
+     *
+     * @return array{order: PurchaseOrder, supplier_told: ?bool}
+     */
+    public function acceptOffer(int $orderId, int $ownerId, ?string $note = null): array
+    {
+        $order = DB::transaction(function () use ($orderId, $ownerId, $note) {
+            $order = $this->offeredOrder($orderId, $ownerId);
+            $order->quietlyMoveTo(['status' => 'processing']);
+            PurchaseOrderEvent::record($order, 'offer_accepted', PurchaseOrder::SUPPLIER_OFFERED, 'processing', $note);
+
+            return $order;
+        });
+
+        $told = null;
+        if ($order->supplier?->email) {
+            try {
+                // A new link in this email; the one they already have keeps working
+                [, $token] = \App\Models\PurchaseOrderSupplierLink::issue($order, false);
+                $url = rtrim((string) config('app.frontend_url'), '/') . config('frontend_routes.supplier_order_path') . '/' . $token;
+                $told = (new \App\Mail\PurchaseOrderOfferAcceptedMail($order, $url, $note))->send();
+            } catch (\Throwable $e) {
+                Log::warning('Offer accepted email failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+                $told = false;
+            }
+            PurchaseOrderEvent::record($order, $told ? 'offer_accepted_emailed' : 'email_failed', null, null, $order->supplier->email);
+        }
+
+        return ['order' => $order->fresh(['supplier', 'items', 'events']), 'supplier_told' => $told];
+    }
+
+    /**
+     * Don't accept what the supplier offered. They're emailed that the order is
+     * cancelled with them, with the reason, and their link stops working. The
+     * order goes back to a draft for the full amount, to send to another supplier.
+     *
+     * @return array{order: PurchaseOrder, supplier_told: ?bool}
+     */
+    public function declineOffer(int $orderId, int $ownerId, string $reason): array
+    {
+        $order = DB::transaction(function () use ($orderId, $ownerId, $reason) {
+            $order = $this->offeredOrder($orderId, $ownerId);
+
+            foreach ($order->items as $item) {
+                $item->update(['cancelled_qty' => 0]);
+            }
+            $order->quietlyMoveTo([
+                'status' => 'draft',
+                'total_amount' => round($order->items->sum(fn ($i) => (int) $i->quantity * (float) $i->price), 2),
+                'submitted_at' => null,
+                'supplier_confirmed_at' => null,
+                'supplier_declined_at' => null,
+                'supplier_note' => null,
+            ]);
+            PurchaseOrderEvent::record($order, 'offer_declined', PurchaseOrder::SUPPLIER_OFFERED, 'draft', $reason);
+            \App\Models\PurchaseOrderSupplierLink::revokeFor($order);
+
+            return $order;
+        });
+
+        // The supplier who made the offer (the shop picks another one afterwards)
+        $told = null;
+        if ($order->supplier?->email) {
+            try {
+                $told = (new \App\Mail\PurchaseOrderCancelledMail($order, $reason, true))->send();
+            } catch (\Throwable $e) {
+                Log::warning('Offer declined email failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+                $told = false;
+            }
+            PurchaseOrderEvent::record($order, $told ? 'cancel_emailed' : 'email_failed', null, null, $order->supplier?->email);
+        }
+
+        return ['order' => $order->fresh(['supplier', 'items', 'events']), 'supplier_told' => $told];
+    }
+
     /** Email the order to the supplier (again). Null when there's no email to send to. */
     public function emailSupplier(PurchaseOrder $order): ?bool
     {

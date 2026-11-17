@@ -13,6 +13,7 @@ const STAGE_OF = {
   draft: "draft",
   pending_approval: "pending_approval",
   pending: "ordered",
+  supplier_offered: "ordered",
   processing: "ordered",
   shipped: "ordered",
   received: "ordered",
@@ -31,11 +32,12 @@ export const stageOf = (status) => PO_FILTER_STAGES.find((s) => s.key === STAGE_
 
 /** Can still be cancelled: nothing has arrived yet */
 export const isCancellable = (o) =>
-  ["draft", "pending_approval", "pending", "processing", "shipped"].includes(o?.status) && !(o?.items ?? []).some((i) => Number(i.received_qty) > 0);
+  ["draft", "pending_approval", "pending", "supplier_offered", "processing", "shipped"].includes(o?.status) && !(o?.items ?? []).some((i) => Number(i.received_qty) > 0);
 
 /** Where an "Ordered" order is right now, in words */
 export const ORDERED_STEP = {
   pending: "Waiting for the supplier",
+  supplier_offered: "Supplier offered less",
   processing: "Supplier approved",
   shipped: "On the way",
   received: "Arrived, not in stock yet",
@@ -55,7 +57,7 @@ export const NEXT_STEPS = {
 };
 
 const pesoFmt = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
-const RANK = { draft: 0, pending_approval: 0, pending: 1, processing: 2, shipped: 3, received: 4, partially_received: 4, completed: 5 };
+const RANK = { draft: 0, pending_approval: 0, pending: 1, supplier_offered: 1, processing: 2, shipped: 3, received: 4, partially_received: 4, completed: 5 };
 
 /**
  * What has really happened to an order, step by step: drafted, (approved,)
@@ -82,7 +84,7 @@ export function orderSteps(o) {
   steps.push({
     key: "supplier",
     label: "Supplier approval",
-    note: rank >= 2 ? (o.supplier_confirmed_at ? `Approved ${poDate(o.supplier_confirmed_at)}${confirmedLess ? " · less than ordered" : ""}` : "Approved") : rank === 1 ? "Waiting for them" : "",
+    note: o.status === "supplier_offered" ? "Offered less · your answer needed" : rank >= 2 ? (o.supplier_confirmed_at ? `Approved ${poDate(o.supplier_confirmed_at)}${confirmedLess ? " · less than ordered" : ""}` : "Approved") : rank === 1 ? "Waiting for them" : "",
     done: rank >= 2,
   });
   const onTheWay = { key: "shipped", label: "On the way", note: o.supplier_shipped_at ? poDate(o.supplier_shipped_at) : rank >= 3 ? "Yes" : "", done: rank >= 3 };
@@ -136,6 +138,14 @@ export function eventText(e) {
       return "Supplier changed their payment account";
     case "supplier_confirmed":
       return "Supplier confirmed the order";
+    case "supplier_offered":
+      return "Supplier can supply less than ordered";
+    case "offer_accepted":
+      return "Accepted what the supplier can supply";
+    case "offer_accepted_emailed":
+      return "Told the supplier they can ship it";
+    case "offer_declined":
+      return "Didn't accept the supplier's offer; back to draft";
     case "supplier_declined":
       return "Supplier can't supply it; back to draft";
     case "supplier_shipped":
@@ -153,7 +163,7 @@ export function eventText(e) {
   }
 }
 
-export const EVENT_TONE = { inspected: "violet", approved: "green", emailed: "blue", sent_back: "amber", email_failed: "red", received: "violet", created: "slate", edited: "slate", status: "slate", supplier_confirmed: "green", supplier_declined: "red", supplier_shipped: "blue", cancelled: "red", cancel_emailed: "blue", paid: "green", paid_emailed: "blue", supplier_payout: "slate" };
+export const EVENT_TONE = { inspected: "violet", approved: "green", emailed: "blue", sent_back: "amber", email_failed: "red", received: "violet", created: "slate", edited: "slate", status: "slate", supplier_confirmed: "green", supplier_offered: "amber", offer_accepted: "green", offer_accepted_emailed: "blue", offer_declined: "red", supplier_declined: "red", supplier_shipped: "blue", cancelled: "red", cancel_emailed: "blue", paid: "green", paid_emailed: "blue", supplier_payout: "slate" };
 
 export const poDate = (d) => (d ? new Date(String(d).length === 10 ? `${d}T00:00:00` : d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—");
 export const poDateTime = (d) => (d ? new Date(d).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—");

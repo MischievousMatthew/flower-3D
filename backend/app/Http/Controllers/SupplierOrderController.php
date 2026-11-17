@@ -97,8 +97,10 @@ class SupplierOrderController extends Controller
             }
 
             $note = trim((string) ($data['note'] ?? ''));
+            // Less than ordered is an offer: the shop accepts it before anything ships
+            $status = $short ? PurchaseOrder::SUPPLIER_OFFERED : 'processing';
             $order->quietlyMoveTo(array_filter([
-                'status' => 'processing',
+                'status' => $status,
                 'total_amount' => $total,
                 'supplier_confirmed_at' => now(),
                 'supplier_note' => $note ?: null,
@@ -110,6 +112,17 @@ class SupplierOrderController extends Controller
                 ! empty($data['delivery_date']) ? 'Delivers on ' . \Carbon\Carbon::parse($data['delivery_date'])->format('M j, Y') : null,
                 $note ?: null,
             ])->filter()->implode(' · ');
+            if ($short) {
+                PurchaseOrderEvent::recordForSupplier($order, 'supplier_offered', 'pending', $status, $summary);
+                $this->logActivity($order, 'Offered part of a supplier order', "Offered part of supplier order {$order->order_number}: {$summary}");
+                $this->tellShop($order, "{$order->supplier?->company_name} can supply less on {$order->order_number}: accept or decline", $summary);
+
+                return response()->json([
+                    'message' => "Sent to the shop. They need to accept these numbers before you ship. We'll email you their answer.",
+                    'data' => $this->present($link->fresh()),
+                ]);
+            }
+
             PurchaseOrderEvent::recordForSupplier($order, 'supplier_confirmed', 'pending', 'processing', $summary);
             $this->logActivity($order, 'Confirmed a supplier order', "Confirmed supplier order {$order->order_number}: {$summary}");
             $this->tellShop($order, "{$order->supplier?->company_name} confirmed {$order->order_number}", $summary);
@@ -160,9 +173,15 @@ class SupplierOrderController extends Controller
         return DB::transaction(function () use ($link, $note) {
             $order = PurchaseOrder::with('supplier')->lockForUpdate()->findOrFail($link->purchase_order_id);
             if ($order->status !== 'processing') {
-                return $order->status === 'pending'
-                    ? response()->json(['message' => 'Confirm the order first.'], 409)
-                    : $this->alreadyAnswered($order);
+                return match ($order->status) {
+                    'pending' => response()->json(['message' => 'Confirm the order first.'], 409),
+                    // Never before the shop agrees to the numbers offered
+                    PurchaseOrder::SUPPLIER_OFFERED => response()->json([
+                        'code' => 'awaiting_shop',
+                        'message' => "The shop hasn't accepted the numbers you offered yet. You can mark it shipped once they do. We'll email you.",
+                    ], 409),
+                    default => $this->alreadyAnswered($order),
+                };
             }
 
             $order->quietlyMoveTo(['status' => 'shipped', 'supplier_shipped_at' => now()]);
@@ -216,7 +235,7 @@ class SupplierOrderController extends Controller
 
         return DB::transaction(function () use ($link, $data) {
             $order = PurchaseOrder::with('supplier')->lockForUpdate()->findOrFail($link->purchase_order_id);
-            if (! in_array($order->status, ['pending', 'processing', 'shipped', 'received', 'partially_received', 'completed'], true)) {
+            if (! in_array($order->status, ['pending', PurchaseOrder::SUPPLIER_OFFERED, 'processing', 'shipped', 'received', 'partially_received', 'completed'], true)) {
                 return response()->json(['message' => 'This order is closed, so the account can\'t be changed here.'], 409);
             }
             if ($this->paymentsFor($order)->where('kind', FundingRequestPayment::KIND_PAYMENT)->isNotEmpty()) {
@@ -333,6 +352,8 @@ class SupplierOrderController extends Controller
             'stage' => match (true) {
                 $order->supplier_declined_at && $order->status === 'draft' => 'declined',
                 $order->status === 'pending' => 'awaiting',
+                // Offered less: waiting for the shop to accept before it can ship
+                $order->status === PurchaseOrder::SUPPLIER_OFFERED => 'offered',
                 $order->status === 'processing' => 'confirmed',
                 $order->status === 'shipped' => 'shipped',
                 in_array($order->status, ['received', 'partially_received', 'completed'], true) => 'received',

@@ -172,6 +172,47 @@ class OrderController extends Controller
         return response()->json(['message' => $message, 'order' => $order, 'supplier_told' => $result['supplier_told']]);
     }
 
+    /** POST /orders/{id}/accept-offer: take what the supplier said they can supply; they're told they can ship */
+    public function acceptOffer(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:500']]);
+        try {
+            $result = $this->service->acceptOffer($id, $this->getOwnerId(), trim((string) ($data['note'] ?? '')) ?: null);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+        $name = $result['order']->supplier?->company_name ?: 'The supplier';
+        $message = match ($result['supplier_told']) {
+            true    => "Accepted. {$name} has been emailed that they can ship it.",
+            false   => "Accepted, but the email to {$name} didn't go through. Tell them they can ship it.",
+            default => "Accepted. {$name} has no email, so tell them they can ship it.",
+        };
+
+        return response()->json(['message' => $message, 'order' => $result['order'], 'supplier_told' => $result['supplier_told']]);
+    }
+
+    /** POST /orders/{id}/decline-offer: not what the shop needs; the supplier is told it's cancelled and the order is a draft again */
+    public function declineOffer(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:500']], [
+            'reason.required' => 'Say why you can\'t accept it. The supplier sees this in their email.',
+            'reason.min'      => 'Say why you can\'t accept it. The supplier sees this in their email.',
+        ]);
+        try {
+            $result = $this->service->declineOffer($id, $this->getOwnerId(), trim($data['reason']));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+        $name = $result['order']->supplier?->company_name ?: 'The supplier';
+        $message = match ($result['supplier_told']) {
+            true    => "{$name} was emailed that it's cancelled. Pick another supplier and send it again.",
+            false   => "Declined, but the email to {$name} didn't go through. Let them know yourself, then pick another supplier.",
+            default => 'Declined. Pick another supplier and send it again.',
+        };
+
+        return response()->json(['message' => $message, 'order' => $result['order'], 'supplier_told' => $result['supplier_told']]);
+    }
+
     /** POST /orders/{id}/mark-sent: a Finance-approved draft went to the supplier another way (phone, printed copy) */
     public function markSent(int $id): JsonResponse
     {
@@ -254,7 +295,7 @@ class OrderController extends Controller
         return response()->json(['message' => 'Order deleted.']);
     }
 
-    private const STATUSES = ['draft', 'pending_approval', 'pending', 'processing', 'shipped', 'partially_received', 'received', 'completed', 'cancelled'];
+    private const STATUSES = ['draft', 'pending_approval', 'pending', 'supplier_offered', 'processing', 'shipped', 'partially_received', 'received', 'completed', 'cancelled'];
 
     private function detailRules(): array
     {

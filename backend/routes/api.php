@@ -1068,6 +1068,9 @@ Route::middleware('token.auth')->group(function () {
                 Route::post('/{id}/approve',   [OrderController::class, 'approve']);
                 Route::post('/{id}/send-back', [OrderController::class, 'sendBack']);
                 Route::post('/{id}/cancel',    [OrderController::class, 'cancel']);
+                // The supplier can supply less than ordered: accept their numbers, or decline and order elsewhere
+                Route::post('/{id}/accept-offer',  [OrderController::class, 'acceptOffer']);
+                Route::post('/{id}/decline-offer', [OrderController::class, 'declineOffer']);
             });
             Route::middleware('employee.module:sc_orders,edit')->group(function () {
                 Route::put('/{id}',                             [OrderController::class, 'update']);

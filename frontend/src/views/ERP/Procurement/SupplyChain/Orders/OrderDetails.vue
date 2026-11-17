@@ -45,6 +45,11 @@
           <button v-if="canApprove" type="button" class="sp-btn sp-btn-ghost" @click="openSendBack">Send back</button>
           <button v-if="canApprove" type="button" class="sp-btn sp-btn-primary" :disabled="busy" @click="openApprove">Approve &amp; send</button>
         </template>
+        <template v-else-if="o.status === 'supplier_offered'">
+          <button v-if="canApprove" type="button" class="sp-btn sp-btn-ghost" :disabled="busy" @click="openDeclineOffer">Don't accept</button>
+          <button v-if="canApprove" type="button" class="sp-btn sp-btn-primary" :disabled="busy" @click="openAcceptOffer"><span v-html="ICONS.check"></span>Accept {{ offeredUnits.toLocaleString("en-PH") }} units</button>
+          <span v-if="!canApprove" class="sp-hint">Someone who can approve orders needs to answer this.</span>
+        </template>
         <template v-else-if="o.status === 'pending' || isReceivable(o.status)">
           <button v-if="canEdit('sc_orders') && o.supplier?.email && ['pending', 'processing'].includes(o.status)" type="button" class="sp-btn sp-btn-ghost" :disabled="busy" @click="emailAgain"><span v-html="ICONS.send"></span>{{ o.sent_at ? "Email again" : "Email supplier" }}</button>
           <button v-if="canEdit('sc_orders') && NEXT_STEPS[o.status]" type="button" class="sp-btn" :class="o.status === 'pending' ? 'sp-btn-primary' : 'sp-btn-ghost'" @click="stepModal = { next: NEXT_STEPS[o.status][0].status, busy: false }">{{ o.status === "pending" ? "Supplier approved it" : "Update progress" }}</button>
@@ -70,12 +75,16 @@
           <div class="od-table-wrap">
             <table class="od-table">
               <thead>
-                <tr><th scope="col">Item</th><th scope="col" class="num">Ordered</th><th v-if="showReceived" scope="col" class="num">Received</th><th v-if="showRejected" scope="col" class="num">Rejected</th><th scope="col" class="num">Agreed price</th><th scope="col" class="num">Amount</th></tr>
+                <tr><th scope="col">Item</th><th scope="col" class="num">Ordered</th><th v-if="offered" scope="col" class="num">Supplier can send</th><th v-if="showReceived" scope="col" class="num">Received</th><th v-if="showRejected" scope="col" class="num">Rejected</th><th scope="col" class="num">Agreed price</th><th scope="col" class="num">Amount</th></tr>
               </thead>
               <tbody>
                 <tr v-for="it in o.items" :key="it.id">
                   <td><b>{{ it.product_name }}</b><small v-if="!it.product_id" class="od-warn">Not linked to a stock item</small></td>
                   <td class="num">{{ Number(it.quantity).toLocaleString("en-PH") }} <small>{{ it.unit || "" }}</small></td>
+                  <td v-if="offered" class="num">
+                    <b :class="{ 'od-short': canSend(it) < Number(it.quantity) }">{{ canSend(it).toLocaleString("en-PH") }}</b>
+                    <small v-if="canSend(it) < Number(it.quantity)" class="od-closed">{{ (Number(it.quantity) - canSend(it)).toLocaleString("en-PH") }} short</small>
+                  </td>
                   <td v-if="showReceived" class="num">
                     <span :class="{ full: it.received_qty >= it.quantity }">{{ Number(it.received_qty ?? 0).toLocaleString("en-PH") }}</span>
                     <div class="od-mini" role="img" :aria-label="`${it.received_qty ?? 0} of ${it.quantity} received`"><span :style="{ width: `${Math.min(100, ((it.received_qty ?? 0) / it.quantity) * 100)}%` }"></span></div>
@@ -86,7 +95,7 @@
                 </tr>
               </tbody>
               <tfoot>
-                <tr><td :colspan="3 + (showReceived ? 1 : 0) + (showRejected ? 1 : 0)" class="num">Total</td><td class="num"><b class="od-total">{{ money(o.total_amount) }}</b></td></tr>
+                <tr><td :colspan="3 + (offered ? 1 : 0) + (showReceived ? 1 : 0) + (showRejected ? 1 : 0)" class="num">Total<template v-if="offered"> of what they can send</template></td><td class="num"><b class="od-total">{{ money(o.total_amount) }}</b></td></tr>
               </tfoot>
             </table>
           </div>
@@ -168,7 +177,7 @@
             <div v-if="o.sent_at || o.supplier_declined_at">
               <dt>Supplier's answer</dt>
               <dd>
-                {{ o.supplier_declined_at ? "Can't supply it" : o.supplier_shipped_at ? "Sent it on its way" : o.supplier_confirmed_at ? "Confirmed" : "Waiting for the supplier" }}
+                {{ o.supplier_declined_at ? "Can't supply it" : o.status === "supplier_offered" ? "Can supply less · waiting for your answer" : o.supplier_shipped_at ? "Sent it on its way" : o.supplier_confirmed_at ? "Confirmed" : "Waiting for the supplier" }}
                 <small v-if="o.supplier_declined_at || o.supplier_shipped_at || o.supplier_confirmed_at">{{ poDateTime(o.supplier_declined_at || o.supplier_shipped_at || o.supplier_confirmed_at) }}</small>
                 <small v-if="o.supplier_note">“{{ o.supplier_note }}”</small>
               </dd>
@@ -233,6 +242,52 @@
             <div class="sp-modal-foot">
               <button type="button" class="sp-btn sp-btn-ghost" @click="cancelModal = null">Keep the order</button>
               <button type="submit" class="sp-btn sp-btn-danger" :disabled="cancelModal.busy">{{ cancelModal.busy ? "Cancelling…" : "Cancel order" }}</button>
+            </div>
+          </form>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- The supplier offered less: accept, or decline and order elsewhere -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="offerModal" class="sp-backdrop" @click="offerModal = null"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="offerModal" class="sp-modal-wrap" @keydown.esc="offerModal = null">
+          <form class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="od-of-title" novalidate @submit.prevent="answerOffer">
+            <div class="sp-modal-head">
+              <div>
+                <h3 id="od-of-title">{{ offerModal.accept ? `Accept what ${o.supplier?.company_name} can send?` : `Don't accept ${o.supplier?.company_name}'s offer?` }}</h3>
+                <p v-if="offerModal.accept">
+                  {{ offeredUnits.toLocaleString("en-PH") }} of {{ units.toLocaleString("en-PH") }} units for {{ money(o.total_amount) }}.
+                  <template v-if="o.supplier?.email">We'll email {{ o.supplier.email }} that they can ship it.</template>
+                  <template v-else>They have no email, so tell them they can ship it.</template>
+                </p>
+                <p v-else>
+                  <template v-if="o.supplier?.email">We'll email {{ o.supplier.email }} that the order is cancelled with them, with your reason, and their link stops working.</template>
+                  <template v-else>They have no email, so let them know yourself.</template>
+                  The order goes back to a draft for the full amount, so you can pick another supplier and send it.
+                </p>
+              </div>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="offerModal = null"><span v-html="ICONS.close"></span></button>
+            </div>
+            <label class="sp-field">
+              <span class="sp-label">{{ offerModal.accept ? "Note for the supplier" : "Why not?" }} <small v-if="offerModal.accept">(optional)</small></span>
+              <textarea
+                v-model.trim="offerModal.text"
+                class="sp-textarea"
+                :class="{ invalid: offerModal.error }"
+                rows="3"
+                maxlength="500"
+                :aria-invalid="!!offerModal.error"
+                :placeholder="offerModal.accept ? 'e.g. Please deliver before 10 AM' : 'e.g. We need all 1,100 tulips for a wedding'"
+              ></textarea>
+              <small v-if="offerModal.error" class="sp-error">{{ offerModal.error }}</small>
+            </label>
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" @click="offerModal = null">Back</button>
+              <button type="submit" class="sp-btn" :class="offerModal.accept ? 'sp-btn-primary' : 'sp-btn-danger'" :disabled="offerModal.busy">
+                {{ offerModal.busy ? "Saving…" : offerModal.accept ? "Accept and tell them" : "Don't accept" }}
+              </button>
             </div>
           </form>
         </div>
@@ -340,7 +395,12 @@ const confirmDelete = ref(false);
 const openReceipt = ref(null);
 // Warehouse staff (create) or purchasing staff (edit) can receive
 const canReceive = computed(() => can("warehouse", "create") || canEdit("sc_orders"));
-const showRejected = computed(() => (o.value?.items ?? []).some((i) => i.rejected_qty || i.cancelled_qty));
+// The supplier said they can send less: waiting for the shop to accept or not
+const offered = computed(() => o.value?.status === "supplier_offered");
+const canSend = (it) => Math.max(0, Number(it.quantity) - Number(it.cancelled_qty || 0));
+const offeredUnits = computed(() => (o.value?.items ?? []).reduce((s, i) => s + canSend(i), 0));
+const offerModal = ref(null);
+const showRejected = computed(() => !offered.value && (o.value?.items ?? []).some((i) => i.rejected_qty || i.cancelled_qty));
 
 const steps = computed(() => orderSteps(o.value));
 const pay = computed(() => (o.value?.funding?.payment && !o.value.funding.payment.legacy ? o.value.funding.payment : null));
@@ -351,7 +411,7 @@ const showReceived = computed(() => ["partially_received", "completed"].includes
 const late = computed(() => isReceivable(o.value?.status) && daysUntil(o.value?.expected_date) < 0);
 const subtitle = computed(() => [o.value.supplier?.company_name, `${money(o.value.total_amount)}`, statusText(o.value.status)].filter(Boolean).join(" · "));
 // Why it's a draft again: sent back by an approver, or declined by the supplier (newest first)
-const lastSentBack = computed(() => (o.value?.events ?? []).find((e) => e.event === "sent_back" || e.event === "supplier_declined"));
+const lastSentBack = computed(() => (o.value?.events ?? []).find((e) => ["sent_back", "supplier_declined", "offer_declined"].includes(e.event)));
 
 const nextAction = computed(() => {
   const x = o.value;
@@ -365,6 +425,14 @@ const nextAction = computed(() => {
   }
   switch (x.status) {
     case "draft":
+      if (lastSentBack.value?.event === "offer_declined") {
+        return {
+          tone: "amber",
+          icon: "restore",
+          title: "Send it to another supplier",
+          text: `You didn't accept the last supplier's offer: “${lastSentBack.value.note}” Edit the order to pick another supplier, then ${x.funding ? "email it to them" : "approve it again to send it"}.`,
+        };
+      }
       if (x.funding && lastSentBack.value?.event !== "supplier_declined") {
         return { tone: "slate", icon: "send", title: "Ready to send", text: `Finance already approved it (${x.funding.finance_request_id}). Email it to ${supplier}: they approve it, or say what they can supply, from the email.` };
       }
@@ -380,6 +448,13 @@ const nextAction = computed(() => {
       return x.sent_at
         ? { tone: "amber", icon: "clock", title: `Waiting for ${supplier} to approve it`, text: `Emailed ${poDate(x.sent_at)}. They approve it, or say what they can supply, from the email link. If they tell you another way, mark it approved.` }
         : { tone: "amber", icon: "clock", title: `Waiting for ${supplier} to approve it`, text: "Sent another way. Mark it approved once they say yes." };
+    case "supplier_offered":
+      return {
+        tone: "amber",
+        icon: "alert",
+        title: `${supplier} can send less than you ordered`,
+        text: `${offeredUnits.value.toLocaleString("en-PH")} of ${units.value.toLocaleString("en-PH")} units, for ${money(x.total_amount)}${x.supplier_note ? `: “${x.supplier_note}”` : "."} They can't ship it until you answer. Accept and they're told to ship, or don't and they're told it's cancelled, so you can send it to another supplier.`,
+      };
     case "processing":
       return pay.value?.stage === "to_pay" && pay.value.timing === "before_delivery"
         ? { tone: "blue", icon: "check", title: `${supplier} approved it`, text: `Finance pays ${pesoOf(pay.value.to_pay)} before they deliver. Receive the items when they arrive.` }
@@ -457,6 +532,33 @@ async function cancelOrder() {
   } catch (e) {
     m.busy = false;
     m.error = apiMessage(e, "Couldn't cancel the order.");
+  }
+}
+
+function openAcceptOffer() {
+  offerModal.value = { accept: true, text: "", busy: false, error: "" };
+}
+function openDeclineOffer() {
+  offerModal.value = { accept: false, text: "", busy: false, error: "" };
+}
+async function answerOffer() {
+  const m = offerModal.value;
+  if (!m.accept && (!m.text || m.text.length < 3)) {
+    m.error = "Say why you can't accept it. The supplier sees this in their email.";
+    return;
+  }
+  m.busy = true;
+  m.error = "";
+  try {
+    const res = m.accept ? await orderService.acceptOffer(o.value.id, m.text || null) : await orderService.declineOffer(o.value.id, m.text);
+    offerModal.value = null;
+    if (res.data.supplier_told === false) toast.warning(res.data.message);
+    else toast.success(res.data.message);
+    await load();
+  } catch (e) {
+    m.busy = false;
+    m.error = apiMessage(e, "Couldn't save your answer.");
+    if (e?.response?.status === 409) await load();
   }
 }
 
@@ -917,6 +1019,9 @@ onMounted(load);
 .od-closed {
   display: block;
   color: var(--v-amber-text) !important;
+}
+.od-short {
+  color: var(--v-amber-text);
 }
 .od-dl {
   list-style: none;

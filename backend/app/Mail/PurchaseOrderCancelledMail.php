@@ -11,7 +11,8 @@ use App\Services\BrevoService;
  */
 class PurchaseOrderCancelledMail
 {
-    public function __construct(private readonly PurchaseOrder $order, private readonly string $reason) {}
+    /** @param bool $offerDeclined the supplier offered less than ordered and the shop didn't accept it */
+    public function __construct(private readonly PurchaseOrder $order, private readonly string $reason, private readonly bool $offerDeclined = false) {}
 
     /** True when the email service accepted it */
     public function send(): bool
@@ -28,6 +29,7 @@ class PurchaseOrderCancelledMail
             'order' => $order,
             'shopName' => $shopName,
             'reason' => $this->reason,
+            'offerDeclined' => $this->offerDeclined,
         ])->render();
 
         $response = (new BrevoService())->send($to, $order->supplier->company_name, "Cancelled: purchase order {$order->order_number} from {$shopName}", $html);

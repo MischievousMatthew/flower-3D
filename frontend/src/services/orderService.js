@@ -18,6 +18,9 @@ export const orderService = {
   approve: (id, data = {}) => api.post(`${BASE}/${id}/approve`, data),
   sendBack: (id, reason) => api.post(`${BASE}/${id}/send-back`, { reason }),
   cancel: (id, reason) => api.post(`${BASE}/${id}/cancel`, { reason }),
+  // The supplier can supply less than ordered: take their numbers, or decline and order elsewhere
+  acceptOffer: (id, note) => api.post(`${BASE}/${id}/accept-offer`, { note }),
+  declineOffer: (id, reason) => api.post(`${BASE}/${id}/decline-offer`, { reason }),
   email: (id) => api.post(`${BASE}/${id}/email`),
   // A Finance-approved draft that went to the supplier another way
   markSent: (id) => api.post(`${BASE}/${id}/mark-sent`),
