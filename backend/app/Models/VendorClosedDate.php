@@ -44,6 +44,20 @@ class VendorClosedDate extends Model
     }
 
     // Helper methods
+
+    /**
+     * Closed for orders on this date: a date the shop closed, or a day of the
+     * week outside its opening hours (e.g. Sunday when it opens Mon to Sat).
+     */
+    public static function isClosedOn($vendorId, $date, ?VendorApplication $application = null): bool
+    {
+        if (static::isDateClosed($vendorId, $date)) {
+            return true;
+        }
+        $application ??= VendorApplication::findApprovedForVendorUser(User::find($vendorId));
+
+        return $application !== null && ! $application->isOpenOn(\Carbon\Carbon::parse($date, VendorApplication::RESERVATION_TIMEZONE));
+    }
     public static function isDateClosed($vendorId, $date): bool
     {
         return static::where('vendor_id', $vendorId)

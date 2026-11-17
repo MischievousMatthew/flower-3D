@@ -777,6 +777,10 @@ const deliveryFacts = computed(() => {
   const lead = leadTimeDays.value;
   const earliest = getPhilippinesToday();
   earliest.setDate(earliest.getDate() + lead + 1);
+  // Skip days the shop is closed (as far as the loaded month shows)
+  for (let i = 0; i < 14 && calendarData.value[formatDateString(earliest)]?.status === "closed"; i++) {
+    earliest.setDate(earliest.getDate() + 1);
+  }
   facts.push(`Earliest: ${earliest.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric" })}`);
   if (lead > 0) facts.push(`${lead} ${lead === 1 ? "day" : "days"} to prepare`);
   const s = vendorReservationSettings.value;
@@ -956,7 +960,11 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
       ? "Cutoff"
       : "Prep Time";
   } else if (availability) {
-    if (availability.is_disabled || availability.status === "closed") {
+    if (availability.status === "closed") {
+      // A date the shop closed, or a day it isn't open (e.g. Sundays)
+      colorClass = "day-disabled";
+      label = "Closed";
+    } else if (availability.is_disabled) {
       colorClass = "day-disabled";
     } else if (availability.status === "fully_booked") {
       colorClass = "day-fully-booked";
@@ -1016,6 +1024,8 @@ function selectDate(day) {
       );
     } else if (day.isPastDate) {
       toast.error("Cannot select past dates.");
+    } else if (day.availability?.status === "closed") {
+      toast.error("The shop is closed that day. Please pick another date.");
     } else {
       toast.error("This date is not available for reservation.");
     }

@@ -671,6 +671,12 @@ class VendorApplication extends Model
         return empty($this->operating_schedules) ? self::SAME_DAY_CUTOFF_TIME : null;
     }
 
+    /** Open that day of the week. A shop that never set its opening hours counts as open every day. */
+    public function isOpenOn(CarbonInterface $date): bool
+    {
+        return empty($this->operating_schedules) || $this->operatingScheduleForDate($date) !== null;
+    }
+
     public function operatingScheduleForDate(CarbonInterface $date): ?array
     {
         $day = $date->copy()->setTimezone(self::RESERVATION_TIMEZONE)->format('l');

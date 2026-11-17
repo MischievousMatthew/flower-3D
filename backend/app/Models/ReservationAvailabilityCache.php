@@ -88,7 +88,27 @@ class ReservationAvailabilityCache extends Model
         return 'available';
     }
 
-    public static function getAvailabilityForRange($vendorId, $startDate, $endDate): array
+    /**
+     * Days of the week outside the shop's opening hours read as closed. That's
+     * checked here, not saved in the cache, so changing the hours shows at once.
+     */
+    public static function getAvailabilityForRange($vendorId, $startDate, $endDate, ?VendorApplication $application = null): array
+    {
+        $application ??= VendorApplication::findApprovedForVendorUser(User::find($vendorId));
+        $result = static::cachedAvailabilityForRange($vendorId, $startDate, $endDate);
+
+        if ($application) {
+            foreach ($result as $date => $day) {
+                if (! $application->isOpenOn(\Carbon\Carbon::parse($date, VendorApplication::RESERVATION_TIMEZONE))) {
+                    $result[$date]['status'] = 'closed';
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    private static function cachedAvailabilityForRange($vendorId, $startDate, $endDate): array
     {
         $data = static::forVendor($vendorId)
             ->inRange($startDate, $endDate)

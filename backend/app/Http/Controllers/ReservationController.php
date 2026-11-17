@@ -67,7 +67,8 @@ class ReservationController extends Controller
             $availability = ReservationAvailabilityCache::getAvailabilityForRange(
                 $vendorId,
                 $startDate,
-                $endDate
+                $endDate,
+                $vendorApplication
             );
 
             $userReservations = [];
@@ -237,7 +238,7 @@ class ReservationController extends Controller
             }
 
             // Check if vendor closed the date
-            if (VendorClosedDate::isDateClosed($vendorId, $requestDate)) {
+            if (VendorClosedDate::isClosedOn($vendorId, $requestDate, $vendorApplication)) {
                 return response()->json([
                     'success' => true,
                     'available' => false,

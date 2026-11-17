@@ -601,11 +601,12 @@ class CheckoutController extends Controller
             }
 
             // Check if reservation date is closed
-            if (VendorClosedDate::isDateClosed($vendorId, $reservationDate->toDateString())) {
+            if (VendorClosedDate::isClosedOn($vendorId, $reservationDate->toDateString(), $vendor)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'This date is not available for reservations'
-                ], 400);
+                    'message' => "{$vendor->store_name} is closed on " . $reservationDate->format('l, F j') . '. Please pick another date.',
+                    'errors' => ['reservation_date' => ['The shop is closed that day']],
+                ], 422);
             }
 
             // Check max orders per day
@@ -1448,7 +1449,7 @@ class CheckoutController extends Controller
             return false;
         }
 
-        if (VendorClosedDate::isDateClosed($order->vendor_id, $order->reservation_date)) {
+        if (VendorClosedDate::isClosedOn($order->vendor_id, $order->reservation_date)) {
             return false;
         }
 
