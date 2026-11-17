@@ -772,6 +772,22 @@ const setStorePin = async (latLng) => {
   }
 };
 
+// After a refresh on a later step the map is built while step 1 is hidden (0×0),
+// where fitting Cavite would zoom all the way in. So the view is only set once
+// the map can be measured: centred on the saved pin, or showing all of Cavite.
+let mapFramed = false;
+const frameStoreMap = () => {
+  const el = storeLocationMap.value;
+  if (!mapInstance || !caviteBoundaryLayer || !el?.offsetWidth || !el?.offsetHeight) return;
+  mapInstance.invalidateSize();
+  const bounds = caviteBoundaryLayer.getBounds();
+  const caviteZoom = mapInstance.getBoundsZoom(bounds, false, L.point(24, 24));
+  mapInstance.setMinZoom(caviteZoom);
+  if (storeMarker) mapInstance.setView(storeMarker.getLatLng(), Math.max(caviteZoom, 16), { animate: false });
+  else mapInstance.fitBounds(bounds, { padding: [12, 12], animate: false });
+  mapFramed = true;
+};
+
 const initialiseStoreLocationMap = async () => {
   await nextTick();
   if (mapInstance || !storeLocationMap.value) return;
@@ -790,8 +806,8 @@ const initialiseStoreLocationMap = async () => {
       style: { color: "#20734d", weight: 2, fillColor: "#48bb78", fillOpacity: 0.12 },
     }).addTo(mapInstance);
     const bounds = caviteBoundaryLayer.getBounds();
-    mapInstance.fitBounds(bounds, { padding: [12, 12] });
-    mapInstance.setMinZoom(mapInstance.getZoom());
+    // A starting view so layers can be added; frameStoreMap sets the real one once the map is visible
+    mapInstance.setView(bounds.getCenter(), 10, { animate: false });
     mapInstance.setMaxBounds(bounds.pad(0.05));
     mapInstance.on("click", ({ latlng }) => setStorePin(latlng));
 
@@ -805,6 +821,7 @@ const initialiseStoreLocationMap = async () => {
         formData.storeLongitude = null;
       }
     }
+    frameStoreMap();
   } catch (error) {
     explain("The map didn't load", `${error.message || "Your connection may have dropped."} You can still type your shop's address.`, { tone: "offline" });
   } finally {
@@ -1694,6 +1711,7 @@ const nextStep = () => {
 watch(currentStep, (step) => {
   if (step === 1) {
     nextTick(() => {
+      if (!mapFramed) return frameStoreMap();
       mapInstance?.invalidateSize();
       if (mapInstance && caviteBoundaryLayer && formData.storeLatitude === null) mapInstance.fitBounds(caviteBoundaryLayer.getBounds(), { padding: [12, 12] });
     });
