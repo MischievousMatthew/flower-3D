@@ -2,15 +2,15 @@
 // offers. Supplies cost too much for e-wallet limits, so it's banks only.
 // Matches App\Support\PayMongoChannels on the server.
 export const CHANNELS = {
-  // QR Ph: a QR code the payer scans with their bank app
-  bank: ["QR Ph", "BPI", "UnionBank", "BDO", "Landbank", "Metrobank"],
+  // Named banks only: QR Ph is left out, since an e-wallet app can scan its code too
+  bank: ["BPI", "UnionBank", "BDO", "Landbank", "Metrobank"],
 };
 
 // No longer offered; only so older requests and supplier accounts still read right
 export const OLD_EWALLETS = ["GCash", "Maya", "GrabPay", "ShopeePay"];
 
-// Accounts a supplier can be paid into (a QR code can't receive money)
-export const PAYOUT_CHANNELS = { bank: CHANNELS.bank.filter((c) => c !== "QR Ph") };
+// Accounts a supplier can be paid into: the same named banks
+export const PAYOUT_CHANNELS = { bank: CHANNELS.bank };
 
 export const kindOf = (channel) => (OLD_EWALLETS.includes(channel) ? "ewallet" : "bank");
 

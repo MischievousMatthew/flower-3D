@@ -238,7 +238,7 @@ class FundingRequestController extends Controller
 
     /** Banks Finance can pay through: only those PayMongo offers. No e-wallets: supplies cost too much for their limits */
     public const PAYMENT_CHANNELS = [
-        'bank' => ['QR Ph', 'BPI', 'UnionBank', 'BDO', 'Landbank', 'Metrobank'],
+        'bank' => ['BPI', 'UnionBank', 'BDO', 'Landbank', 'Metrobank'],
     ];
 
     private const REASONS = ['New Order', 'Spoilage', 'Forecast Error', 'Seasonal Demand', 'Supplier Delay'];

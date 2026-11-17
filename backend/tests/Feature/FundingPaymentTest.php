@@ -291,7 +291,7 @@ class FundingPaymentTest extends TestCase
         $this->assertSame('BC-R-' . str_pad((string) $row->id, 6, '0', STR_PAD_LEFT), $this->payment($id)['payments'][0]['receipt_number']);
     }
 
-    public function test_qr_ph_pays_from_any_bank_app_but_is_not_a_payout_account(): void
+    public function test_supplies_are_paid_through_named_banks_only(): void
     {
         config(['services.paymongo.secret_key' => 'sk_test_x']);
         $id = $this->request();
@@ -299,9 +299,11 @@ class FundingPaymentTest extends TestCase
         $this->order($id, 'Pay before delivery', 'processing');
         Http::fake(['*' => Http::response(['data' => ['id' => 'cs_2', 'attributes' => ['checkout_url' => 'https://checkout.paymongo.test/cs_2']]])]);
 
-        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'QR Ph'])->assertOk();
-        Http::assertSent(fn ($request) => $request['data']['attributes']['payment_method_types'] === ['qrph']);
-        $this->assertNotContains('QR Ph', \App\Support\PayMongoChannels::payoutNames());
+        // QR Ph can be scanned with an e-wallet app, so it's not offered
+        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'QR Ph'])->assertStatus(422);
+        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'BPI'])->assertOk();
+        Http::assertSent(fn ($request) => ($request['data']['attributes']['payment_method_types'] ?? null) === ['dob']);
+        $this->assertSame(['BPI', 'UnionBank', 'BDO', 'Landbank', 'Metrobank'], \App\Support\PayMongoChannels::payoutNames());
     }
 
     public function test_an_order_from_funding_stays_a_draft_until_it_is_sent(): void

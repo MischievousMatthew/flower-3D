@@ -66,7 +66,6 @@
                   </label>
                 </div>
               </div>
-              <small v-if="form.payment_channel === 'QR Ph'" class="sp-hint">PayMongo shows a QR code. Scan it with your bank's app (BDO, BPI, Metrobank and others).</small>
               <small v-if="request.payment_channel && form.payment_channel !== request.payment_channel" class="sp-hint">Procurement asked for {{ request.payment_channel }}.</small>
             </fieldset>
             <label class="sp-field fp-amount">
@@ -92,9 +91,11 @@
             </label>
             <label v-if="!isCredit || form.outcome === 'refund'" class="sp-field">
               <span class="sp-label">{{ isCredit ? "Into" : "Paid through" }}</span>
-              <select v-model="form.payment_channel" class="sp-select">
+              <select v-model="form.payment_channel" class="sp-select" :class="{ invalid: err.payment_channel }" :aria-invalid="!!err.payment_channel">
+                <option value="" disabled>Choose the bank</option>
                 <option v-for="c in CHANNELS.bank" :key="c" :value="c">{{ c }}</option>
               </select>
+              <small v-if="err.payment_channel" class="sp-error">{{ err.payment_channel }}</small>
               <small v-if="!isCredit && request.payment_channel && form.payment_channel !== request.payment_channel" class="sp-hint">Procurement asked for {{ request.payment_channel }}.</small>
             </label>
             <label v-if="!isCredit || form.outcome === 'refund'" class="sp-field">
@@ -178,8 +179,8 @@ watch(
       outcome: "refund",
       amount: isCredit.value ? p.value.supplier_owes : p.value.to_pay,
       paid_on: today,
-      // Banks only; an older request that named an e-wallet starts on QR Ph
-      payment_channel: CHANNELS.bank.includes(props.request.payment_channel) ? props.request.payment_channel : "QR Ph",
+      // Named banks only; an older request that named an e-wallet or QR Ph asks Finance to pick one
+      payment_channel: CHANNELS.bank.includes(props.request.payment_channel) ? props.request.payment_channel : "",
       reference: "",
       note: "",
     });
@@ -198,6 +199,7 @@ function validate() {
     if (!form.paid_on) err.paid_on = "Pick the date.";
     else if (form.paid_on > today) err.paid_on = "It can't be in the future.";
     if (!form.reference) err.reference = "Enter the reference number, so it can be matched to the statement.";
+    if (!form.payment_channel) err.payment_channel = "Choose the bank.";
   } else if (!form.note) {
     err.note = "Say how the credit will be used.";
   }

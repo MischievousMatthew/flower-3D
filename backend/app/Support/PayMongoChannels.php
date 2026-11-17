@@ -10,11 +10,9 @@ namespace App\Support;
  */
 class PayMongoChannels
 {
-    // QR Ph: PayMongo shows a QR code the payer scans with their bank app
-    public const QR = 'QR Ph';
-
+    // Named banks only. QR Ph is left out: its QR code can be scanned with an
+    // e-wallet app too, and supplies are paid by bank only
     public const BANK = [
-        'QR Ph' => 'qrph',
         'BPI' => 'dob',
         'UnionBank' => 'dob_ubp',
         'BDO' => 'brankas_bdo',
@@ -109,10 +107,10 @@ class PayMongoChannels
         return implode(' ', $parts);
     }
 
-    /** Accounts a supplier can be paid into: everything except QR Ph */
+    /** Accounts a supplier can be paid into: the same named banks */
     public static function payoutNames(): array
     {
-        return array_values(array_diff(self::all(), [self::QR]));
+        return self::all();
     }
 
     public static function methodOf(string $channel): ?string
