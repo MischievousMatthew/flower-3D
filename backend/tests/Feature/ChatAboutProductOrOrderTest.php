@@ -30,7 +30,7 @@ class ChatAboutProductOrOrderTest extends TestCase
                 Schema::table('users', fn (Blueprint $t) => $type === 'boolean' ? $t->boolean($column)->default(false) : $t->{$type}($column)->nullable());
             }
         }
-        foreach (['conversations', 'messages', 'products', 'product_images', 'orders'] as $table) {
+        foreach (['conversations', 'messages', 'products', 'product_images', 'orders', 'deliveries'] as $table) {
             Schema::dropIfExists($table);
         }
         Schema::create('conversations', function (Blueprint $t) {
@@ -87,6 +87,13 @@ class ChatAboutProductOrOrderTest extends TestCase
             $t->unsignedBigInteger('vendor_id');
             $t->string('status');
             $t->decimal('total_amount', 10, 2)->default(0);
+            $t->timestamps();
+        });
+        // The order card shows the delivery's step, like the Orders page
+        Schema::create('deliveries', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('order_id');
+            $t->string('status')->default('pending');
             $t->timestamps();
         });
 
@@ -154,7 +161,8 @@ class ChatAboutProductOrOrderTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('message.type', 'order_question')
             ->assertJsonPath('message.meta.order_number', 'ORD-0042')
-            ->assertJsonPath('message.meta.order_status', 'processing');
+            // The same status the shop and the customer see ("Preparing")
+            ->assertJsonPath('message.meta.order_status', 'to_processed');
     }
 
     public function test_someone_elses_order_or_another_shops_product_is_refused(): void

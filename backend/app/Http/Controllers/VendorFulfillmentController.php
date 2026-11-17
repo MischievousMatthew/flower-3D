@@ -27,17 +27,8 @@ class VendorFulfillmentController extends Controller
 {
     use ResolvesOwner;
 
-    /** Display statuses, in workflow order, with the vendor-facing words. */
-    public const STAGES = [
-        'pending' => 'Pending',
-        'to_processed' => 'Preparing',
-        'to_ship' => 'Ready',
-        'to_received' => 'Out for delivery',
-        'completed' => 'Completed',
-        'cancelled' => 'Cancelled',
-        'returned' => 'Returned',
-        'refunded' => 'Refunded',
-    ];
+    /** Display statuses, in workflow order: the same words the customer and the ERP see. */
+    public const STAGES = Order::STATUS_LABELS;
 
     private const TABS = ['all', 'pending', 'to_processed', 'to_ship', 'to_received', 'completed', 'cancelled', 'returns'];
 
@@ -440,19 +431,7 @@ class VendorFulfillmentController extends Controller
 
     private function displayStatus(Order $order): string
     {
-        if (in_array($order->status, ['cancelled', 'refunded', 'returned'], true)) {
-            return $order->status;
-        }
-        if ($order->delivery?->status) {
-            return $order->delivery->status;
-        }
-
-        return match ($order->status) {
-            'processing' => 'to_processed',
-            'delivered' => 'to_received',
-            'failed' => 'cancelled',
-            default => $order->status,
-        };
+        return $order->displayStatus();
     }
 
     private function summary(Order $order): array

@@ -196,7 +196,7 @@
             </p>
 
             <!-- ── Progress ──────────────────────────────────────────── -->
-            <div v-if="order.status === 'cancelled'" class="ot-cancelled">
+            <div v-if="(order.status_key || order.status) === 'cancelled'" class="ot-cancelled">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
               This order was cancelled.
             </div>
@@ -688,26 +688,20 @@ let searchTimer = null;
 const statusTabs = [
   { label: "All", value: "all" },
   { label: "Processing", value: "processing" },
-  { label: "Out for Delivery", value: "out_for_delivery" },
+  { label: "Out for delivery", value: "out_for_delivery" },
   { label: "Completed", value: "completed" },
+  { label: "Cancelled", value: "cancelled" },
   { label: "Returned", value: "returned" },
   { label: "Returns & refunds", value: "returns" },
 ];
 
+// The same steps and words the shop sees on its Orders page
 const trackingSteps = [
-  { key: "pending", label: "Ordered", deliveryKeys: ["pending"] },
-  { key: "to_processed", label: "Packed", deliveryKeys: ["to_processed"] },
-  { key: "to_ship", label: "Shipped", deliveryKeys: ["to_ship"] },
-  {
-    key: "to_received",
-    label: "Out for Delivery",
-    deliveryKeys: ["to_received"],
-  },
-  {
-    key: "completed",
-    label: "Delivered",
-    deliveryKeys: ["completed", "returned", "refunded"],
-  },
+  { key: "pending", label: "Pending", deliveryKeys: ["pending"] },
+  { key: "to_processed", label: "Preparing", deliveryKeys: ["to_processed"] },
+  { key: "to_ship", label: "Ready", deliveryKeys: ["to_ship"] },
+  { key: "to_received", label: "Out for delivery", deliveryKeys: ["to_received"] },
+  { key: "completed", label: "Completed", deliveryKeys: ["completed", "returned", "refunded"] },
 ];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -1169,35 +1163,28 @@ const debounceSearch = () => {
 };
 
 // stepper
+// The order's status as the shop and the ERP see it (Order::displayStatus on the server)
+const statusKey = (order) => order.status_key || order.delivery?.status || "pending";
 function stepIdx(order) {
-  const ds = order.delivery?.status;
-  if (!ds) return 0;
-  return trackingSteps.findIndex((s) => s.deliveryKeys.includes(ds));
+  const key = statusKey(order);
+  const i = trackingSteps.findIndex((s) => s.deliveryKeys.includes(key));
+  return i < 0 ? 0 : i;
 }
 const isStepDone = (o, i) => i < stepIdx(o);
 const isStepActive = (o, i) => i === stepIdx(o);
 
-// labels & chips
+// labels & chips: the server sends the same words the shop sees
+const FALLBACK_LABEL = { pending: "Pending", to_processed: "Preparing", to_ship: "Ready", to_received: "Out for delivery", completed: "Completed", cancelled: "Cancelled", returned: "Returned", refunded: "Refunded" };
 function dlvLabel(order) {
-  if (order.status === "cancelled") return "Cancelled";
-  const m = {
-    pending: "Pending",
-    to_processed: "Packed",
-    to_ship: "Shipped",
-    to_received: "Out for Delivery",
-    completed: "Delivered",
-    returned: "Returned",
-    refunded: "Refunded",
-  };
-  return m[order.delivery?.status] ?? "Pending";
+  return order.status_label || FALLBACK_LABEL[statusKey(order)] || "Pending";
 }
 /** The colour of an order's status: amber (with the shop), blue (on the way), green (done) */
 function statusTone(order) {
-  if (order.status === "cancelled") return "red";
-  const ds = order.delivery?.status ?? "pending";
-  if (["to_ship", "to_received"].includes(ds)) return "blue";
-  if (ds === "completed") return "green";
-  if (["pending", "to_processed"].includes(ds)) return "amber";
+  const key = statusKey(order);
+  if (key === "cancelled") return "red";
+  if (key === "to_received") return "blue";
+  if (key === "completed") return "green";
+  if (["pending", "to_processed", "to_ship"].includes(key)) return "amber";
   return "slate";
 }
 const PAY_LABELS = { paid: "Paid", unpaid: "Not paid yet", failed: "Payment failed", refunded: "Refunded", pending: "Payment pending" };

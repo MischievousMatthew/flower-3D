@@ -212,6 +212,7 @@ class CrmCustomersController extends Controller
     {
         $orders = Order::withoutGlobalScopes()->where('vendor_id', $vendorId)->where('user_id', $customer->id)
             ->orderByDesc('created_at')->limit(50)
+            ->with('delivery:id,order_id,status')
             ->get(['id', 'order_number', 'status', 'payment_status', 'payment_method', 'total_amount', 'delivery_address', 'delivery_contact_name', 'delivery_contact_number', 'paid_at', 'created_at']);
         $sold = $orders->filter(fn ($o) => $o->paid_at && ! in_array($o->status, self::NOT_A_SALE, true));
 
@@ -243,7 +244,9 @@ class CrmCustomersController extends Controller
             'orders' => $orders->map(fn ($o) => [
                 'id' => $o->id,
                 'order_number' => $o->order_number,
-                'status' => $o->status,
+                // The same status (and words) as the shop's Orders page and the customer's
+                'status' => $o->displayStatus(),
+                'status_label' => $o->displayStatusLabel(),
                 'payment_status' => $o->payment_status,
                 'payment_method' => $o->payment_method,
                 'total' => round((float) $o->total_amount, 2),

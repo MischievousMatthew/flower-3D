@@ -517,7 +517,7 @@ class ChatController extends Controller
                 'kind' => 'order_question',
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'order_status' => $order->status,
+                'order_status' => $order->displayStatus(),
                 'total' => round((float) $order->total_amount, 2),
             ] : null;
         }

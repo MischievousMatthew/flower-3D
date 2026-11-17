@@ -102,6 +102,38 @@ class OrderScannerTest extends TestCase
             ->assertJsonPath('data.items.0.is_custom_bouquet', true);
     }
 
+    public function test_the_shop_and_the_customer_see_the_same_status(): void
+    {
+        // The shop's order page shows what the customer shared about themselves
+        foreach (['customer_dates', 'customer_preferences', 'customer_notes', 'vendor_customer_profiles', 'favorite_products'] as $t) {
+            Schema::dropIfExists($t);
+        }
+        (require base_path('database/migrations/2026_10_24_100000_create_customer_management.php'))->up();
+        $vendor = $this->shopOwner();
+        $customer = \App\Models\User::create(['name' => 'Ana', 'email' => fake()->unique()->safeEmail(), 'password' => 'x', 'role' => \App\Models\User::ROLE_CUSTOMER]);
+        $orderId = DB::table('deliveries')->where('id', $this->delivery($vendor, 'to_ship'))->value('order_id');
+        DB::table('orders')->where('id', $orderId)->update(['user_id' => $customer->id]);
+
+        $this->signIn($vendor);
+        $this->getJson("/api/vendor/fulfillment/orders/{$orderId}")
+            ->assertOk()->assertJsonPath('data.status', 'to_ship')->assertJsonPath('data.status_label', 'Ready');
+
+        $this->signIn($customer);
+        $this->getJson('/api/customer/orders')
+            ->assertOk()->assertJsonPath('data.0.status_key', 'to_ship')->assertJsonPath('data.0.status_label', 'Ready');
+        // Ready is still at the shop: under Processing, not Out for delivery
+        $this->getJson('/api/customer/orders?delivery_status=processing')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/customer/orders?delivery_status=out_for_delivery')->assertOk()->assertJsonCount(0, 'data');
+
+        // Cancelled overrides the delivery step for both, and has its own tab
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'cancelled']);
+        $this->getJson('/api/customer/orders?delivery_status=cancelled')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.status_label', 'Cancelled');
+        $this->getJson('/api/customer/orders?delivery_status=processing')->assertOk()->assertJsonCount(0, 'data');
+        $this->signIn($vendor);
+        $this->getJson("/api/vendor/fulfillment/orders/{$orderId}")->assertOk()->assertJsonPath('data.status_label', 'Cancelled');
+    }
+
     public function test_another_shops_order_cant_be_scanned(): void
     {
         $other = $this->shopOwner();

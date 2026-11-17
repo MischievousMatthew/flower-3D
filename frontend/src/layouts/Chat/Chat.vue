@@ -707,6 +707,7 @@ import NavHeader from "../NavHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
+import { orderStatusLabel } from "../../components/vendor/crm/crmUi";
 import { formatPhilippineDate, formatPhilippineTime } from "../../utils/philippineDateTime";
 
 const props = defineProps({
@@ -1353,8 +1354,8 @@ watch(activeAbout, (a) => {
   });
 });
 
-const ORDER_STATUS_LABELS = { pending: "Waiting for the shop", processing: "Being prepared", ready: "Ready", out_for_delivery: "Out for delivery", delivered: "Delivered", completed: "Completed", cancelled: "Cancelled" };
-const statusLabel = (status) => ORDER_STATUS_LABELS[status] ?? String(status ?? "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+// The same words as the shop's Orders page and My Orders (older messages kept their old keys)
+const statusLabel = orderStatusLabel;
 
 const handleInitialVendorConversation = async () => {
   if (

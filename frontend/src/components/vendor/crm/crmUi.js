@@ -69,16 +69,27 @@ export const QUICK_REPLIES = [
   "Thank you for your order! Let us know if you need anything else.",
 ];
 
+// An order's status: the same words and colours as the Orders & Fulfillment pages
+// and the customer's My Orders (the server sends Order::displayStatus keys).
+// The older keys stay for chat messages sent before.
 export const ORDER_STATUS = {
   pending: ["Pending", "amber"],
-  confirmed: ["Confirmed", "blue"],
-  processing: ["Preparing", "blue"],
-  ready: ["Ready", "teal"],
-  out_for_delivery: ["Out for delivery", "violet"],
-  delivered: ["Delivered", "green"],
+  to_processed: ["Preparing", "blue"],
+  to_ship: ["Ready", "violet"],
+  to_received: ["Out for delivery", "teal"],
   completed: ["Completed", "green"],
   cancelled: ["Cancelled", "slate"],
+  returned: ["Returned", "red"],
   refunded: ["Refunded", "red"],
-  failed: ["Payment failed", "red"],
-  payment_failed: ["Payment failed", "red"],
+  confirmed: ["Preparing", "blue"],
+  processing: ["Preparing", "blue"],
+  ready: ["Ready", "violet"],
+  shipped: ["Ready", "violet"],
+  out_for_delivery: ["Out for delivery", "teal"],
+  delivered: ["Out for delivery", "teal"],
+  failed: ["Cancelled", "slate"],
+  payment_failed: ["Cancelled", "slate"],
 };
+
+/** "Out for delivery" for any order status key, old or new */
+export const orderStatusLabel = (status) => ORDER_STATUS[status]?.[0] ?? String(status ?? "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());

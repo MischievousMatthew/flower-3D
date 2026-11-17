@@ -1364,7 +1364,10 @@ async function fetchCalendarOrders() {
       });
       if (inMonth) {
         seen.add(order.id);
-        result.push(order);
+        // The status everyone sees (as on the Orders page): the delivery's step,
+        // unless the order was cancelled, returned or refunded
+        const ended = ["cancelled", "returned", "refunded"].includes(order.status);
+        result.push({ ...order, status: ended ? order.status : order.status === "failed" ? "cancelled" : delivery.status || order.status });
       }
     }
     calendarOrders.value = result;
@@ -1597,15 +1600,15 @@ function statusLabel(s) {
   return (
     {
       pending: "Pending",
-      to_processed: "To Processed",
-      to_ship: "To Ship",
-      to_received: "To Received",
+      to_processed: "Preparing",
+      to_ship: "Ready",
+      to_received: "Out for delivery",
       completed: "Completed",
       returned: "Returned",
       refunded: "Refunded",
-      processing: "Processing",
-      shipped: "Shipped",
-      out_for_delivery: "Out for Delivery",
+      processing: "Preparing",
+      shipped: "Ready",
+      out_for_delivery: "Out for delivery",
       cancelled: "Cancelled",
     }[s] ?? s
   );

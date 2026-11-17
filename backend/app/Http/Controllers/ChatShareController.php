@@ -45,11 +45,13 @@ class ChatShareController extends Controller
 
         $orders = Order::withoutGlobalScopes()->where('vendor_id', $vendorId)->where('user_id', $conversation->customer_id)
             ->orderByDesc('created_at')->limit(20)
+            ->with('delivery:id,order_id,status')
             ->get(['id', 'order_number', 'status', 'total_amount', 'created_at'])
             ->map(fn ($o) => [
                 'id' => $o->id,
                 'order_number' => $o->order_number,
-                'status' => $o->status,
+                'status' => $o->displayStatus(),
+                'status_label' => $o->displayStatusLabel(),
                 'total' => round((float) $o->total_amount, 2),
                 'created_at' => $o->created_at?->toIso8601String(),
             ]);

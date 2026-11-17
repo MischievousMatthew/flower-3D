@@ -17,12 +17,14 @@ use App\Services\ReturnCaseService;
 class CustomerOrderTrackingController extends Controller
 {
     /**
-     * Delivery status groups per tab.
+     * Which order statuses (Order::STATUS_LABELS, the same ones the shop sees) each tab holds.
+     * "Processing" is everything still at the shop: pending, preparing and ready.
      */
-    private const TAB_DELIVERY_STATUSES = [
-        'processing' => ['pending', 'to_processed'],
-        'out_for_delivery' => ['to_ship', 'to_received'],
+    private const TAB_STATUSES = [
+        'processing' => ['pending', 'to_processed', 'to_ship'],
+        'out_for_delivery' => ['to_received'],
         'completed' => ['completed'],
+        'cancelled' => ['cancelled'],
         'returned' => ['returned', 'refunded'],
     ];
 
@@ -41,17 +43,12 @@ class CustomerOrderTrackingController extends Controller
         $query = Order::where('user_id', Auth::id())
             // Same as the shop sees: an e-wallet checkout that was never paid
             // isn't an order (it would show as "pending" here and nowhere else)
-            ->placed()
-            ->with(['delivery.logs', 'vendor:id,name,email', 'items', 'orderRequests']);
+            ->placed();
 
-        if ($request->input('delivery_status') === 'returns') {
+        $tab = $request->input('delivery_status');
+        if ($tab === 'returns') {
             // Every order with a return/refund case, open or closed
             $query->whereHas('orderRequests');
-        } elseif ($request->filled('delivery_status')) {
-            $statuses = self::TAB_DELIVERY_STATUSES[$request->delivery_status]
-                ?? [$request->delivery_status];
-
-            $query->whereHas('delivery', fn ($q) => $q->whereIn('status', $statuses));
         }
 
         if ($request->filled('search')) {
@@ -61,18 +58,35 @@ class CustomerOrderTrackingController extends Controller
                 ->orWhere('store_name', 'LIKE', "%{$s}%"));
         }
 
-        $paginated = $query
-            ->orderBy('created_at', 'desc')
-            ->paginate($request->input('per_page', 15));
+        // Tabs go by the order's status as everyone sees it (Order::displayStatus),
+        // worked out on a light list first so only one page is loaded in full
+        $ids = $query->orderBy('created_at', 'desc')->orderByDesc('id')
+            ->with('delivery:id,order_id,status')
+            ->get(['id', 'status'])
+            ->when($tab && $tab !== 'returns' && $tab !== 'all', function ($orders) use ($tab) {
+                $wanted = self::TAB_STATUSES[$tab] ?? [$tab];
+
+                return $orders->filter(fn ($o) => in_array($o->displayStatus(), $wanted, true));
+            })
+            ->pluck('id')->values();
+
+        $perPage = (int) $request->input('per_page', 15);
+        $page = max(1, (int) $request->input('page', 1));
+        $pageIds = $ids->slice(($page - 1) * $perPage, $perPage)->values();
+        $orders = Order::whereIn('id', $pageIds)
+            ->with(['delivery.logs', 'vendor:id,name,email', 'items', 'orderRequests'])
+            ->get()
+            ->sortBy(fn ($o) => $pageIds->search($o->id))
+            ->values();
 
         return response()->json([
             'success' => true,
-            'data' => array_map([$this, 'formatOrder'], $paginated->items()),
+            'data' => $orders->map(fn ($o) => $this->formatOrder($o))->all(),
             'meta' => [
-                'current_page' => $paginated->currentPage(),
-                'last_page' => $paginated->lastPage(),
-                'total' => $paginated->total(),
-                'per_page' => $paginated->perPage(),
+                'current_page' => $page,
+                'last_page' => max(1, (int) ceil($ids->count() / max(1, $perPage))),
+                'total' => $ids->count(),
+                'per_page' => $perPage,
             ],
         ]);
     }
@@ -248,6 +262,9 @@ class CustomerOrderTrackingController extends Controller
             'id' => $order->id,
             'order_number' => $order->order_number,
             'status' => $order->status,
+            // The status the shop and the ERP show too, with the same words
+            'status_key' => $order->displayStatus(),
+            'status_label' => $order->displayStatusLabel(),
             'payment_status' => $order->payment_status,
             // Why an online payment didn't go through, shown when the customer taps "Failed"
             'payment_failure' => $order->paymentFailure(),

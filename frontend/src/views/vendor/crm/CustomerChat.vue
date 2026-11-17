@@ -404,7 +404,7 @@ import { useAssignment } from "../../../composables/useAssignment";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../components/vendor/finance/financeUi";
-import { ORDER_STATUS, QUICK_REPLIES, clock, colorFor, dayHeading, initialsOf, timeAgo } from "../../../components/vendor/crm/crmUi";
+import { ORDER_STATUS, QUICK_REPLIES, clock, orderStatusLabel, colorFor, dayHeading, initialsOf, timeAgo } from "../../../components/vendor/crm/crmUi";
 import { linkedId } from "../../../utils/hiddenIds";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
@@ -430,7 +430,7 @@ const MAX_FILES = 5;
 const MAX_BYTES = 5 * 1024 * 1024;
 
 const router = useRouter();
-const orderStatus = (status) => String(status ?? "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+const orderStatus = orderStatusLabel;
 const conversations = ref([]);
 const loaded = ref(false);
 const error = ref("");

@@ -127,6 +127,46 @@ class Order extends Model
         'refunded',
     ];
 
+    /**
+     * The one status everyone sees for an order (shop, customer, ERP), in
+     * workflow order, with its words. The step comes from the delivery; a
+     * cancelled, returned or refunded order says so instead.
+     */
+    public const STATUS_LABELS = [
+        'pending' => 'Pending',
+        'to_processed' => 'Preparing',
+        'to_ship' => 'Ready',
+        'to_received' => 'Out for delivery',
+        'completed' => 'Completed',
+        'cancelled' => 'Cancelled',
+        'returned' => 'Returned',
+        'refunded' => 'Refunded',
+    ];
+
+    /** One of the STATUS_LABELS keys. Load the delivery relation first when listing orders. */
+    public function displayStatus(): string
+    {
+        if (in_array($this->status, ['cancelled', 'refunded', 'returned'], true)) {
+            return $this->status;
+        }
+        if ($this->delivery?->status) {
+            return $this->delivery->status === 'to_receive' ? 'to_received' : $this->delivery->status;
+        }
+
+        return match ($this->status) {
+            'processing' => 'to_processed',
+            'shipped', 'ready' => 'to_ship',
+            'delivered', 'out_for_delivery' => 'to_received',
+            'failed' => 'cancelled',
+            default => array_key_exists((string) $this->status, self::STATUS_LABELS) ? $this->status : 'pending',
+        };
+    }
+
+    public function displayStatusLabel(): string
+    {
+        return self::STATUS_LABELS[$this->displayStatus()];
+    }
+
     protected static function boot()
     {
         parent::boot();

@@ -292,13 +292,13 @@ class CrmCasesController extends Controller
 
     private function linkOptions(int $vendorId, int $customerId): array
     {
-        $orders = Order::withoutGlobalScopes()->where('vendor_id', $vendorId)->where('user_id', $customerId)->orderByDesc('created_at')->limit(30)
+        $orders = Order::withoutGlobalScopes()->where('vendor_id', $vendorId)->where('user_id', $customerId)->orderByDesc('created_at')->limit(30)->with('delivery:id,order_id,status')
             ->get(['id', 'order_number', 'status', 'total_amount', 'created_at']);
         $refunds = OrderRequest::withoutGlobalScopes()->whereIn('order_id', $orders->pluck('id'))->orderByDesc('created_at')
             ->get(['id', 'order_id', 'type', 'status', 'amount_requested', 'settled_amount', 'created_at']);
 
         return [
-            'orders' => $orders->map(fn ($o) => ['id' => $o->id, 'order_number' => $o->order_number, 'status' => $o->status, 'total' => round((float) $o->total_amount, 2), 'created_at' => $o->created_at?->toIso8601String()])->values(),
+            'orders' => $orders->map(fn ($o) => ['id' => $o->id, 'order_number' => $o->order_number, 'status' => $o->displayStatus(), 'status_label' => $o->displayStatusLabel(), 'total' => round((float) $o->total_amount, 2), 'created_at' => $o->created_at?->toIso8601String()])->values(),
             'refunds' => $refunds->map(fn ($r) => [
                 'id' => $r->id, 'order_id' => $r->order_id, 'order_number' => $orders->firstWhere('id', $r->order_id)?->order_number,
                 'type' => $r->type, 'status' => $r->status, 'amount' => round((float) ($r->settled_amount ?? $r->amount_requested ?? 0), 2),
