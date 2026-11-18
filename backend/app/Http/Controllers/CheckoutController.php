@@ -167,7 +167,7 @@ class CheckoutController extends Controller
                         'product_id' => $product->id,
                         'product' => $product,
                         'quantity' => (int) ($customItem['quantity'] ?? 1),
-                        'price' => $product->selling_price,
+                        'price' => (float) ($product->discount_price ?: $product->selling_price),
                         'is_available' => true,
                         'color' => null,
                         'size' => null,
@@ -253,6 +253,28 @@ class CheckoutController extends Controller
             $subtotal = 0;
             $items = [];
 
+            // Custom bouquets list each flower's price: the shop's own, never the browser's
+            $flowerIds = $cartItems
+                ->filter(fn ($i) => data_get($i->customizations, 'type') === 'custom_flower_bouquet')
+                ->flatMap(fn ($i) => collect(data_get($i->customizations, 'flowers', []))->pluck('product_id'))
+                ->map(fn ($id) => (int) $id)->filter()->unique()->values();
+            $flowerProducts = $flowerIds->isEmpty()
+                ? collect()
+                : Product::whereIn('id', $flowerIds)->get(['id', 'product_name', 'selling_price', 'discount_price'])->keyBy('id');
+            $stampFlowers = function ($customizations) use ($flowerProducts) {
+                if (!is_array($customizations) || !is_array($customizations['flowers'] ?? null)) {
+                    return $customizations;
+                }
+                foreach ($customizations['flowers'] as $k => $flower) {
+                    $p = $flowerProducts->get((int) ($flower['product_id'] ?? 0));
+                    if ($p) {
+                        $customizations['flowers'][$k]['price'] = (float) ($p->discount_price ?: $p->selling_price);
+                        $customizations['flowers'][$k]['product_name'] = $p->product_name;
+                    }
+                }
+                return $customizations;
+            };
+
             foreach ($cartItems as $cartItem) {
                 if (!$cartItem->is_available) {
                     return response()->json([
@@ -290,7 +312,7 @@ class CheckoutController extends Controller
                     'color' => $cartItem->color,
                     'size' => $cartItem->size,
                     'notes' => $cartItem->notes,
-                    'customizations' => $cartItem->customizations,
+                    'customizations' => $isCustomBouquet ? $stampFlowers($cartItem->customizations) : $cartItem->customizations,
                     'model_3d_url' => $model3d?->model_url,
                     'model_3d_path' => $model3d?->model_path,
                 ];
@@ -447,7 +469,7 @@ class CheckoutController extends Controller
                         'product_id' => $product->id,
                         'product' => $product,
                         'quantity' => (int) ($customItem['quantity'] ?? 1),
-                        'price' => $product->selling_price,
+                        'price' => (float) ($product->discount_price ?: $product->selling_price),
                         'color' => null,
                         'size' => null,
                         'notes' => null,

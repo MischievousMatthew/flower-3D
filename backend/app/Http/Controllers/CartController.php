@@ -162,7 +162,7 @@ class CartController extends Controller
                     return response()->json(['success' => false, 'message' => $extras['message']], 422);
                 }
                 $bouquetPrice += $extras['total'];
-                $request->merge(['customizations' => $extras['customizations']]);
+                $request->merge(['customizations' => $this->stampFlowerPrices($extras['customizations'], $bouquetProducts)]);
             }
 
             if (!$isCustomBouquet && $product->stockFor($request->color) < $request->quantity) {
@@ -312,7 +312,7 @@ class CartController extends Controller
                     return response()->json(['success' => false, 'message' => $extras['message']], 422);
                 }
                 $bouquetPrice += $extras['total'];
-                $request->merge(['customizations' => $extras['customizations']]);
+                $request->merge(['customizations' => $this->stampFlowerPrices($extras['customizations'], $bouquetProducts)]);
             }
 
             if (!$isCustomBouquet && $product->stockFor($cartItem->color) < $request->quantity) {
@@ -483,6 +483,28 @@ class CartController extends Controller
         if($cartItem->product->stockFor($cartItem->color)===0) return 'Out of stock';
         if($cartItem->product->stockFor($cartItem->color)<$cartItem->quantity) return 'Insufficient stock';
         return 'Unknown reason';
+    }
+
+    /**
+     * Each flower in a custom bouquet carries the shop's own price (never the
+     * browser's), so checkout can list what every stem costs.
+     */
+    private function stampFlowerPrices(array $customizations, $products): array
+    {
+        $flowers = $customizations['flowers'] ?? [];
+        if (!is_array($flowers)) {
+            return $customizations;
+        }
+        foreach ($flowers as $i => $flower) {
+            $product = $products->get((int) ($flower['product_id'] ?? 0));
+            if ($product) {
+                $flowers[$i]['price'] = (float) ($product->discount_price ?: $product->selling_price);
+                $flowers[$i]['product_name'] = $product->product_name;
+            }
+        }
+        $customizations['flowers'] = array_values($flowers);
+
+        return $customizations;
     }
 
     /**

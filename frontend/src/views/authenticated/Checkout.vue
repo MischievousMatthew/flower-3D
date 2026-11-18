@@ -361,20 +361,41 @@
                 <button type="button" class="co-link" @click="fillBouquet(entry)">Fill it</button>
               </div>
               <ul class="co-items">
-                <li v-for="(item, index) in checkoutData.items" :key="item.cart_item_id ?? `${item.product_id}-${index}`" class="co-item">
+                <li v-for="row in orderRows" :key="row.key" class="co-item" :class="{ 'co-item--bouquet': row.bouquet }">
+                  <template v-if="row.bouquet">
+                    <span class="co-item-img">
+                      <img :src="row.item.product_image || FALLBACK_IMAGE" alt="Custom bouquet" @error="handleImageError" />
+                    </span>
+                    <span class="co-item-main">
+                      <strong>Custom Bouquet</strong>
+                      <small>{{ row.flowerCount }} {{ row.flowerCount === 1 ? "flower" : "flowers" }}</small>
+                    </span>
+                    <span class="co-item-total">₱{{ formatPrice(row.total) }}</span>
+                    <dl class="co-bq-lines" aria-label="Bouquet price breakdown">
+                      <div v-for="line in row.lines" :key="line.key">
+                        <dt>
+                          {{ line.label }}
+                          <small v-if="line.qty">{{ line.qty }} × ₱{{ formatPrice(line.each) }}</small>
+                        </dt>
+                        <dd>₱{{ formatPrice(line.amount) }}</dd>
+                      </div>
+                    </dl>
+                  </template>
+                  <template v-else>
                   <span class="co-item-img">
-                    <img :src="item.product_image || FALLBACK_IMAGE" :alt="item.product_name" @error="handleImageError" />
+                    <img :src="row.item.product_image || FALLBACK_IMAGE" :alt="row.item.product_name" @error="handleImageError" />
                   </span>
                   <span class="co-item-main">
-                    <strong>{{ item.product_name || "Product" }}</strong>
+                    <strong>{{ row.item.product_name || "Product" }}</strong>
                     <small>
-                      Qty {{ item.quantity }}
-                      <template v-if="item.color"> · {{ item.color }}</template>
-                      · ₱{{ formatPrice(effectivePrice(item)) }} each
-                      <span v-if="hasDiscount(item)" class="co-off">−{{ discountPercent(item) }}%</span>
+                      Qty {{ row.item.quantity }}
+                      <template v-if="row.item.color"> · {{ row.item.color }}</template>
+                      · ₱{{ formatPrice(effectivePrice(row.item)) }} each
+                      <span v-if="hasDiscount(row.item)" class="co-off">−{{ discountPercent(row.item) }}%</span>
                     </small>
                   </span>
-                  <span class="co-item-total">₱{{ formatPrice(lineTotal(item)) }}</span>
+                  <span class="co-item-total">₱{{ formatPrice(row.total) }}</span>
+                  </template>
                 </li>
               </ul>
             </div>
@@ -415,13 +436,16 @@
             {{ checkoutData.vendor.store_name }}
           </p>
           <ul class="co-sum-items">
-            <li v-for="(item, index) in checkoutData.items" :key="item.cart_item_id ?? `${item.product_id}-${index}`">
+            <li v-for="row in orderRows" :key="row.key">
               <span class="co-sum-img">
-                <img :src="item.product_image || FALLBACK_IMAGE" :alt="item.product_name" @error="handleImageError" />
-                <b>{{ item.quantity }}</b>
+                <img :src="row.item.product_image || FALLBACK_IMAGE" :alt="row.bouquet ? 'Custom bouquet' : row.item.product_name" @error="handleImageError" />
+                <b>{{ row.bouquet ? 1 : row.item.quantity }}</b>
               </span>
-              <span class="co-sum-name">{{ item.product_name }}</span>
-              <span class="co-sum-price">₱{{ formatPrice(effectivePrice(item) * item.quantity) }}</span>
+              <span class="co-sum-name">
+                {{ row.bouquet ? "Custom Bouquet" : row.item.product_name }}
+                <small v-if="row.bouquet" class="co-sum-sub">{{ row.flowerCount }} {{ row.flowerCount === 1 ? "flower" : "flowers" }}<template v-if="row.base"> · base ₱{{ formatPrice(row.base) }}</template></small>
+              </span>
+              <span class="co-sum-price">₱{{ formatPrice(row.total) }}</span>
             </li>
           </ul>
           <dl class="co-totals co-totals--side">
@@ -704,7 +728,56 @@ const initials = computed(() =>
     .map((w) => w[0].toUpperCase())
     .join(""),
 );
-const itemCount = computed(() => (checkoutData.value.items || []).reduce((n, item) => n + Number(item.quantity || 0), 0));
+// A custom bouquet counts as one item, however many flowers it has
+const itemCount = computed(() => orderRows.value.reduce((n, row) => n + (row.bouquet ? 1 : Number(row.item.quantity || 0)), 0));
+
+// What the order lists: products as they are, and each custom bouquet as one
+// row with its base price and every flower's price. A bouquet bought straight
+// from the customizer comes as one item per flower, so those join into one row.
+const orderRows = computed(() => {
+  const rows = [];
+  const bouquets = new Map();
+  (checkoutData.value.items || []).forEach((item, index) => {
+    if (item.customizations?.type !== "custom_flower_bouquet") {
+      rows.push({ key: item.cart_item_id ?? `${item.product_id}-${index}`, item, total: lineTotal(item) });
+      return;
+    }
+    const key = item.cart_item_id ? `cart-${item.cart_item_id}` : "direct";
+    let row = bouquets.get(key);
+    if (!row) {
+      row = { key, item, bouquet: true, total: 0, ...bouquetBreakdown(item.customizations) };
+      bouquets.set(key, row);
+      rows.push(row);
+    }
+    row.total += lineTotal(item);
+  });
+  return rows;
+});
+
+/** Base price, each kind of flower (count × price) and the card, from the saved design */
+function bouquetBreakdown(design = {}) {
+  const lines = [];
+  const preset = design?.preset;
+  const base = Number(preset?.base_price || 0);
+  if (base > 0) {
+    const label = [preset.label, preset.size ? `${preset.size} flowers` : ""].filter(Boolean).join(", ");
+    lines.push({ key: "base", label: label ? `Base price (${label})` : "Base price", amount: base });
+  }
+  const flowers = new Map();
+  let flowerCount = 0;
+  for (const flower of Array.isArray(design?.flowers) ? design.flowers : []) {
+    const qty = Number(flower.quantity || 1);
+    const entry = flowers.get(flower.product_id) || { key: `flower-${flower.product_id}`, label: flower.product_name || "Flower", qty: 0, each: Number(flower.price || 0) };
+    entry.qty += qty;
+    flowerCount += qty;
+    flowers.set(flower.product_id, entry);
+  }
+  for (const entry of flowers.values()) lines.push({ ...entry, amount: entry.qty * entry.each });
+  if (design?.card) {
+    lines.push({ key: "card", label: `Card: ${design.card.name || "Message card"}${design.card.size ? ` (${design.card.size})` : ""}`, amount: Number(design.card.price || 0) });
+  }
+  return { lines, flowerCount, base };
+}
 const deliveryFee = computed(() => Number(checkoutData.value.summary?.delivery_fee || 0));
 
 // ── Delivery areas: is this address one the shop delivers to? ──
@@ -2582,6 +2655,52 @@ onMounted(async () => {
   font-variant-numeric: tabular-nums;
 }
 
+/* A custom bouquet: its price breakdown sits under the row */
+.co-item--bouquet {
+  flex-wrap: wrap;
+}
+
+.co-bq-lines {
+  display: grid;
+  flex-basis: 100%;
+  gap: 6px;
+  margin: 2px 0 0 68px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--ivory-deep);
+  font-size: 13px;
+}
+
+.co-bq-lines div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.co-bq-lines dt {
+  min-width: 0;
+  color: var(--ink);
+}
+
+.co-bq-lines dt small {
+  margin-left: 6px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.co-bq-lines dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .co-bq-lines {
+    margin-left: 0;
+  }
+}
+
 .co-totals {
   display: grid;
   gap: 8px;
@@ -2738,6 +2857,15 @@ onMounted(async () => {
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.co-sum-sub {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 400;
+  text-overflow: ellipsis;
 }
 
 .co-sum-price {

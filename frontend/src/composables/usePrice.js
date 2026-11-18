@@ -3,7 +3,7 @@
 export function usePrice() {
   const effectivePrice = (item) => {
     if (item.customizations?.type === "custom_flower_bouquet") {
-      return parseFloat(item.price || 0);
+      return parseFloat(item.price ?? item.unit_price ?? 0);
     }
     if (item.product?.discount_price)
       return parseFloat(item.product.discount_price);
@@ -14,7 +14,7 @@ export function usePrice() {
 
   const originalPrice = (item) => {
     if (item.customizations?.type === "custom_flower_bouquet") {
-      return parseFloat(item.price || 0);
+      return parseFloat(item.price ?? item.unit_price ?? 0);
     }
     return parseFloat(
       item.original_price ||
